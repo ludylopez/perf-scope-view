@@ -1,8 +1,10 @@
+import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Header } from "@/components/layout/Header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { 
   ClipboardCheck, 
   Users, 
@@ -11,18 +13,105 @@ import {
   AlertCircle,
   CheckCircle2,
   Clock,
-  FileText
+  FileText,
+  PlayCircle
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { getEvaluationDraft, hasSubmittedEvaluation } from "@/lib/storage";
 
 const Dashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  const [evaluationStatus, setEvaluationStatus] = useState<"not_started" | "in_progress" | "submitted">("not_started");
+  const [progress, setProgress] = useState(0);
+
   const isColaborador = user?.rol === "colaborador";
   const isJefe = user?.rol === "jefe";
   const isAdminRRHH = user?.rol === "admin_rrhh";
   const isAdminGeneral = user?.rol === "admin_general";
+
+  useEffect(() => {
+    if (!user) return;
+
+    // Check evaluation status
+    const isSubmitted = hasSubmittedEvaluation(user.dpi, "2025-1");
+    if (isSubmitted) {
+      setEvaluationStatus("submitted");
+      setProgress(100);
+    } else {
+      const draft = getEvaluationDraft(user.dpi, "2025-1");
+      if (draft && Object.keys(draft.responses).length > 0) {
+        setEvaluationStatus("in_progress");
+        setProgress(draft.progreso);
+      } else {
+        setEvaluationStatus("not_started");
+        setProgress(0);
+      }
+    }
+  }, [user]);
+
+  const getStatusBadge = () => {
+    switch (evaluationStatus) {
+      case "submitted":
+        return (
+          <Badge className="bg-success text-success-foreground">
+            <CheckCircle2 className="mr-1 h-3 w-3" />
+            Enviada
+          </Badge>
+        );
+      case "in_progress":
+        return (
+          <Badge variant="outline" className="text-info border-info">
+            <PlayCircle className="mr-1 h-3 w-3" />
+            En progreso
+          </Badge>
+        );
+      default:
+        return (
+          <Badge variant="outline" className="text-warning border-warning">
+            <Clock className="mr-1 h-3 w-3" />
+            Pendiente
+          </Badge>
+        );
+    }
+  };
+
+  const getActionButton = () => {
+    switch (evaluationStatus) {
+      case "submitted":
+        return (
+          <Button 
+            className="w-full" 
+            size="lg"
+            variant="outline"
+            onClick={() => navigate("/mi-autoevaluacion")}
+          >
+            Ver Mi Autoevaluación
+          </Button>
+        );
+      case "in_progress":
+        return (
+          <Button 
+            className="w-full" 
+            size="lg"
+            onClick={() => navigate("/autoevaluacion")}
+          >
+            Continuar Autoevaluación ({Math.round(progress)}%)
+          </Button>
+        );
+      default:
+        return (
+          <Button 
+            className="w-full" 
+            size="lg"
+            onClick={() => navigate("/autoevaluacion")}
+          >
+            Comenzar Autoevaluación
+          </Button>
+        );
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -60,29 +149,18 @@ const Dashboard = () => {
                       Fecha límite: 31 de Marzo, 2025
                     </p>
                   </div>
-                  <Badge variant="outline" className="text-warning border-warning">
-                    <Clock className="mr-1 h-3 w-3" />
-                    Pendiente
-                  </Badge>
+                  {getStatusBadge()}
                 </div>
                 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
                     <span>Progreso</span>
-                    <span className="font-medium">0%</span>
+                    <span className="font-medium">{Math.round(progress)}%</span>
                   </div>
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-secondary">
-                    <div className="h-full w-0 bg-gradient-primary transition-all" />
-                  </div>
+                  <Progress value={progress} className="h-2" />
                 </div>
 
-                <Button 
-                  className="w-full" 
-                  size="lg"
-                  onClick={() => navigate("/autoevaluacion")}
-                >
-                  Comenzar Autoevaluación
-                </Button>
+                {getActionButton()}
               </CardContent>
             </Card>
 
@@ -95,7 +173,8 @@ const Dashboard = () => {
               </CardHeader>
               <CardContent className="space-y-3">
                 <p className="text-sm text-muted-foreground">
-                  Los resultados estarán disponibles una vez finalizado el periodo de evaluación.
+                  Los resultados finales estarán disponibles cuando su jefe complete la
+                  evaluación y el periodo cierre.
                 </p>
                 <Button variant="outline" className="w-full" disabled>
                   Ver Resultados
@@ -106,16 +185,37 @@ const Dashboard = () => {
             <Card className="md:col-span-2 lg:col-span-3">
               <CardHeader>
                 <CardTitle>Estado del Proceso</CardTitle>
+                <CardDescription>
+                  Timeline de su evaluación de desempeño
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid gap-4 md:grid-cols-3">
                   <div className="flex items-center gap-3 rounded-lg border p-4">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-warning/10">
-                      <Clock className="h-5 w-5 text-warning" />
+                    <div className={`flex h-10 w-10 items-center justify-center rounded-full ${
+                      evaluationStatus === "submitted" 
+                        ? "bg-success/10" 
+                        : evaluationStatus === "in_progress"
+                        ? "bg-info/10"
+                        : "bg-warning/10"
+                    }`}>
+                      {evaluationStatus === "submitted" ? (
+                        <CheckCircle2 className="h-5 w-5 text-success" />
+                      ) : (
+                        <Clock className={`h-5 w-5 ${
+                          evaluationStatus === "in_progress" ? "text-info" : "text-warning"
+                        }`} />
+                      )}
                     </div>
                     <div>
                       <p className="text-sm font-medium">Autoevaluación</p>
-                      <p className="text-xs text-muted-foreground">Pendiente</p>
+                      <p className="text-xs text-muted-foreground">
+                        {evaluationStatus === "submitted" 
+                          ? "Completada" 
+                          : evaluationStatus === "in_progress"
+                          ? `En progreso (${Math.round(progress)}%)`
+                          : "Pendiente"}
+                      </p>
                     </div>
                   </div>
                   
@@ -134,7 +234,7 @@ const Dashboard = () => {
                       <BarChart3 className="h-5 w-5 text-muted-foreground" />
                     </div>
                     <div>
-                      <p className="text-sm font-medium">Resultados</p>
+                      <p className="text-sm font-medium">Resultados Finales</p>
                       <p className="text-xs text-muted-foreground">No disponible</p>
                     </div>
                   </div>

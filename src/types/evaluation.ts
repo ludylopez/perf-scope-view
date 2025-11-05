@@ -1,6 +1,7 @@
 export interface Dimension {
   id: string;
   nombre: string;
+  descripcion?: string;
   peso: number;
   items: EvaluationItem[];
 }
@@ -15,6 +16,7 @@ export interface Instrument {
   id: string;
   nivel: string;
   version: string;
+  tiempoEstimado?: string;
   dimensionesDesempeno: Dimension[];
   dimensionesPotencial: Dimension[];
 }

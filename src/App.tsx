@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Autoevaluacion from "./pages/Autoevaluacion";
+import MiAutoevaluacion from "./pages/MiAutoevaluacion";
 import EvaluacionEquipo from "./pages/EvaluacionEquipo";
 import NotFound from "./pages/NotFound";
 
@@ -40,6 +41,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Autoevaluacion />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/mi-autoevaluacion"
+              element={
+                <ProtectedRoute>
+                  <MiAutoevaluacion />
                 </ProtectedRoute>
               }
             />
