@@ -2,6 +2,7 @@ import { Dimension, FinalScore } from "@/types/evaluation";
 import { EvaluationDraft } from "@/lib/storage";
 import { calculatePerformanceScore, scoreToPercentage } from "@/lib/calculations";
 import { calculatePotencialScore } from "./groupStats";
+import { callCalculateFinalResult } from "./backendCalculations";
 
 /**
  * Calcula el resultado final ponderado: 70% jefe + 30% colaborador
@@ -98,14 +99,42 @@ export const getNineBoxDescription = (posicion: string): string => {
 
 /**
  * Calcula el resultado final completo incluyendo 9-box
+ * Intenta usar el backend primero, con fallback a cálculo local
  * Retorna scores (1-5) para cálculos internos, pero 9-box se calcula con porcentajes
  */
-export const calculateCompleteFinalScore = (
+export const calculateCompleteFinalScore = async (
   autoevaluacion: EvaluationDraft,
   evaluacionJefe: EvaluationDraft,
   dimensions: Dimension[],
-  potencialDimensions?: Dimension[]
-): FinalScore => {
+  potencialDimensions?: Dimension[],
+  useBackend: boolean = true,
+  autoevaluacionId?: string,
+  evaluacionJefeId?: string,
+  instrumentConfig?: any
+): Promise<FinalScore> => {
+  // Intentar usar backend si tenemos los IDs y la configuración
+  if (
+    useBackend &&
+    autoevaluacionId &&
+    evaluacionJefeId &&
+    instrumentConfig
+  ) {
+    try {
+      const backendResult = await callCalculateFinalResult(
+        autoevaluacionId,
+        evaluacionJefeId,
+        instrumentConfig
+      );
+
+      if (backendResult) {
+        return backendResult;
+      }
+    } catch (error) {
+      console.warn("Error al calcular en backend, usando cálculo local:", error);
+    }
+  }
+
+  // Fallback a cálculo local
   const resultado = calculateFinalScore(autoevaluacion, evaluacionJefe, dimensions);
   
   // Si hay dimensiones de potencial, calcular correctamente

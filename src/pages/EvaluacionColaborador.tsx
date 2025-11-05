@@ -55,10 +55,9 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { generateDevelopmentPlan } from "@/lib/developmentPlan";
-import { calculateCompleteFinalScore } from "@/lib/finalScore";
 import { getInstrumentForUser } from "@/lib/instruments";
+import { getActivePeriod } from "@/lib/supabase";
 import { supabase } from "@/integrations/supabase/client";
-import { saveFinalResultToSupabase } from "@/lib/finalResultSupabase";
 
 // Datos mock del colaborador
 const MOCK_COLABORADORES: Record<string, any> = {
@@ -77,6 +76,7 @@ const EvaluacionColaborador = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const [instrument, setInstrument] = useState(INSTRUMENT_A1);
+  const [periodoId, setPeriodoId] = useState<string>("");
 
   const [colaborador, setColaborador] = useState<any>(null);
   const [autoevaluacion, setAutoevaluacion] = useState<any>(null);
@@ -130,6 +130,26 @@ const EvaluacionColaborador = () => {
 
     const loadData = async () => {
       try {
+        // Obtener período activo
+        const activePeriod = await getActivePeriod();
+        if (activePeriod) {
+          setPeriodoId(activePeriod.id);
+        } else {
+          // Fallback: buscar período 2025-1 por nombre
+          const { data: periodData } = await supabase
+            .from("evaluation_periods")
+            .select("id")
+            .eq("nombre", "2025-1")
+            .single();
+          if (periodData) {
+            setPeriodoId(periodData.id);
+          } else {
+            toast.error("No se encontró un período de evaluación activo");
+            navigate("/evaluacion-equipo");
+            return;
+          }
+        }
+
         // Cargar colaborador desde Supabase usando el DPI (id)
         const { data: colaboradorData, error: colaboradorError } = await supabase
           .from("users")
@@ -176,13 +196,13 @@ const EvaluacionColaborador = () => {
         }
 
         // Cargar autoevaluación del colaborador solo si el jefe ya completó su evaluación
-        const jefeDraft = await getJefeEvaluationDraft(user.dpi, colaboradorFormatted.dpi, "2025-1");
+        const jefeDraft = await getJefeEvaluationDraft(user.dpi, colaboradorFormatted.dpi, periodoId);
         const jefeCompleto = jefeDraft?.estado === "enviado";
         setJefeAlreadyEvaluated(jefeCompleto);
         
         if (jefeCompleto) {
           // Solo mostrar autoevaluación si el jefe ya completó su evaluación
-          const submittedAuto = await getSubmittedEvaluation(colaboradorFormatted.dpi, "2025-1");
+          const submittedAuto = await getSubmittedEvaluation(colaboradorFormatted.dpi, periodoId);
           const mockAuto = getMockColaboradorEvaluation(colaboradorFormatted.dpi);
           setAutoevaluacion(submittedAuto || mockAuto);
           // Cambiar a la pestaña de autoevaluación cuando está disponible
@@ -218,13 +238,13 @@ const EvaluacionColaborador = () => {
 
   // Auto-save functionality
   const performAutoSave = useCallback(() => {
-    if (!user || !colaborador) return;
+    if (!user || !colaborador || !periodoId) return;
 
     setAutoSaveStatus("saving");
     
     const draft: EvaluationDraft = {
       usuarioId: colaborador.dpi,
-      periodoId: "2025-1",
+      periodoId: periodoId,
       tipo: "jefe",
       responses: desempenoResponses,
       comments: desempenoComments,
@@ -246,7 +266,7 @@ const EvaluacionColaborador = () => {
       setHasUnsavedChanges(false);
       setTimeout(() => setAutoSaveStatus("idle"), 2000);
     }, 500);
-  }, [user, colaborador, desempenoResponses, desempenoComments, potencialResponses, potencialComments, desempenoProgress, potencialProgress]);
+  }, [user, colaborador, periodoId, desempenoResponses, desempenoComments, potencialResponses, potencialComments, desempenoProgress, potencialProgress]);
 
   useEffect(() => {
     if (hasUnsavedChanges) {
@@ -308,11 +328,11 @@ const EvaluacionColaborador = () => {
   };
 
   const handleConfirmSubmit = async () => {
-    if (!user || !colaborador) return;
+    if (!user || !colaborador || !periodoId) return;
 
     const draft: EvaluationDraft = {
       usuarioId: colaborador.dpi,
-      periodoId: "2025-1",
+      periodoId: periodoId,
       tipo: "jefe",
       responses: desempenoResponses,
       comments: desempenoComments,
@@ -329,106 +349,30 @@ const EvaluacionColaborador = () => {
 
     await submitEvaluation(draft);
     
-    // Generar resultado final automáticamente
-    await generateFinalResult(colaborador.dpi, "2025-1");
+    // El trigger automático calculará el resultado final cuando se guarde la evaluación
+    // Solo esperamos un momento para que el trigger procese
+    await new Promise(resolve => setTimeout(resolve, 1000));
     
-    toast.success("¡Evaluación enviada exitosamente! Se ha generado el resultado final.");
+    // Verificar que el resultado final se haya calculado
+    const { data: finalResult } = await supabase
+      .from("final_evaluation_results")
+      .select("id")
+      .eq("colaborador_id", colaborador.dpi)
+      .eq("periodo_id", periodoId)
+      .maybeSingle();
+    
+    if (finalResult) {
+      toast.success("¡Evaluación enviada exitosamente! El resultado final se ha calculado automáticamente.");
+    } else {
+      toast.success("¡Evaluación enviada exitosamente! El resultado final se calculará cuando esté disponible la autoevaluación.");
+    }
+    
     navigate("/evaluacion-equipo");
   };
   
-  // Función para generar resultado final automáticamente
-  const generateFinalResult = async (colaboradorId: string, periodoId: string) => {
-    try {
-      const autoevaluacion = await getSubmittedEvaluation(colaboradorId, periodoId) || 
-                           getMockColaboradorEvaluation(colaboradorId);
-      const evaluacionJefe = await getJefeEvaluationDraft(user?.dpi || "", colaboradorId, periodoId);
-      
-      if (!autoevaluacion || !evaluacionJefe) return;
-      
-      // Obtener IDs de las evaluaciones desde Supabase
-      let autoevaluacionId: string | null = null;
-      let evaluacionJefeId: string | null = null;
-
-      try {
-        // Obtener ID de autoevaluación
-        const { data: autoData } = await supabase
-          .from("evaluations")
-          .select("id")
-          .eq("usuario_id", colaboradorId)
-          .eq("periodo_id", periodoId)
-          .eq("tipo", "auto")
-          .single();
-        autoevaluacionId = autoData?.id || null;
-
-        // Obtener ID de evaluación del jefe
-        const { data: jefeData } = await supabase
-          .from("evaluations")
-          .select("id")
-          .eq("colaborador_id", colaboradorId)
-          .eq("periodo_id", periodoId)
-          .eq("tipo", "jefe")
-          .eq("evaluador_id", user?.dpi)
-          .single();
-        evaluacionJefeId = jefeData?.id || null;
-      } catch (error) {
-        console.error("Error obteniendo IDs de evaluaciones:", error);
-      }
-
-      // Calcular resultado final
-      const resultadoFinal = calculateCompleteFinalScore(
-        autoevaluacion,
-        evaluacionJefe,
-        desempenoDimensions,
-        potencialDimensions
-      );
-      
-      // Guardar resultado final en localStorage (fallback)
-      const resultadoKey = `final_result_${colaboradorId}_${periodoId}`;
-      localStorage.setItem(resultadoKey, JSON.stringify({
-        colaboradorId,
-        periodoId,
-        resultadoFinal,
-        fechaGeneracion: new Date().toISOString(),
-      }));
-
-      // Guardar en Supabase si tenemos los IDs
-      if (autoevaluacionId && evaluacionJefeId) {
-        await saveFinalResultToSupabase(
-          colaboradorId,
-          periodoId,
-          autoevaluacionId,
-          evaluacionJefeId,
-          resultadoFinal
-        );
-      }
-      
-      // Generar plan de desarrollo con IA automáticamente
-      try {
-        const plan = await generateDevelopmentPlan(
-          colaboradorId,
-          periodoId,
-          autoevaluacion,
-          evaluacionJefe,
-          resultadoFinal,
-          desempenoDimensions,
-          potencialDimensions
-        );
-        
-        if (plan) {
-          const planKey = `development_plan_${colaboradorId}_${periodoId}`;
-          localStorage.setItem(planKey, JSON.stringify(plan));
-          
-          // Guardar en Supabase también
-          await saveDevelopmentPlanToSupabase(plan);
-        }
-      } catch (error) {
-        console.error("Error generando plan de desarrollo:", error);
-        // Continuar aunque falle la generación del plan
-      }
-    } catch (error) {
-      console.error("Error generando resultado final:", error);
-    }
-  };
+  // Nota: La función generateFinalResult ya no es necesaria porque el trigger automático
+  // calcula el resultado final cuando se envía la evaluación del jefe.
+  // El trigger handle_final_result_calculation se ejecuta automáticamente.
   
   // Función auxiliar para guardar plan en Supabase
   const saveDevelopmentPlanToSupabase = async (plan: any) => {
