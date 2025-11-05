@@ -20,7 +20,8 @@ import VistaPlanDesarrollo from "./pages/VistaPlanDesarrollo";
 import VistaResultadosFinales from "./pages/VistaResultadosFinales";
 import EstadisticasGrupales from "./pages/EstadisticasGrupales";
 import SupabaseUtils from "./pages/SupabaseUtils";
-import ConfiguracionSistema from "./pages/ConfiguracionSistema";
+import AdminInstrumentos from "./pages/AdminInstrumentos";
+import CambioContrasena from "./pages/CambioContrasena";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -165,6 +166,22 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <ConfiguracionSistema />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/instrumentos"
+              element={
+                <ProtectedRoute>
+                  <AdminInstrumentos />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/cambio-contrasena"
+              element={
+                <ProtectedRoute>
+                  <CambioContrasena />
                 </ProtectedRoute>
               }
             />

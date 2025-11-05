@@ -7,46 +7,64 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, FileEdit, CheckCircle2, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { getJefeEvaluationDraft, hasJefeEvaluation } from "@/lib/storage";
-
-const MOCK_TEAM = [
-  {
-    id: "1",
-    dpi: "4567890123104",
-    nombre: "Roberto Hernández Silva",
-    cargo: "Coordinador",
-    nivel: "S2",
-    area: "Tecnología",
-  },
-  {
-    id: "2",
-    dpi: "9999999999998",
-    nombre: "Carlos Méndez Juárez",
-    cargo: "Analista Senior",
-    nivel: "E1",
-    area: "Tecnología",
-  },
-  {
-    id: "3",
-    dpi: "9999999999997",
-    nombre: "Laura Vásquez Cruz",
-    cargo: "Especialista",
-    nivel: "E2",
-    area: "Tecnología",
-  },
-];
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const EvaluacionEquipo = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [teamStatus, setTeamStatus] = useState<Record<string, { estado: string; progreso: number }>>({});
 
   useEffect(() => {
     if (!user) return;
+    loadTeamMembers();
+  }, [user]);
 
-    const loadStatus = async () => {
+  const loadTeamMembers = async () => {
+    try {
+      setLoading(true);
+      
+      // Cargar colaboradores asignados desde Supabase
+      const { data: assignments, error: assignmentsError } = await supabase
+        .from("user_assignments")
+        .select(`
+          colaborador_id,
+          periodo_id,
+          users!user_assignments_colaborador_id_fkey (
+            dpi,
+            nombre,
+            apellidos,
+            cargo,
+            nivel,
+            area
+          )
+        `)
+        .eq("jefe_id", user.dpi)
+        .eq("periodo_id", "2025-1");
+
+      if (assignmentsError) throw assignmentsError;
+
+      // Formatear datos de colaboradores
+      const members = (assignments || []).map((assignment: any) => {
+        const colaborador = assignment.users;
+        return {
+          id: colaborador.dpi,
+          dpi: colaborador.dpi,
+          nombre: `${colaborador.nombre} ${colaborador.apellidos}`,
+          cargo: colaborador.cargo,
+          nivel: colaborador.nivel,
+          area: colaborador.area,
+        };
+      });
+
+      setTeamMembers(members);
+
+      // Cargar estado de evaluaciones
       const status: Record<string, { estado: string; progreso: number }> = {};
       
-      for (const colaborador of MOCK_TEAM) {
+      for (const colaborador of members) {
         const evaluado = await hasJefeEvaluation(user.dpi, colaborador.dpi, "2025-1");
         if (evaluado) {
           const draft = await getJefeEvaluationDraft(user.dpi, colaborador.dpi, "2025-1");
@@ -71,10 +89,24 @@ const EvaluacionEquipo = () => {
       }
 
       setTeamStatus(status);
-    };
-
-    loadStatus();
-  }, [user]);
+    } catch (error: any) {
+      console.error("Error loading team members:", error);
+      toast.error("Error al cargar miembros del equipo");
+      // Fallback a datos mock si hay error
+      setTeamMembers([
+        {
+          id: "1",
+          dpi: "4567890123104",
+          nombre: "Roberto Hernández Silva",
+          cargo: "Coordinador",
+          nivel: "S2",
+          area: "Tecnología",
+        },
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getStatusBadge = (estado: string) => {
     if (estado === "completado") {
@@ -121,54 +153,71 @@ const EvaluacionEquipo = () => {
         </div>
 
         <div className="grid gap-4">
-          {MOCK_TEAM.map((colaborador) => {
-            const status = teamStatus[colaborador.id] || { estado: "pendiente", progreso: 0 };
-            return (
-              <Card key={colaborador.id}>
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <CardTitle>{colaborador.nombre}</CardTitle>
-                      <CardDescription>
-                        {colaborador.cargo} • {colaborador.area} • Nivel {colaborador.nivel}
-                      </CardDescription>
-                    </div>
-                    {getStatusBadge(status.estado)}
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="mb-2 flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">Progreso</span>
-                        <span className="font-medium">{status.progreso}%</span>
+          {loading ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <p className="text-muted-foreground">Cargando equipo...</p>
+              </CardContent>
+            </Card>
+          ) : teamMembers.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <p className="text-muted-foreground">No tiene colaboradores asignados para evaluar</p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Contacte al administrador para asignar colaboradores a su cargo
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            teamMembers.map((colaborador) => {
+              const status = teamStatus[colaborador.id] || { estado: "pendiente", progreso: 0 };
+              return (
+                <Card key={colaborador.id}>
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <CardTitle>{colaborador.nombre}</CardTitle>
+                        <CardDescription>
+                          {colaborador.cargo} • {colaborador.area} • Nivel {colaborador.nivel}
+                        </CardDescription>
                       </div>
-                      <div className="h-2 w-full overflow-hidden rounded-full bg-secondary">
-                        <div
-                          className="h-full bg-gradient-primary transition-all"
-                          style={{ width: `${status.progreso}%` }}
-                        />
-                      </div>
+                      {getStatusBadge(status.estado)}
                     </div>
-                           <Button 
-                             className="ml-4"
-                             onClick={() => {
-                               const jefeEvaluado = status.estado === "completado";
-                               if (jefeEvaluado) {
-                                 navigate(`/evaluacion-equipo/${colaborador.id}/comparativa`);
-                               } else {
-                                 navigate(`/evaluacion-equipo/${colaborador.id}`);
-                               }
-                             }}
-                           >
-                             <FileEdit className="mr-2 h-4 w-4" />
-                             {status.estado === "completado" ? "Ver Comparativa" : "Evaluar"}
-                           </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="mb-2 flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">Progreso</span>
+                          <span className="font-medium">{status.progreso}%</span>
+                        </div>
+                        <div className="h-2 w-full overflow-hidden rounded-full bg-secondary">
+                          <div
+                            className="h-full bg-gradient-primary transition-all"
+                            style={{ width: `${status.progreso}%` }}
+                          />
+                        </div>
+                      </div>
+                      <Button 
+                        className="ml-4"
+                        onClick={() => {
+                          const jefeEvaluado = status.estado === "completado";
+                          if (jefeEvaluado) {
+                            navigate(`/evaluacion-equipo/${colaborador.id}/comparativa`);
+                          } else {
+                            navigate(`/evaluacion-equipo/${colaborador.id}`);
+                          }
+                        }}
+                      >
+                        <FileEdit className="mr-2 h-4 w-4" />
+                        {status.estado === "completado" ? "Ver Comparativa" : "Evaluar"}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })
+          )}
         </div>
       </main>
     </div>

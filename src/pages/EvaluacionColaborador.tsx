@@ -57,6 +57,7 @@ import { toast } from "sonner";
 import { generateDevelopmentPlan } from "@/lib/developmentPlan";
 import { calculateCompleteFinalScore } from "@/lib/finalScore";
 import { getInstrumentForUser } from "@/lib/instruments";
+import { supabase } from "@/integrations/supabase/client";
 
 // Datos mock del colaborador
 const MOCK_COLABORADORES: Record<string, any> = {
@@ -127,53 +128,87 @@ const EvaluacionColaborador = () => {
     }
 
     const loadData = async () => {
-      const colaboradorData = MOCK_COLABORADORES[id];
-      if (!colaboradorData) {
-        navigate("/evaluacion-equipo");
-        return;
-      }
+      try {
+        // Cargar colaborador desde Supabase usando el DPI (id)
+        const { data: colaboradorData, error: colaboradorError } = await supabase
+          .from("users")
+          .select("*")
+          .eq("dpi", id)
+          .single();
 
-      setColaborador(colaboradorData);
-
-      // Cargar instrumento según el nivel del colaborador
-      if (colaboradorData.nivel) {
-        const userInstrument = await getInstrumentForUser(colaboradorData.nivel);
-        if (userInstrument) {
-          setInstrument(userInstrument);
-        }
-      }
-
-      // Cargar autoevaluación del colaborador solo si el jefe ya completó su evaluación
-      const jefeDraft = await getJefeEvaluationDraft(user.dpi, colaboradorData.dpi, "2025-1");
-      const jefeCompleto = jefeDraft?.estado === "enviado";
-      setJefeAlreadyEvaluated(jefeCompleto);
-      
-      if (jefeCompleto) {
-        // Solo mostrar autoevaluación si el jefe ya completó su evaluación
-        const submittedAuto = await getSubmittedEvaluation(colaboradorData.dpi, "2025-1");
-        const mockAuto = getMockColaboradorEvaluation(colaboradorData.dpi);
-        setAutoevaluacion(submittedAuto || mockAuto);
-        // Cambiar a la pestaña de autoevaluación cuando está disponible
-        setEvaluacionTab("auto");
-      } else {
-        // Si el jefe no ha completado, empezar en desempeño
-        setEvaluacionTab("desempeno");
-      }
-
-      // Cargar evaluación del jefe si existe
-      if (jefeDraft) {
-        setDesempenoResponses(jefeDraft.responses);
-        setDesempenoComments(jefeDraft.comments);
-        if (jefeDraft.evaluacionPotencial) {
-          setPotencialResponses(jefeDraft.evaluacionPotencial.responses);
-          setPotencialComments(jefeDraft.evaluacionPotencial.comments);
-        }
+        let colaboradorFormatted: any;
+        let instrumentoOverride: string | undefined;
         
-        if (jefeDraft.estado === "enviado") {
-          toast.info("Esta evaluación ya fue enviada");
+        if (colaboradorError || !colaboradorData) {
+          // Fallback a datos mock si no se encuentra en Supabase
+          const mockColaborador = MOCK_COLABORADORES[id];
+          if (!mockColaborador) {
+            toast.error("Colaborador no encontrado");
+            navigate("/evaluacion-equipo");
+            return;
+          }
+          colaboradorFormatted = mockColaborador;
         } else {
-          toast.info("Se ha cargado su borrador guardado");
+          // Formatear datos del colaborador desde Supabase
+          colaboradorFormatted = {
+            id: colaboradorData.dpi,
+            dpi: colaboradorData.dpi,
+            nombre: `${colaboradorData.nombre} ${colaboradorData.apellidos}`,
+            cargo: colaboradorData.cargo,
+            nivel: colaboradorData.nivel,
+            area: colaboradorData.area,
+          };
+          instrumentoOverride = colaboradorData.instrumento_id || undefined;
         }
+
+        setColaborador(colaboradorFormatted);
+
+        // Cargar instrumento según el nivel del colaborador
+        if (colaboradorFormatted.nivel) {
+          const userInstrument = await getInstrumentForUser(
+            colaboradorFormatted.nivel,
+            instrumentoOverride
+          );
+          if (userInstrument) {
+            setInstrument(userInstrument);
+          }
+        }
+
+        // Cargar autoevaluación del colaborador solo si el jefe ya completó su evaluación
+        const jefeDraft = await getJefeEvaluationDraft(user.dpi, colaboradorFormatted.dpi, "2025-1");
+        const jefeCompleto = jefeDraft?.estado === "enviado";
+        setJefeAlreadyEvaluated(jefeCompleto);
+        
+        if (jefeCompleto) {
+          // Solo mostrar autoevaluación si el jefe ya completó su evaluación
+          const submittedAuto = await getSubmittedEvaluation(colaboradorFormatted.dpi, "2025-1");
+          const mockAuto = getMockColaboradorEvaluation(colaboradorFormatted.dpi);
+          setAutoevaluacion(submittedAuto || mockAuto);
+          // Cambiar a la pestaña de autoevaluación cuando está disponible
+          setEvaluacionTab("auto");
+        } else {
+          // Si el jefe no ha completado, empezar en desempeño
+          setEvaluacionTab("desempeno");
+        }
+
+        // Cargar evaluación del jefe si existe
+        if (jefeDraft) {
+          setDesempenoResponses(jefeDraft.responses);
+          setDesempenoComments(jefeDraft.comments);
+          if (jefeDraft.evaluacionPotencial) {
+            setPotencialResponses(jefeDraft.evaluacionPotencial.responses);
+            setPotencialComments(jefeDraft.evaluacionPotencial.comments);
+          }
+          
+          if (jefeDraft.estado === "enviado") {
+            toast.info("Esta evaluación ya fue enviada");
+          } else {
+            toast.info("Se ha cargado su borrador guardado");
+          }
+        }
+      } catch (error) {
+        console.error("Error loading data:", error);
+        toast.error("Error al cargar datos del colaborador");
       }
     };
 

@@ -30,6 +30,17 @@ import { toast } from "@/hooks/use-toast";
 const Dashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  
+  // Redirigir a cambio de contraseña si es primer ingreso
+  useEffect(() => {
+    if (user?.primerIngreso) {
+      const savedPassword = localStorage.getItem(`password_${user.dpi}`);
+      if (!savedPassword) {
+        navigate("/cambio-contrasena");
+        return;
+      }
+    }
+  }, [user, navigate]);
 
   const [evaluationStatus, setEvaluationStatus] = useState<"not_started" | "in_progress" | "submitted">("not_started");
   const [progress, setProgress] = useState(0);
@@ -569,7 +580,11 @@ const Dashboard = () => {
                     </div>
                   </Button>
                   
-                  <Button variant="outline" className="justify-start h-auto py-4">
+                  <Button 
+                    variant="outline" 
+                    className="justify-start h-auto py-4"
+                    onClick={() => navigate("/admin/instrumentos")}
+                  >
                     <div className="flex flex-col items-start">
                       <div className="flex items-center gap-2">
                         <FileText className="h-4 w-4" />
@@ -579,7 +594,11 @@ const Dashboard = () => {
                     </div>
                   </Button>
                   
-                  <Button variant="outline" className="justify-start h-auto py-4">
+                  <Button 
+                    variant="outline" 
+                    className="justify-start h-auto py-4"
+                    onClick={() => navigate("/admin/usuarios")}
+                  >
                     <div className="flex flex-col items-start">
                       <div className="flex items-center gap-2">
                         <Users className="h-4 w-4" />
@@ -589,7 +608,11 @@ const Dashboard = () => {
                     </div>
                   </Button>
                   
-                  <Button variant="outline" className="justify-start h-auto py-4">
+                  <Button 
+                    variant="outline" 
+                    className="justify-start h-auto py-4"
+                    onClick={() => navigate("/admin/dashboard")}
+                  >
                     <div className="flex flex-col items-start">
                       <div className="flex items-center gap-2">
                         <BarChart3 className="h-4 w-4" />

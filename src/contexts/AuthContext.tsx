@@ -85,8 +85,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
-      setUser(JSON.parse(storedUser));
+      const userObj = JSON.parse(storedUser);
+      setUser(userObj);
       setIsAuthenticated(true);
+      
+      // Si es primer ingreso, redirigir a cambio de contraseña
+      if (userObj.primerIngreso) {
+        // Verificar si hay contraseña guardada
+        const savedPassword = localStorage.getItem(`password_${userObj.dpi}`);
+        if (!savedPassword) {
+          // No redirigir automáticamente aquí, mejor hacerlo en el componente Dashboard
+        }
+      }
     }
   }, []);
 
@@ -97,7 +107,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       throw new Error("DPI no encontrado");
     }
 
-    if (password !== foundUser.fechaNacimiento && password !== "nuevaclave123") {
+    // Verificar si el usuario ya cambió su contraseña
+    const savedPassword = localStorage.getItem(`password_${dpi}`);
+    const validPassword = savedPassword || foundUser.fechaNacimiento;
+    
+    // También permitir contraseña temporal para desarrollo
+    if (password !== validPassword && password !== "nuevaclave123") {
       throw new Error("Contraseña incorrecta");
     }
 
