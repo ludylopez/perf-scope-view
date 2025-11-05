@@ -25,10 +25,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Plus, Edit, X, UserPlus, Users, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, Plus, Edit, X, UserPlus, Users, Search, ChevronLeft, ChevronRight, Upload, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@/types/auth";
+import { parsearArchivoUsuarios, importarUsuarios, ImportedUser } from "@/lib/importUsers";
 
 const PAGE_SIZE = 50; // OPTIMIZACIÓN: Paginación para manejar 400 usuarios
 
@@ -39,6 +40,10 @@ const AdminUsuarios = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importResults, setImportResults] = useState<{ exitosos: number; errores: Array<{ usuario: ImportedUser; error: string }> } | null>(null);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [currentPage, setCurrentPage] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
@@ -47,6 +52,8 @@ const AdminUsuarios = () => {
     nombre: "",
     apellidos: "",
     fechaNacimiento: "",
+    fechaIngreso: "",
+    tipoPuesto: "" as "" | "administrativo" | "operativo",
     correo: "",
     telefono: "",
     nivel: "",
@@ -131,13 +138,19 @@ const AdminUsuarios = () => {
     }
 
     try {
+      // Convertir fecha de nacimiento a formato DDMMAAAA
+      const fechaNac = new Date(newUser.fechaNacimiento);
+      const fechaNacFormato = `${String(fechaNac.getDate()).padStart(2, '0')}${String(fechaNac.getMonth() + 1).padStart(2, '0')}${fechaNac.getFullYear()}`;
+
       const { error } = await supabase
         .from("users")
         .insert({
           dpi: newUser.dpi,
           nombre: newUser.nombre,
           apellidos: newUser.apellidos,
-          fecha_nacimiento: newUser.fechaNacimiento,
+          fecha_nacimiento: fechaNacFormato,
+          fecha_ingreso: newUser.fechaIngreso || null,
+          tipo_puesto: newUser.tipoPuesto || null,
           correo: newUser.correo || null,
           telefono: newUser.telefono || null,
           nivel: newUser.nivel,
@@ -158,6 +171,8 @@ const AdminUsuarios = () => {
         nombre: "",
         apellidos: "",
         fechaNacimiento: "",
+        fechaIngreso: "",
+        tipoPuesto: "",
         correo: "",
         telefono: "",
         nivel: "",
@@ -180,12 +195,21 @@ const AdminUsuarios = () => {
     if (!editingUser) return;
 
     try {
+      // Convertir fecha de nacimiento a formato DDMMAAAA si está en formato date
+      let fechaNacFormato = editingUser.fechaNacimiento;
+      if (fechaNacFormato.includes('-')) {
+        const fechaNac = new Date(fechaNacFormato);
+        fechaNacFormato = `${String(fechaNac.getDate()).padStart(2, '0')}${String(fechaNac.getMonth() + 1).padStart(2, '0')}${fechaNac.getFullYear()}`;
+      }
+
       const { error } = await supabase
         .from("users")
         .update({
           nombre: editingUser.nombre,
           apellidos: editingUser.apellidos,
-          fecha_nacimiento: editingUser.fechaNacimiento,
+          fecha_nacimiento: fechaNacFormato,
+          fecha_ingreso: (editingUser as any).fechaIngreso || null,
+          tipo_puesto: (editingUser as any).tipoPuesto || null,
           correo: editingUser.correo || null,
           telefono: editingUser.telefono || null,
           nivel: editingUser.nivel,
@@ -206,6 +230,54 @@ const AdminUsuarios = () => {
     } catch (error: any) {
       console.error("Error updating user:", error);
       toast.error(error.message || "Error al actualizar usuario");
+    }
+  };
+
+  const handleImportFile = async () => {
+    if (!importFile) {
+      toast.error("Debe seleccionar un archivo");
+      return;
+    }
+
+    setImporting(true);
+    setImportResults(null);
+
+    try {
+      // Parsear archivo
+      const { usuarios, errores } = await parsearArchivoUsuarios(importFile);
+
+      if (errores.length > 0) {
+        console.warn("Errores al parsear:", errores);
+      }
+
+      if (usuarios.length === 0) {
+        toast.error("No se encontraron usuarios válidos en el archivo");
+        setImporting(false);
+        return;
+      }
+
+      // Importar usuarios
+      const resultados = await importarUsuarios(usuarios);
+
+      setImportResults(resultados);
+
+      if (resultados.exitosos > 0) {
+        toast.success(`${resultados.exitosos} usuarios importados exitosamente`);
+        loadUsuarios(currentPage);
+      }
+
+      if (resultados.errores.length > 0) {
+        toast.warning(`${resultados.errores.length} usuarios tuvieron errores`);
+      }
+
+      if (errores.length > 0 && resultados.exitosos === 0) {
+        toast.error(`Errores al procesar archivo: ${errores.slice(0, 3).join(', ')}`);
+      }
+    } catch (error: any) {
+      console.error("Error importing:", error);
+      toast.error(error.message || "Error al importar archivo");
+    } finally {
+      setImporting(false);
     }
   };
 
@@ -293,6 +365,31 @@ const AdminUsuarios = () => {
                       value={newUser.fechaNacimiento}
                       onChange={(e) => setNewUser({ ...newUser, fechaNacimiento: e.target.value })}
                     />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Fecha de Ingreso</Label>
+                    <Input
+                      type="date"
+                      value={newUser.fechaIngreso}
+                      onChange={(e) => setNewUser({ ...newUser, fechaIngreso: e.target.value })}
+                    />
+                    <p className="text-xs text-muted-foreground">Necesaria para determinar elegibilidad de evaluación</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Tipo de Puesto</Label>
+                    <Select
+                      value={newUser.tipoPuesto}
+                      onValueChange={(value: any) => setNewUser({ ...newUser, tipoPuesto: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar tipo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="administrativo">Administrativo</SelectItem>
+                        <SelectItem value="operativo">Operativo</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">Administrativo: 3 meses mínimo | Operativo: 6 meses mínimo</p>
                   </div>
                   <div className="space-y-2">
                     <Label>Nombre *</Label>
@@ -413,6 +510,76 @@ const AdminUsuarios = () => {
                   Cancelar
                 </Button>
                 <Button onClick={handleCreateUser}>Crear</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <Upload className="mr-2 h-4 w-4" />
+                Importar Usuarios
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Importar Usuarios desde Archivo</DialogTitle>
+                <DialogDescription>
+                  Importe usuarios desde un archivo CSV o Excel. El archivo debe contener las columnas: DPI, NOMBRE, FECHA DE NACIMIENTO, FECHA DE INICIO LABORAL, Nivel de puesto, PUESTO, DEPARTAMENTO O DEPENDENCIA
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Archivo (CSV o Excel)</Label>
+                  <Input
+                    type="file"
+                    accept=".csv,.xlsx,.xls"
+                    onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+                    disabled={importing}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Formatos soportados: CSV, Excel (.xlsx, .xls)
+                  </p>
+                </div>
+                {importResults && (
+                  <div className="space-y-2">
+                    <div className="p-4 bg-success/10 border border-success rounded-lg">
+                      <p className="text-sm font-medium text-success">
+                        ✓ {importResults.exitosos} usuarios importados exitosamente
+                      </p>
+                    </div>
+                    {importResults.errores.length > 0 && (
+                      <div className="p-4 bg-destructive/10 border border-destructive rounded-lg">
+                        <p className="text-sm font-medium text-destructive mb-2">
+                          ✗ {importResults.errores.length} usuarios con errores:
+                        </p>
+                        <div className="max-h-40 overflow-y-auto space-y-1">
+                          {importResults.errores.slice(0, 10).map((error, idx) => (
+                            <p key={idx} className="text-xs text-muted-foreground">
+                              {error.usuario.dpi} - {error.usuario.nombre} {error.usuario.apellidos}: {error.error}
+                            </p>
+                          ))}
+                          {importResults.errores.length > 10 && (
+                            <p className="text-xs text-muted-foreground">
+                              ... y {importResults.errores.length - 10} errores más
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => {
+                  setShowImportDialog(false);
+                  setImportFile(null);
+                  setImportResults(null);
+                }}>
+                  Cerrar
+                </Button>
+                <Button onClick={handleImportFile} disabled={!importFile || importing}>
+                  {importing ? "Importando..." : "Importar"}
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>

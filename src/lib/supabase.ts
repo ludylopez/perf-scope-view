@@ -92,7 +92,63 @@ export const getPeriodStatus = async (periodId: string): Promise<PeriodStatus> =
   }
 };
 
-// ASIGNACIONES
+// ELEGIBILIDAD DE EVALUACIÓN
+export interface EligibilityResult {
+  elegible: boolean;
+  motivo?: string;
+  meses_antiguedad?: number;
+  meses_requeridos?: number;
+  tipo_puesto?: string;
+  fecha_ingreso?: string;
+}
+
+/**
+ * Verifica si un colaborador es elegible para evaluación según su antigüedad
+ * Administrativos: mínimo 3 meses
+ * Operativos: mínimo 6 meses
+ */
+export const verificarElegibilidad = async (usuarioDpi: string): Promise<EligibilityResult> => {
+  if (!isSupabaseAvailable()) {
+    return { elegible: true }; // Fallback: permitir si no hay conexión
+  }
+
+  try {
+    const { data, error } = await supabase.rpc('verificar_elegibilidad_evaluacion', {
+      usuario_dpi: usuarioDpi
+    });
+
+    if (error) {
+      console.error('Error verificando elegibilidad:', error);
+      return { elegible: true }; // Fallback: permitir si hay error
+    }
+
+    return data as EligibilityResult;
+  } catch {
+    return { elegible: true }; // Fallback: permitir si hay error
+  }
+};
+
+/**
+ * Calcula la antigüedad en meses de un colaborador
+ */
+export const calcularAntiguedadMeses = async (usuarioDpi: string): Promise<number | null> => {
+  if (!isSupabaseAvailable()) return null;
+
+  try {
+    const { data, error } = await supabase.rpc('calcular_antiguedad_meses', {
+      usuario_dpi: usuarioDpi
+    });
+
+    if (error) {
+      console.error('Error calculando antigüedad:', error);
+      return null;
+    }
+
+    return data as number;
+  } catch {
+    return null;
+  }
+};
 export const getUserAssignments = async (jefeId: string): Promise<AssignmentWithUsers[]> => {
   if (!isSupabaseAvailable()) return [];
   
