@@ -3,6 +3,7 @@ import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { scoreToPercentage } from "./calculations";
 
 // Tipos para exportación
 export interface ExportData {
@@ -213,13 +214,13 @@ export const exportResultadoIndividualPDF = (
   doc.setFontSize(11);
   doc.setFont("helvetica", "normal");
   const resultados = [
-    ["Desempeño Final", resultado.desempenoFinal?.toFixed(2) || "N/A"],
-    ["Autoevaluación", resultado.desempenoAuto?.toFixed(2) || "N/A"],
-    ["Evaluación Jefe", resultado.desempenoJefe?.toFixed(2) || "N/A"],
+    ["Desempeño Final", resultado.desempenoFinal ? `${scoreToPercentage(resultado.desempenoFinal)}% (${resultado.desempenoFinal.toFixed(2)}/5.0)` : "N/A"],
+    ["Autoevaluación", resultado.desempenoAuto ? `${scoreToPercentage(resultado.desempenoAuto)}% (${resultado.desempenoAuto.toFixed(2)}/5.0)` : "N/A"],
+    ["Evaluación Jefe", resultado.desempenoJefe ? `${scoreToPercentage(resultado.desempenoJefe)}% (${resultado.desempenoJefe.toFixed(2)}/5.0)` : "N/A"],
   ];
 
   if (resultado.potencial) {
-    resultados.push(["Potencial", resultado.potencial.toFixed(2)]);
+    resultados.push(["Potencial", `${scoreToPercentage(resultado.potencial)}% (${resultado.potencial.toFixed(2)}/5.0)`]);
   }
 
   if (resultado.posicion9Box) {

@@ -28,6 +28,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { exportToPDF, exportToExcel, ExportData } from "@/lib/exports";
 import { getAPIUsageStats } from "@/lib/gemini";
+import { scoreToPercentage } from "@/lib/calculations";
 
 interface DashboardStats {
   totalUsuarios: number;
@@ -194,8 +195,8 @@ const DashboardRRHH = () => {
         evaluacionesPendientes: pendientes,
         evaluacionesEnProgreso: enProgreso,
         porcentajeCompletitud: totalEsperadas > 0 ? Math.round((completadas / totalEsperadas) * 100) : 0,
-        promedioDesempeno: Math.round(promedioDesempeno * 100) / 100,
-        promedioPotencial: Math.round(promedioPotencial * 100) / 100,
+        promedioDesempeno: Math.round(promedioDesempeno * 100) / 100, // Mantener score para cálculos internos
+        promedioPotencial: Math.round(promedioPotencial * 100) / 100, // Mantener score para cálculos internos
         distribucion9Box,
         evaluacionesPorArea,
         evaluacionesPorNivel,
@@ -225,8 +226,8 @@ const DashboardRRHH = () => {
         { label: "Evaluaciones Pendientes", value: stats.evaluacionesPendientes },
         { label: "Evaluaciones en Progreso", value: stats.evaluacionesEnProgreso },
         { label: "Porcentaje de Completitud", value: `${stats.porcentajeCompletitud}%` },
-        { label: "Promedio de Desempeño", value: stats.promedioDesempeno },
-        { label: "Promedio de Potencial", value: stats.promedioPotencial },
+        { label: "Promedio de Desempeño", value: `${scoreToPercentage(stats.promedioDesempeno)}%` },
+        { label: "Promedio de Potencial", value: `${scoreToPercentage(stats.promedioPotencial)}%` },
       ],
       tables: [
         {
@@ -385,9 +386,9 @@ const DashboardRRHH = () => {
               <CardTitle>Promedio de Desempeño</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-4xl font-bold text-primary">{stats.promedioDesempeno.toFixed(2)}</p>
-              <p className="text-sm text-muted-foreground mt-2">/5.0 puntos</p>
-              <Progress value={(stats.promedioDesempeno / 5) * 100} className="mt-4" />
+              <p className="text-4xl font-bold text-primary">{scoreToPercentage(stats.promedioDesempeno)}%</p>
+              <p className="text-sm text-muted-foreground mt-2">Desempeño promedio</p>
+              <Progress value={scoreToPercentage(stats.promedioDesempeno)} className="mt-4" />
             </CardContent>
           </Card>
 
@@ -396,9 +397,9 @@ const DashboardRRHH = () => {
               <CardTitle>Promedio de Potencial</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-4xl font-bold text-accent">{stats.promedioPotencial.toFixed(2)}</p>
-              <p className="text-sm text-muted-foreground mt-2">/5.0 puntos</p>
-              <Progress value={(stats.promedioPotencial / 5) * 100} className="mt-4" />
+              <p className="text-4xl font-bold text-accent">{scoreToPercentage(stats.promedioPotencial)}%</p>
+              <p className="text-sm text-muted-foreground mt-2">Potencial promedio</p>
+              <Progress value={scoreToPercentage(stats.promedioPotencial)} className="mt-4" />
             </CardContent>
           </Card>
 

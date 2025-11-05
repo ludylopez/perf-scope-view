@@ -83,7 +83,16 @@ export const getDimensionProgress = (
 export const scoreToPercentage = (score: number): number => {
   // Escala 1-5 → 0-100%
   // 1 = 0%, 2 = 25%, 3 = 50%, 4 = 75%, 5 = 100%
+  if (score < 1) return 0;
+  if (score > 5) return 100;
   return Math.round(((score - 1) / 4) * 100);
+};
+
+// Convertir porcentaje (0-100%) a puntaje Likert (1-5) - útil para conversiones inversas
+export const percentageToScore = (percentage: number): number => {
+  if (percentage <= 0) return 1;
+  if (percentage >= 100) return 5;
+  return Math.round((percentage / 100) * 4 + 1);
 };
 
 // Calcular porcentaje por dimensión
@@ -93,4 +102,13 @@ export const calculateDimensionPercentage = (
 ): number => {
   const avg = calculateDimensionAverage(responses, dimension);
   return scoreToPercentage(avg);
+};
+
+// Calcular desempeño como porcentaje directamente
+export const calculatePerformancePercentage = (
+  responses: Record<string, number>,
+  dimensions: Dimension[]
+): number => {
+  const score = calculatePerformanceScore(responses, dimensions);
+  return scoreToPercentage(score);
 };

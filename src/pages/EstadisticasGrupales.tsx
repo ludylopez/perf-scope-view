@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { exportToExcel, ExportData } from "@/lib/exports";
+import { scoreToPercentage } from "@/lib/calculations";
 
 interface GroupStats {
   grupoId: string;
@@ -214,8 +215,8 @@ const EstadisticasGrupales = () => {
                       { label: "Total Miembros", value: currentStats.totalMiembros },
                       { label: "Evaluaciones Completadas", value: currentStats.evaluacionesCompletadas },
                       { label: "Porcentaje Completitud", value: `${Math.round((currentStats.evaluacionesCompletadas / currentStats.totalMiembros) * 100)}%` },
-                      { label: "Promedio Desempeño", value: currentStats.promedioDesempeno },
-                      { label: "Promedio Potencial", value: currentStats.promedioPotencial },
+                      { label: "Promedio Desempeño", value: `${scoreToPercentage(currentStats.promedioDesempeno)}%` },
+                      { label: "Promedio Potencial", value: `${scoreToPercentage(currentStats.promedioPotencial)}%` },
                     ],
                     tables: [
                       {
@@ -330,10 +331,12 @@ const EstadisticasGrupales = () => {
                 </CardHeader>
                 <CardContent>
                   <p className="text-3xl font-bold text-info">
-                    {currentStats.promedioDesempeno.toFixed(2)}
+                    {scoreToPercentage(currentStats.promedioDesempeno)}%
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">/5.0 puntos</p>
-                  <Progress value={(currentStats.promedioDesempeno / 5) * 100} className="mt-2 h-2" />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    ({currentStats.promedioDesempeno.toFixed(2)}/5.0)
+                  </p>
+                  <Progress value={scoreToPercentage(currentStats.promedioDesempeno)} className="mt-2 h-2" />
                 </CardContent>
               </Card>
 
@@ -343,10 +346,12 @@ const EstadisticasGrupales = () => {
                 </CardHeader>
                 <CardContent>
                   <p className="text-3xl font-bold text-accent">
-                    {currentStats.promedioPotencial.toFixed(2)}
+                    {scoreToPercentage(currentStats.promedioPotencial)}%
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">/5.0 puntos</p>
-                  <Progress value={(currentStats.promedioPotencial / 5) * 100} className="mt-2 h-2" />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    ({currentStats.promedioPotencial.toFixed(2)}/5.0)
+                  </p>
+                  <Progress value={scoreToPercentage(currentStats.promedioPotencial)} className="mt-2 h-2" />
                 </CardContent>
               </Card>
             </div>
@@ -451,8 +456,8 @@ const EstadisticasGrupales = () => {
                   <div className="p-4 bg-muted rounded-lg">
                     <p className="text-sm">
                       <strong>Resumen del Desempeño:</strong> El grupo {currentStats.nombreGrupo} presenta un 
-                      promedio de desempeño de {currentStats.promedioDesempeno.toFixed(2)}/5.0 y un potencial 
-                      promedio de {currentStats.promedioPotencial.toFixed(2)}/5.0. 
+                      promedio de desempeño de {scoreToPercentage(currentStats.promedioDesempeno)}% ({currentStats.promedioDesempeno.toFixed(2)}/5.0) y un potencial 
+                      promedio de {scoreToPercentage(currentStats.promedioPotencial)}% ({currentStats.promedioPotencial.toFixed(2)}/5.0). 
                       {currentStats.evaluacionesCompletadas === currentStats.totalMiembros 
                         ? " Todas las evaluaciones han sido completadas." 
                         : ` Faltan ${currentStats.totalMiembros - currentStats.evaluacionesCompletadas} evaluaciones por completar.`}

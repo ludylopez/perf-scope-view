@@ -13,6 +13,7 @@ import { getSubmittedEvaluation } from "@/lib/storage";
 import { getNineBoxDescription } from "@/lib/finalScore";
 import { toast } from "sonner";
 import { exportResultadoIndividualPDF } from "@/lib/exports";
+import { scoreToPercentage } from "@/lib/calculations";
 
 const VistaResultadosFinales = () => {
   const { user } = useAuth();
@@ -144,10 +145,12 @@ const VistaResultadosFinales = () => {
             </CardHeader>
             <CardContent>
               <p className="text-3xl font-bold text-primary">
-                {resultadoFinal.desempenoFinal?.toFixed(2) || "N/A"}
+                {resultadoFinal.desempenoFinal ? scoreToPercentage(resultadoFinal.desempenoFinal) : "N/A"}%
               </p>
-              <p className="text-xs text-muted-foreground mt-1">/5.0 puntos</p>
-              <Progress value={((resultadoFinal.desempenoFinal || 0) / 5) * 100} className="mt-2" />
+              <p className="text-xs text-muted-foreground mt-1">
+                {resultadoFinal.desempenoFinal ? `(${resultadoFinal.desempenoFinal.toFixed(2)}/5.0)` : "N/A"}
+              </p>
+              <Progress value={resultadoFinal.desempenoFinal ? scoreToPercentage(resultadoFinal.desempenoFinal) : 0} className="mt-2" />
             </CardContent>
           </Card>
 
@@ -157,9 +160,11 @@ const VistaResultadosFinales = () => {
             </CardHeader>
             <CardContent>
               <p className="text-3xl font-bold text-accent">
-                {resultadoFinal.desempenoAuto?.toFixed(2) || "N/A"}
+                {resultadoFinal.desempenoAuto ? scoreToPercentage(resultadoFinal.desempenoAuto) : "N/A"}%
               </p>
-              <p className="text-xs text-muted-foreground mt-1">/5.0 puntos</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {resultadoFinal.desempenoAuto ? `(${resultadoFinal.desempenoAuto.toFixed(2)}/5.0)` : "N/A"}
+              </p>
             </CardContent>
           </Card>
 
@@ -169,9 +174,11 @@ const VistaResultadosFinales = () => {
             </CardHeader>
             <CardContent>
               <p className="text-3xl font-bold text-info">
-                {resultadoFinal.desempenoJefe?.toFixed(2) || "N/A"}
+                {resultadoFinal.desempenoJefe ? scoreToPercentage(resultadoFinal.desempenoJefe) : "N/A"}%
               </p>
-              <p className="text-xs text-muted-foreground mt-1">/5.0 puntos</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {resultadoFinal.desempenoJefe ? `(${resultadoFinal.desempenoJefe.toFixed(2)}/5.0)` : "N/A"}
+              </p>
             </CardContent>
           </Card>
 
@@ -182,9 +189,11 @@ const VistaResultadosFinales = () => {
               </CardHeader>
               <CardContent>
                 <p className="text-3xl font-bold text-success">
-                  {resultadoFinal.potencial.toFixed(2)}
+                  {scoreToPercentage(resultadoFinal.potencial)}%
                 </p>
-                <p className="text-xs text-muted-foreground mt-1">/5.0 puntos</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  ({resultadoFinal.potencial.toFixed(2)}/5.0)
+                </p>
               </CardContent>
             </Card>
           )}

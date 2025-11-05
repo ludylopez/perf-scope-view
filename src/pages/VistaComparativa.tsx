@@ -13,6 +13,7 @@ import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Responsi
 import { getSubmittedEvaluation, getJefeEvaluationDraft, getMockColaboradorEvaluation } from "@/lib/storage";
 import { INSTRUMENT_A1 } from "@/data/instruments";
 import { getNineBoxDescription, calculateCompleteFinalScore } from "@/lib/finalScore";
+import { scoreToPercentage } from "@/lib/calculations";
 
 const MOCK_COLABORADORES: Record<string, any> = {
   "1": {
@@ -116,7 +117,7 @@ const VistaComparativa = () => {
     );
   }
 
-  // Preparar datos para gráficos
+  // Preparar datos para gráficos - convertir a porcentajes
   const radarData = instrument.dimensionesDesempeno.map((dim) => {
     const autoItems = dim.items.map(item => autoevaluacion.responses[item.id]).filter(v => v !== undefined);
     const jefeItems = dim.items.map(item => evaluacionJefe.responses[item.id]).filter(v => v !== undefined);
@@ -126,16 +127,16 @@ const VistaComparativa = () => {
     
     return {
       dimension: dim.nombre.substring(0, 20),
-      autoevaluacion: autoAvg,
-      evaluacionJefe: jefeAvg,
+      autoevaluacion: scoreToPercentage(autoAvg),
+      evaluacionJefe: scoreToPercentage(jefeAvg),
     };
   });
 
   const barData = comparativo.map((item) => ({
     dimension: item.nombre.substring(0, 15),
-    autoevaluacion: item.autoevaluacion,
-    evaluacionJefe: item.evaluacionJefe,
-    diferencia: item.diferencia,
+    autoevaluacion: scoreToPercentage(item.autoevaluacion),
+    evaluacionJefe: scoreToPercentage(item.evaluacionJefe),
+    diferencia: scoreToPercentage(item.evaluacionJefe) - scoreToPercentage(item.autoevaluacion),
   }));
 
   const COLORS = {
@@ -180,31 +181,31 @@ const VistaComparativa = () => {
                 <div className="text-center p-4 rounded-lg border">
                   <p className="text-sm text-muted-foreground mb-1">Autoevaluación</p>
                   <p className="text-3xl font-bold text-primary">
-                    {resultadoFinal.desempenoAuto.toFixed(2)}
+                    {scoreToPercentage(resultadoFinal.desempenoAuto)}%
                   </p>
-                  <p className="text-xs text-muted-foreground">/5.0</p>
+                  <p className="text-xs text-muted-foreground">({resultadoFinal.desempenoAuto.toFixed(2)}/5.0)</p>
                 </div>
                 <div className="text-center p-4 rounded-lg border">
                   <p className="text-sm text-muted-foreground mb-1">Evaluación Jefe</p>
                   <p className="text-3xl font-bold text-accent">
-                    {resultadoFinal.desempenoJefe.toFixed(2)}
+                    {scoreToPercentage(resultadoFinal.desempenoJefe)}%
                   </p>
-                  <p className="text-xs text-muted-foreground">/5.0</p>
+                  <p className="text-xs text-muted-foreground">({resultadoFinal.desempenoJefe.toFixed(2)}/5.0)</p>
                 </div>
                 <div className="text-center p-4 rounded-lg border bg-primary/5">
                   <p className="text-sm text-muted-foreground mb-1">Desempeño Final</p>
                   <p className="text-3xl font-bold text-primary">
-                    {resultadoFinal.desempenoFinal.toFixed(2)}
+                    {scoreToPercentage(resultadoFinal.desempenoFinal)}%
                   </p>
-                  <p className="text-xs text-muted-foreground">/5.0</p>
+                  <p className="text-xs text-muted-foreground">({resultadoFinal.desempenoFinal.toFixed(2)}/5.0)</p>
                 </div>
                 {resultadoFinal.potencial && (
                   <div className="text-center p-4 rounded-lg border">
                     <p className="text-sm text-muted-foreground mb-1">Potencial</p>
                     <p className="text-3xl font-bold text-success">
-                      {resultadoFinal.potencial.toFixed(2)}
+                      {scoreToPercentage(resultadoFinal.potencial)}%
                     </p>
-                    <p className="text-xs text-muted-foreground">/5.0</p>
+                    <p className="text-xs text-muted-foreground">({resultadoFinal.potencial.toFixed(2)}/5.0)</p>
                   </div>
                 )}
               </div>
@@ -235,7 +236,7 @@ const VistaComparativa = () => {
                 <RadarChart data={radarData}>
                   <PolarGrid />
                   <PolarAngleAxis dataKey="dimension" />
-                  <PolarRadiusAxis angle={90} domain={[0, 5]} />
+                  <PolarRadiusAxis angle={90} domain={[0, 100]} />
                   <Radar
                     name="Autoevaluación"
                     dataKey="autoevaluacion"
@@ -268,11 +269,11 @@ const VistaComparativa = () => {
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={barData}>
                   <XAxis dataKey="dimension" angle={-45} textAnchor="end" height={80} />
-                  <YAxis domain={[0, 5]} />
+                  <YAxis domain={[0, 100]} />
                   <Tooltip />
                   <Legend />
-                  <Bar dataKey="autoevaluacion" fill={COLORS.auto} name="Autoevaluación" />
-                  <Bar dataKey="evaluacionJefe" fill={COLORS.jefe} name="Evaluación Jefe" />
+                  <Bar dataKey="autoevaluacion" fill={COLORS.auto} name="Autoevaluación (%)" />
+                  <Bar dataKey="evaluacionJefe" fill={COLORS.jefe} name="Evaluación Jefe (%)" />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
@@ -290,10 +291,10 @@ const VistaComparativa = () => {
           <CardContent>
             <div className="space-y-6">
               {comparativo.map((item, idx) => {
-                const diferenciaPorcentaje = (item.diferencia / item.autoevaluacion) * 100;
-                const isAligned = Math.abs(item.diferencia) < 0.3;
-                const jefeHigher = item.diferencia > 0.3;
-                const autoHigher = item.diferencia < -0.3;
+                const diferenciaPorcentaje = scoreToPercentage(item.evaluacionJefe) - scoreToPercentage(item.autoevaluacion);
+                const isAligned = Math.abs(diferenciaPorcentaje) < 10; // 10% de diferencia es considerado alineado
+                const jefeHigher = diferenciaPorcentaje > 10;
+                const autoHigher = diferenciaPorcentaje < -10;
 
                 return (
                   <div key={item.dimensionId} className="border rounded-lg p-4">
@@ -321,32 +322,34 @@ const VistaComparativa = () => {
                       <div>
                         <p className="text-sm text-muted-foreground mb-1">Autoevaluación</p>
                         <div className="flex items-center gap-2">
-                          <Progress value={(item.autoevaluacion / 5) * 100} className="flex-1" />
-                          <span className="font-medium w-12 text-right">
-                            {item.autoevaluacion.toFixed(2)}
+                          <Progress value={scoreToPercentage(item.autoevaluacion)} className="flex-1" />
+                          <span className="font-medium w-16 text-right">
+                            {scoreToPercentage(item.autoevaluacion)}%
                           </span>
                         </div>
+                        <p className="text-xs text-muted-foreground mt-1">({item.autoevaluacion.toFixed(2)}/5.0)</p>
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground mb-1">Evaluación Jefe</p>
                         <div className="flex items-center gap-2">
-                          <Progress value={(item.evaluacionJefe / 5) * 100} className="flex-1" />
-                          <span className="font-medium w-12 text-right">
-                            {item.evaluacionJefe.toFixed(2)}
+                          <Progress value={scoreToPercentage(item.evaluacionJefe)} className="flex-1" />
+                          <span className="font-medium w-16 text-right">
+                            {scoreToPercentage(item.evaluacionJefe)}%
                           </span>
                         </div>
+                        <p className="text-xs text-muted-foreground mt-1">({item.evaluacionJefe.toFixed(2)}/5.0)</p>
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground mb-1">Diferencia</p>
                         <div className="flex items-center gap-2">
-                          <span className={`font-medium w-12 text-right ${
+                          <span className={`font-medium w-16 text-right ${
                             Math.abs(item.diferencia) < 0.3 ? "text-muted-foreground" :
                             item.diferencia > 0 ? "text-accent" : "text-warning"
                           }`}>
-                            {item.diferencia > 0 ? "+" : ""}{item.diferencia.toFixed(2)}
+                            {item.diferencia > 0 ? "+" : ""}{scoreToPercentage(item.evaluacionJefe) - scoreToPercentage(item.autoevaluacion)}%
                           </span>
                           <span className="text-xs text-muted-foreground">
-                            ({Math.abs(diferenciaPorcentaje).toFixed(1)}%)
+                            ({item.diferencia > 0 ? "+" : ""}{item.diferencia.toFixed(2)})
                           </span>
                         </div>
                       </div>
