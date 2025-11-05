@@ -42,6 +42,11 @@ export const calculateFinalScore = (
 
 /**
  * Calcula la posición en la matriz 9-box basado en desempeño y potencial (usando porcentajes)
+ * 
+ * Metodología 9-Box estándar:
+ * - Desempeño: Bajo (< 50%), Medio (50-75%), Alto (> 75%)
+ * - Potencial: Bajo (< 50%), Medio (50-75%), Alto (> 75%)
+ * 
  * Retorna la posición como string (ej: "alto-alto", "medio-bajo", etc.)
  */
 export const calculateNineBoxPosition = (
@@ -51,20 +56,22 @@ export const calculateNineBoxPosition = (
   // Convertir scores a porcentajes para calcular 9-box
   const desempenoPorcentaje = scoreToPercentage(desempenoFinal);
   
-  if (potencial === undefined) {
+  if (potencial === undefined || potencial === null) {
     // Si no hay potencial, solo clasificamos por desempeño (usando porcentajes)
-    if (desempenoPorcentaje >= 87.5) return "alto-alto"; // >= 4.5
-    if (desempenoPorcentaje >= 62.5) return "medio-alto"; // >= 3.5
-    if (desempenoPorcentaje >= 37.5) return "medio-medio"; // >= 2.5
-    return "bajo-medio";
+    // Esto es para casos donde solo se evaluó desempeño
+    if (desempenoPorcentaje > 75) return "alto-medio"; // Alto desempeño, potencial desconocido
+    if (desempenoPorcentaje >= 50) return "medio-medio"; // Medio desempeño, potencial desconocido
+    return "bajo-medio"; // Bajo desempeño, potencial desconocido
   }
   
   const potencialPorcentaje = scoreToPercentage(potencial);
   
-  // Clasificar desempeño usando porcentajes: bajo (< 50%), medio (50-75%), alto (> 75%)
+  // Clasificar desempeño usando porcentajes según metodología estándar:
+  // Bajo: < 50%, Medio: 50-75%, Alto: > 75%
   const desempenoLevel = desempenoPorcentaje < 50 ? "bajo" : desempenoPorcentaje <= 75 ? "medio" : "alto";
   
-  // Clasificar potencial usando porcentajes: bajo (< 50%), medio (50-75%), alto (> 75%)
+  // Clasificar potencial usando porcentajes según metodología estándar:
+  // Bajo: < 50%, Medio: 50-75%, Alto: > 75%
   const potencialLevel = potencialPorcentaje < 50 ? "bajo" : potencialPorcentaje <= 75 ? "medio" : "alto";
   
   return `${desempenoLevel}-${potencialLevel}`;
