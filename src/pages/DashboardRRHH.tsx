@@ -76,6 +76,64 @@ const DashboardRRHH = () => {
       
       const activePeriodId = periodData?.id || periodoId;
 
+      // OPTIMIZACIÓN: Usar función SQL para obtener todas las estadísticas de una vez
+      // Esto reduce significativamente la carga de datos al cliente (de ~1200 registros a 1 JSONB)
+      const { data: statsData, error: statsError } = await supabase
+        .rpc("get_dashboard_stats", { periodo_id_param: activePeriodId });
+
+      if (statsError) {
+        console.error("Error loading stats:", statsError);
+        // Fallback a método anterior si la función no existe aún
+        await loadStatsFallback(activePeriodId);
+        return;
+      }
+
+      if (!statsData) {
+        await loadStatsFallback(activePeriodId);
+        return;
+      }
+
+      // Mapear datos de la función SQL
+      const distribucion9Box = statsData.distribucion9Box || {};
+      const evaluacionesPorArea = (statsData.evaluacionesPorArea || []) as Array<{ area: string; completadas: number; total: number }>;
+      const evaluacionesPorNivel = (statsData.evaluacionesPorNivel || []) as Array<{ nivel: string; completadas: number; total: number }>;
+
+      // Tendencia semanal (simulada por ahora)
+      const completadas = statsData.evaluacionesCompletadas || 0;
+      const tendenciaSemanal = [
+        { semana: "Sem 1", completadas: Math.floor(completadas * 0.1) },
+        { semana: "Sem 2", completadas: Math.floor(completadas * 0.25) },
+        { semana: "Sem 3", completadas: Math.floor(completadas * 0.5) },
+        { semana: "Sem 4", completadas: Math.floor(completadas * 0.75) },
+        { semana: "Actual", completadas },
+      ];
+
+      setStats({
+        totalUsuarios: statsData.totalUsuarios || 0,
+        totalJefes: statsData.totalJefes || 0,
+        evaluacionesCompletadas: statsData.evaluacionesCompletadas || 0,
+        evaluacionesPendientes: statsData.evaluacionesPendientes || 0,
+        evaluacionesEnProgreso: statsData.evaluacionesEnProgreso || 0,
+        porcentajeCompletitud: statsData.porcentajeCompletitud || 0,
+        promedioDesempeno: statsData.promedioDesempeno || 0,
+        promedioPotencial: statsData.promedioPotencial || 0,
+        distribucion9Box: distribucion9Box as Record<string, number>,
+        evaluacionesPorArea,
+        evaluacionesPorNivel,
+        tendenciaSemanal,
+      });
+    } catch (error: any) {
+      console.error("Error loading stats:", error);
+      toast.error("Error al cargar estadísticas");
+    } finally {
+      setLoading(false);
+      setApiUsageStats(getAPIUsageStats());
+    }
+  };
+
+  // Método fallback si la función SQL no está disponible
+  const loadStatsFallback = async (activePeriodId: string) => {
+    try {
       // Estadísticas básicas
       const { data: usuariosData } = await supabase
         .from("users")
@@ -88,7 +146,6 @@ const DashboardRRHH = () => {
         .eq("periodo_id", activePeriodId);
 
       // Contar evaluaciones
-      const autoevaluaciones = evaluacionesData?.filter(e => e.tipo === "auto") || [];
       const evaluacionesJefe = evaluacionesData?.filter(e => e.tipo === "jefe") || [];
       
       const completadas = evaluacionesJefe.filter(e => e.estado === "enviado").length;
@@ -102,11 +159,13 @@ const DashboardRRHH = () => {
         .select("resultado_final")
         .eq("periodo_id", activePeriodId);
 
-      // Calcular promedios
+      // Calcular promedios usando porcentajes directamente
       const promedios = resultadosData?.reduce((acc, r) => {
         const resultado = r.resultado_final as any;
-        acc.desempeno += resultado.desempenoFinal || 0;
-        acc.potencial += resultado.potencial || 0;
+        const desempenoPercent = resultado.desempenoFinal ? scoreToPercentage(resultado.desempenoFinal) : 0;
+        const potencialPercent = resultado.potencial ? scoreToPercentage(resultado.potencial) : 0;
+        acc.desempeno += desempenoPercent;
+        acc.potencial += potencialPercent;
         acc.count++;
         return acc;
       }, { desempeno: 0, potencial: 0, count: 0 }) || { desempeno: 0, potencial: 0, count: 0 };
@@ -180,7 +239,7 @@ const DashboardRRHH = () => {
         ...data,
       }));
 
-      // Tendencia semanal (simulada por ahora)
+      // Tendencia semanal
       const tendenciaSemanal = [
         { semana: "Sem 1", completadas: Math.floor(completadas * 0.1) },
         { semana: "Sem 2", completadas: Math.floor(completadas * 0.25) },
@@ -191,24 +250,21 @@ const DashboardRRHH = () => {
 
       setStats({
         totalUsuarios: usuariosData?.length || 0,
-        totalJefes: usuariosData?.filter(u => u.rol === "jefe" || u.rol === "admin_rrhh" || u.rol === "admin_general").length || 0,
+        totalJefes: usuariosData?.filter(u => u.rol === "jefe").length || 0,
         evaluacionesCompletadas: completadas,
         evaluacionesPendientes: pendientes,
         evaluacionesEnProgreso: enProgreso,
         porcentajeCompletitud: totalEsperadas > 0 ? Math.round((completadas / totalEsperadas) * 100) : 0,
-        promedioDesempeno: Math.round(promedioDesempeno * 100) / 100, // Mantener score para cálculos internos
-        promedioPotencial: Math.round(promedioPotencial * 100) / 100, // Mantener score para cálculos internos
+        promedioDesempeno,
+        promedioPotencial,
         distribucion9Box,
         evaluacionesPorArea,
         evaluacionesPorNivel,
         tendenciaSemanal,
       });
     } catch (error: any) {
-      console.error("Error loading stats:", error);
+      console.error("Error in fallback:", error);
       toast.error("Error al cargar estadísticas");
-    } finally {
-      setLoading(false);
-      setApiUsageStats(getAPIUsageStats());
     }
   };
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, memo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
@@ -6,9 +6,36 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, FileEdit, CheckCircle2, Clock, Grid3x3 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { getJefeEvaluationDraft, hasJefeEvaluation } from "@/lib/storage";
 import { supabase } from "@/integrations/supabase/client";
+import { getActivePeriod } from "@/lib/supabase";
 import { toast } from "sonner";
+
+// Componente memoizado para el badge de estado
+const StatusBadge = memo(({ estado }: { estado: string }) => {
+  if (estado === "completado") {
+    return (
+      <Badge className="bg-success text-success-foreground">
+        <CheckCircle2 className="mr-1 h-3 w-3" />
+        Completado
+      </Badge>
+    );
+  }
+  if (estado === "en_progreso") {
+    return (
+      <Badge variant="outline" className="text-primary border-primary">
+        <Clock className="mr-1 h-3 w-3" />
+        En Progreso
+      </Badge>
+    );
+  }
+  return (
+    <Badge variant="outline" className="text-warning border-warning">
+      <Clock className="mr-1 h-3 w-3" />
+      Pendiente
+    </Badge>
+  );
+});
+StatusBadge.displayName = "StatusBadge";
 
 const EvaluacionEquipo = () => {
   const { user } = useAuth();
@@ -16,13 +43,41 @@ const EvaluacionEquipo = () => {
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [teamStatus, setTeamStatus] = useState<Record<string, { estado: string; progreso: number }>>({});
+  const [periodoId, setPeriodoId] = useState<string>("");
 
   useEffect(() => {
     if (!user) return;
-    loadTeamMembers();
+    loadPeriodoAndTeam();
   }, [user]);
 
-  const loadTeamMembers = async () => {
+  const loadPeriodoAndTeam = async () => {
+    try {
+      // Obtener período activo primero
+      const activePeriod = await getActivePeriod();
+      if (activePeriod) {
+        setPeriodoId(activePeriod.id);
+        await loadTeamMembers(activePeriod.id);
+      } else {
+        // Fallback: buscar período 2025-1 por nombre
+        const { data: periodData } = await supabase
+          .from("evaluation_periods")
+          .select("id")
+          .eq("nombre", "2025-1")
+          .single();
+        if (periodData) {
+          setPeriodoId(periodData.id);
+          await loadTeamMembers(periodData.id);
+        } else {
+          toast.error("No se encontró un período de evaluación activo");
+        }
+      }
+    } catch (error: any) {
+      console.error("Error loading period:", error);
+      toast.error("Error al cargar período de evaluación");
+    }
+  };
+
+  const loadTeamMembers = async (periodoIdParam: string) => {
     try {
       setLoading(true);
       
@@ -41,8 +96,8 @@ const EvaluacionEquipo = () => {
             area
           )
         `)
-        .eq("jefe_id", user.dpi)
-        .eq("periodo_id", "2025-1");
+        .eq("jefe_id", user!.dpi)
+        .eq("periodo_id", periodoIdParam);
 
       if (assignmentsError) throw assignmentsError;
 
@@ -61,32 +116,53 @@ const EvaluacionEquipo = () => {
 
       setTeamMembers(members);
 
-      // Cargar estado de evaluaciones
+      // OPTIMIZACIÓN: Cargar todos los estados de evaluaciones de una vez usando query batch
+      if (members.length === 0) {
+        setTeamStatus({});
+        return;
+      }
+
+      const colaboradoresIds = members.map(m => m.dpi);
+      
+      // Obtener todas las evaluaciones del jefe para estos colaboradores en una sola query
+      const { data: evaluacionesData, error: evaluacionesError } = await supabase
+        .from("evaluations")
+        .select("colaborador_id, estado, progreso")
+        .eq("evaluador_id", user!.dpi)
+        .eq("periodo_id", periodoIdParam)
+        .eq("tipo", "jefe")
+        .in("colaborador_id", colaboradoresIds);
+
+      if (evaluacionesError) {
+        console.error("Error loading evaluations:", evaluacionesError);
+        // Continuar con estados por defecto
+      }
+
+      // Procesar estados en memoria
       const status: Record<string, { estado: string; progreso: number }> = {};
       
-      for (const colaborador of members) {
-        const evaluado = await hasJefeEvaluation(user.dpi, colaborador.dpi, "2025-1");
-        if (evaluado) {
-          const draft = await getJefeEvaluationDraft(user.dpi, colaborador.dpi, "2025-1");
-          status[colaborador.id] = {
-            estado: "completado",
-            progreso: draft?.progreso || 100,
-          };
-        } else {
-          const draft = await getJefeEvaluationDraft(user.dpi, colaborador.dpi, "2025-1");
-          if (draft) {
+      members.forEach((colaborador) => {
+        const evaluacion = evaluacionesData?.find(e => e.colaborador_id === colaborador.dpi);
+        
+        if (evaluacion) {
+          if (evaluacion.estado === "enviado") {
             status[colaborador.id] = {
-              estado: "en_progreso",
-              progreso: draft.progreso,
+              estado: "completado",
+              progreso: evaluacion.progreso || 100,
             };
           } else {
             status[colaborador.id] = {
-              estado: "pendiente",
-              progreso: 0,
+              estado: "en_progreso",
+              progreso: evaluacion.progreso || 0,
             };
           }
+        } else {
+          status[colaborador.id] = {
+            estado: "pendiente",
+            progreso: 0,
+          };
         }
-      }
+      });
 
       setTeamStatus(status);
     } catch (error: any) {
@@ -106,31 +182,6 @@ const EvaluacionEquipo = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const getStatusBadge = (estado: string) => {
-    if (estado === "completado") {
-      return (
-        <Badge className="bg-success text-success-foreground">
-          <CheckCircle2 className="mr-1 h-3 w-3" />
-          Completado
-        </Badge>
-      );
-    }
-    if (estado === "en_progreso") {
-      return (
-        <Badge variant="outline" className="text-primary border-primary">
-          <Clock className="mr-1 h-3 w-3" />
-          En Progreso
-        </Badge>
-      );
-    }
-    return (
-      <Badge variant="outline" className="text-warning border-warning">
-        <Clock className="mr-1 h-3 w-3" />
-        Pendiente
-      </Badge>
-    );
   };
 
   return (
@@ -195,7 +246,7 @@ const EvaluacionEquipo = () => {
                           {colaborador.cargo} • {colaborador.area} • Nivel {colaborador.nivel}
                         </CardDescription>
                       </div>
-                      {getStatusBadge(status.estado)}
+                      <StatusBadge estado={status.estado} />
                     </div>
                   </CardHeader>
                   <CardContent>

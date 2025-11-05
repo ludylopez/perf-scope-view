@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
@@ -25,10 +25,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Plus, Edit, X, UserPlus, Users, Search } from "lucide-react";
+import { ArrowLeft, Plus, Edit, X, UserPlus, Users, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@/types/auth";
+
+const PAGE_SIZE = 50; // OPTIMIZACIÓN: Paginación para manejar 400 usuarios
 
 const AdminUsuarios = () => {
   const { user } = useAuth();
@@ -38,6 +40,8 @@ const AdminUsuarios = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
   const [newUser, setNewUser] = useState({
     dpi: "",
     nombre: "",
@@ -62,12 +66,27 @@ const AdminUsuarios = () => {
     loadUsuarios();
   }, [user, navigate]);
 
-  const loadUsuarios = async () => {
+  const loadUsuarios = async (page: number = 0) => {
     try {
+      setLoading(true);
+      
+      // OPTIMIZACIÓN: Obtener total de usuarios primero (solo count)
+      const { count, error: countError } = await supabase
+        .from("users")
+        .select("*", { count: "exact", head: true });
+
+      if (countError) throw countError;
+      setTotalCount(count || 0);
+
+      // OPTIMIZACIÓN: Cargar solo la página actual con paginación
+      const from = page * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+
       const { data, error } = await supabase
         .from("users")
         .select("*")
-        .order("nombre", { ascending: true });
+        .order("nombre", { ascending: true })
+        .range(from, to);
 
       if (error) throw error;
 
@@ -96,6 +115,14 @@ const AdminUsuarios = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!user || (user.rol !== "admin_rrhh" && user.rol !== "admin_general")) {
+      navigate("/dashboard");
+      return;
+    }
+    loadUsuarios(currentPage);
+  }, [user, navigate, currentPage]);
 
   const handleCreateUser = async () => {
     if (!newUser.dpi || !newUser.nombre || !newUser.apellidos || !newUser.fechaNacimiento || !newUser.nivel || !newUser.cargo || !newUser.area) {
@@ -142,7 +169,7 @@ const AdminUsuarios = () => {
         instrumentoId: "",
       });
       setShowCreateDialog(false);
-      loadUsuarios();
+      loadUsuarios(currentPage);
     } catch (error: any) {
       console.error("Error creating user:", error);
       toast.error(error.message || "Error al crear usuario");
@@ -175,16 +202,24 @@ const AdminUsuarios = () => {
 
       toast.success("Usuario actualizado exitosamente");
       setEditingUser(null);
-      loadUsuarios();
+      loadUsuarios(currentPage);
     } catch (error: any) {
       console.error("Error updating user:", error);
       toast.error(error.message || "Error al actualizar usuario");
     }
   };
 
-  const filteredUsuarios = usuarios.filter((u) =>
-    `${u.nombre} ${u.apellidos} ${u.dpi} ${u.cargo} ${u.area}`.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // OPTIMIZACIÓN: Memoizar el filtrado para evitar recalcular en cada render
+  const filteredUsuarios = useMemo(() => {
+    if (!searchTerm) return usuarios;
+    return usuarios.filter((u) =>
+      `${u.nombre} ${u.apellidos} ${u.dpi} ${u.cargo} ${u.area}`.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [usuarios, searchTerm]);
+
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+  const hasNextPage = currentPage < totalPages - 1;
+  const hasPrevPage = currentPage > 0;
 
   if (loading) {
     return (
@@ -388,10 +423,36 @@ const AdminUsuarios = () => {
           <CardHeader>
             <CardTitle>Usuarios Registrados</CardTitle>
             <CardDescription>
-              Total: {filteredUsuarios.length} usuarios {searchTerm && `(filtrados de ${usuarios.length})`}
+              {searchTerm 
+                ? `Mostrando ${filteredUsuarios.length} resultados filtrados de ${totalCount} usuarios`
+                : `Mostrando página ${currentPage + 1} de ${totalPages} (${filteredUsuarios.length} de ${totalCount} usuarios)`
+              }
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {!searchTerm && totalPages > 1 && (
+              <div className="flex items-center justify-between mb-4">
+                <Button
+                  variant="outline"
+                  onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
+                  disabled={!hasPrevPage}
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Anterior
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  Página {currentPage + 1} de {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages - 1, p + 1))}
+                  disabled={!hasNextPage}
+                >
+                  Siguiente
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+            )}
             <Table>
               <TableHeader>
                 <TableRow>
