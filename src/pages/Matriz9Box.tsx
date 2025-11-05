@@ -8,12 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Grid3x3, Users, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { 
-  getJefeEvaluationDraft, 
-  getSubmittedEvaluation, 
-  getMockColaboradorEvaluation,
-  hasJefeEvaluation 
-} from "@/lib/storage";
+import { getActivePeriod } from "@/lib/supabase";
 import { calculateCompleteFinalScore, getNineBoxDescription } from "@/lib/finalScore";
 import { getInstrumentForUser } from "@/lib/instruments";
 import { scoreToPercentage } from "@/lib/calculations";
@@ -73,12 +68,20 @@ const Matriz9Box = () => {
     try {
       setLoading(true);
       
+      // Obtener período activo
+      const activePeriod = await getActivePeriod();
+      if (!activePeriod) {
+        toast.error("No se encontró un período de evaluación activo");
+        return;
+      }
+      const periodoId = activePeriod.id;
+      
       // Cargar colaboradores asignados desde Supabase
+      // NOTA: Las asignaciones son permanentes, no están vinculadas a períodos específicos
       const { data: assignments, error: assignmentsError } = await supabase
         .from("user_assignments")
         .select(`
           colaborador_id,
-          periodo_id,
           users!user_assignments_colaborador_id_fkey (
             dpi,
             nombre,
@@ -89,7 +92,7 @@ const Matriz9Box = () => {
           )
         `)
         .eq("jefe_id", user.dpi)
-        .eq("periodo_id", "2025-1");
+        .eq("activo", true);
 
       if (assignmentsError) throw assignmentsError;
 
@@ -101,7 +104,7 @@ const Matriz9Box = () => {
         const colaboradorDpi = colaborador.dpi;
 
         // Verificar si el jefe completó la evaluación
-        const jefeEvaluado = await hasJefeEvaluation(user.dpi, colaboradorDpi, "2025-1");
+        const jefeEvaluado = await hasJefeEvaluation(user.dpi, colaboradorDpi, periodoId);
         
         if (!jefeEvaluado) {
           // Si no está evaluado, no se incluye en la matriz
@@ -109,14 +112,13 @@ const Matriz9Box = () => {
         }
 
         // Primero intentar cargar desde Supabase (más eficiente)
-        let resultadoFinal = await getFinalResultFromSupabase(colaboradorDpi, "2025-1");
+        let resultadoFinal = await getFinalResultFromSupabase(colaboradorDpi, periodoId);
 
         // Si no está en Supabase, calcular sobre la marcha
         if (!resultadoFinal) {
           // Cargar evaluaciones
-          const evaluacionJefe = await getJefeEvaluationDraft(user.dpi, colaboradorDpi, "2025-1");
-          const autoevaluacion = await getSubmittedEvaluation(colaboradorDpi, "2025-1") || 
-                                getMockColaboradorEvaluation(colaboradorDpi);
+          const evaluacionJefe = await getJefeEvaluationDraft(user.dpi, colaboradorDpi, periodoId);
+          const autoevaluacion = await getSubmittedEvaluation(colaboradorDpi, periodoId);
 
           if (!evaluacionJefe || evaluacionJefe.estado !== "enviado" || !autoevaluacion) {
             continue;

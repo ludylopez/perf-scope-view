@@ -82,11 +82,11 @@ const EvaluacionEquipo = () => {
       setLoading(true);
       
       // Cargar colaboradores asignados desde Supabase
+      // NOTA: Las asignaciones son permanentes, no están vinculadas a períodos específicos
       const { data: assignments, error: assignmentsError } = await supabase
         .from("user_assignments")
         .select(`
           colaborador_id,
-          periodo_id,
           users!user_assignments_colaborador_id_fkey (
             dpi,
             nombre,
@@ -97,7 +97,7 @@ const EvaluacionEquipo = () => {
           )
         `)
         .eq("jefe_id", user!.dpi)
-        .eq("periodo_id", periodoIdParam);
+        .eq("activo", true);
 
       if (assignmentsError) throw assignmentsError;
 
