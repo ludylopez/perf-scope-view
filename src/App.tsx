@@ -9,6 +9,7 @@ import Dashboard from "./pages/Dashboard";
 import Autoevaluacion from "./pages/Autoevaluacion";
 import MiAutoevaluacion from "./pages/MiAutoevaluacion";
 import EvaluacionEquipo from "./pages/EvaluacionEquipo";
+import EvaluacionColaborador from "./pages/EvaluacionColaborador";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -57,6 +58,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <EvaluacionEquipo />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/evaluacion-equipo/:id"
+              element={
+                <ProtectedRoute>
+                  <EvaluacionColaborador />
                 </ProtectedRoute>
               }
             />

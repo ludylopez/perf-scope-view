@@ -12,8 +12,8 @@ const MOCK_TEAM = [
     cargo: "Coordinador",
     nivel: "S2",
     area: "Tecnología",
-    estado: "pendiente",
-    progreso: 0,
+    estado: "completado",
+    progreso: 100,
   },
   {
     id: "2",
@@ -102,9 +102,12 @@ const EvaluacionEquipo = () => {
                       />
                     </div>
                   </div>
-                  <Button className="ml-4">
+                  <Button 
+                    className="ml-4"
+                    onClick={() => navigate(`/evaluacion-equipo/${colaborador.id}`)}
+                  >
                     <FileEdit className="mr-2 h-4 w-4" />
-                    Evaluar
+                    {colaborador.estado === "completado" ? "Ver Evaluación" : "Evaluar"}
                   </Button>
                 </div>
               </CardContent>
