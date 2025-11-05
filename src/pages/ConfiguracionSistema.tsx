@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Zap, TrendingUp, AlertCircle, CheckCircle2 } from "lucide-react";
 import { getAPIUsageStats, getGeminiApiKey } from "@/lib/gemini";
 
+// Componente de configuración del sistema
 const ConfiguracionSistema = () => {
   const { user } = useAuth();
   const navigate = useNavigate();

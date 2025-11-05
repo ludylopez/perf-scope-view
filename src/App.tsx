@@ -23,6 +23,7 @@ import SupabaseUtils from "./pages/SupabaseUtils";
 import AdminInstrumentos from "./pages/AdminInstrumentos";
 import Matriz9Box from "./pages/Matriz9Box";
 import NotFound from "./pages/NotFound";
+import ConfiguracionSistema from "./pages/ConfiguracionSistema";
 
 const queryClient = new QueryClient();
 
