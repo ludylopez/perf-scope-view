@@ -78,7 +78,7 @@ const Login = () => {
                 className="text-base"
               />
               <p className="text-xs text-muted-foreground">
-                Primera vez: use su fecha de nacimiento (DDMMAAAA)
+                Ingrese su fecha de nacimiento (DDMMAAAA) sin espacios ni guiones
               </p>
             </div>
 

@@ -88,32 +88,52 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       const userObj = JSON.parse(storedUser);
       setUser(userObj);
       setIsAuthenticated(true);
-      
-      // Si es primer ingreso, redirigir a cambio de contraseña
-      if (userObj.primerIngreso) {
-        // Verificar si hay contraseña guardada
-        const savedPassword = localStorage.getItem(`password_${userObj.dpi}`);
-        if (!savedPassword) {
-          // No redirigir automáticamente aquí, mejor hacerlo en el componente Dashboard
-        }
-      }
     }
   }, []);
 
   const login = async (dpi: string, password: string) => {
-    const foundUser = MOCK_USERS.find((u) => u.dpi === dpi);
+    // Buscar usuario en Supabase primero, luego en mock
+    let foundUser: User | null = null;
+    
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { data, error } = await supabase
+        .from("users")
+        .select("*")
+        .eq("dpi", dpi)
+        .single();
+      
+      if (!error && data) {
+        foundUser = {
+          dpi: data.dpi,
+          nombre: data.nombre,
+          apellidos: data.apellidos,
+          fechaNacimiento: data.fecha_nacimiento,
+          correo: data.correo,
+          nivel: data.nivel,
+          cargo: data.cargo,
+          area: data.area,
+          rol: data.rol as User["rol"],
+          estado: data.estado as "activo" | "inactivo",
+          primerIngreso: data.primer_ingreso || false,
+        };
+      }
+    } catch (error) {
+      console.error("Error loading user from Supabase:", error);
+    }
+    
+    // Si no se encuentra en Supabase, buscar en mock
+    if (!foundUser) {
+      foundUser = MOCK_USERS.find((u) => u.dpi === dpi) || null;
+    }
     
     if (!foundUser) {
       throw new Error("DPI no encontrado");
     }
 
-    // Verificar si el usuario ya cambió su contraseña
-    const savedPassword = localStorage.getItem(`password_${dpi}`);
-    const validPassword = savedPassword || foundUser.fechaNacimiento;
-    
-    // También permitir contraseña temporal para desarrollo
-    if (password !== validPassword && password !== "nuevaclave123") {
-      throw new Error("Contraseña incorrecta");
+    // La contraseña SIEMPRE debe ser la fecha de nacimiento (formato DDMMAAAA)
+    if (password !== foundUser.fechaNacimiento) {
+      throw new Error("Contraseña incorrecta. Use su fecha de nacimiento (DDMMAAAA)");
     }
 
     setUser(foundUser);
@@ -130,18 +150,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     toast.info("Sesión cerrada");
   };
 
-  const changePassword = (newPassword: string) => {
-    if (user) {
-      const updatedUser = { ...user, primerIngreso: false };
-      setUser(updatedUser);
-      localStorage.setItem("user", JSON.stringify(updatedUser));
-      toast.success("Contraseña actualizada correctamente");
-    }
-  };
-
   return (
     <AuthContext.Provider
-      value={{ user, login, logout, changePassword, isAuthenticated }}
+      value={{ user, login, logout, isAuthenticated }}
     >
       {children}
     </AuthContext.Provider>

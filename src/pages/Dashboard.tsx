@@ -31,17 +31,6 @@ const Dashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   
-  // Redirigir a cambio de contraseña si es primer ingreso
-  useEffect(() => {
-    if (user?.primerIngreso) {
-      const savedPassword = localStorage.getItem(`password_${user.dpi}`);
-      if (!savedPassword) {
-        navigate("/cambio-contrasena");
-        return;
-      }
-    }
-  }, [user, navigate]);
-
   const [evaluationStatus, setEvaluationStatus] = useState<"not_started" | "in_progress" | "submitted">("not_started");
   const [progress, setProgress] = useState(0);
 
