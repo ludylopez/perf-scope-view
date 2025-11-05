@@ -205,11 +205,11 @@ const handleSaveDraft = () => {
   };
 
   const handleConfirmSubmit = async () => {
-    if (!user) return;
+    if (!user || !periodoId) return;
 
     const draft: EvaluationDraft = {
       usuarioId: user.dpi,
-      periodoId: "2025-1",
+      periodoId: periodoId,
       tipo: "auto",
       responses,
       comments,
@@ -222,9 +222,7 @@ const handleSaveDraft = () => {
     
     // Guardar respuestas a preguntas abiertas
     if (Object.keys(openQuestionResponses).length > 0) {
-      // Obtener el ID de la evaluación guardada (necesitaríamos obtenerlo de Supabase)
-      // Por ahora guardamos en localStorage como backup
-      const openQuestionsKey = `open_questions_${user.dpi}_2025-1`;
+      const openQuestionsKey = `open_questions_${user.dpi}_${periodoId}`;
       localStorage.setItem(openQuestionsKey, JSON.stringify(openQuestionResponses));
       
       // Intentar guardar en Supabase también
