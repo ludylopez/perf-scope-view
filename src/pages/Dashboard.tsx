@@ -18,8 +18,6 @@ import {
   FileText,
   PlayCircle,
   Sparkles,
-  Key,
-  Save,
   Trash2,
   Database
 } from "lucide-react";
@@ -27,7 +25,6 @@ import { useNavigate } from "react-router-dom";
 import { getEvaluationDraft, hasSubmittedEvaluation, saveEvaluationDraft, submitEvaluation, EvaluationDraft } from "@/lib/storage";
 import { INSTRUMENT_A1 } from "@/data/instruments";
 import { toast } from "@/hooks/use-toast";
-import { setGeminiApiKey, getGeminiApiKey, removeGeminiApiKey } from "@/lib/gemini";
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -35,8 +32,6 @@ const Dashboard = () => {
 
   const [evaluationStatus, setEvaluationStatus] = useState<"not_started" | "in_progress" | "submitted">("not_started");
   const [progress, setProgress] = useState(0);
-  const [apiKey, setApiKey] = useState("");
-  const [hasApiKey, setHasApiKey] = useState(false);
 
   const isColaborador = user?.rol === "colaborador";
   const isJefe = user?.rol === "jefe";
@@ -61,42 +56,7 @@ const Dashboard = () => {
         setProgress(0);
       }
     }
-
-    // Check if API key exists
-    const existingKey = getGeminiApiKey();
-    setHasApiKey(!!existingKey);
   }, [user]);
-
-  const handleSaveApiKey = () => {
-    if (!apiKey.trim()) {
-      toast({
-        title: "Error",
-        description: "Por favor ingresa una clave de API válida",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setGeminiApiKey(apiKey.trim());
-    setHasApiKey(true);
-    setApiKey("");
-    
-    toast({
-      title: "✓ Clave guardada",
-      description: "Tu clave de Google AI ha sido configurada correctamente",
-    });
-  };
-
-  const handleRemoveApiKey = () => {
-    removeGeminiApiKey();
-    setHasApiKey(false);
-    setApiKey("");
-    
-    toast({
-      title: "Clave eliminada",
-      description: "La clave de API ha sido removida",
-    });
-  };
 
   const getStatusBadge = () => {
     switch (evaluationStatus) {
@@ -237,83 +197,6 @@ const Dashboard = () => {
         {/* Colaborador Dashboard */}
         {isColaborador && (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {/* AI Configuration Card */}
-            <Card className="md:col-span-2 lg:col-span-3 border-info/20 bg-info/5">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Key className="h-5 w-5 text-info" />
-                  Configuración de IA
-                </CardTitle>
-                <CardDescription>
-                  Configura tu clave de Google AI para obtener análisis inteligentes de tu desempeño
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="rounded-lg border border-warning/30 bg-warning/5 p-4">
-                  <div className="flex gap-2">
-                    <AlertCircle className="h-5 w-5 text-warning flex-shrink-0 mt-0.5" />
-                    <div className="text-sm">
-                      <p className="font-medium text-warning mb-1">Nota de seguridad</p>
-                      <p className="text-muted-foreground">
-                        Esta clave se almacena en tu navegador. Para mayor seguridad en producción, 
-                        considera usar Lovable Cloud para proteger tus claves de API.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {hasApiKey ? (
-                  <div className="flex items-center justify-between p-4 rounded-lg border bg-success/5 border-success/20">
-                    <div className="flex items-center gap-3">
-                      <CheckCircle2 className="h-5 w-5 text-success" />
-                      <div>
-                        <p className="font-medium">Clave de API configurada</p>
-                        <p className="text-sm text-muted-foreground">
-                          El análisis de IA está habilitado
-                        </p>
-                      </div>
-                    </div>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={handleRemoveApiKey}
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Eliminar
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <div className="space-y-2">
-                      <Label htmlFor="apiKey">Clave de API de Google AI</Label>
-                      <Input
-                        id="apiKey"
-                        type="password"
-                        placeholder="Ingresa tu clave de Google AI (Gemini)"
-                        value={apiKey}
-                        onChange={(e) => setApiKey(e.target.value)}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Obtén tu clave en:{" "}
-                        <a 
-                          href="https://aistudio.google.com/app/apikey" 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="text-primary hover:underline"
-                        >
-                          Google AI Studio
-                        </a>
-                      </p>
-                    </div>
-                    <Button onClick={handleSaveApiKey} className="w-full">
-                      <Save className="mr-2 h-4 w-4" />
-                      Guardar Clave
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
             <Card className="md:col-span-2">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -575,6 +458,14 @@ const Dashboard = () => {
                   >
                     <Database className="mr-2 h-4 w-4" />
                     Estado Base de Datos
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="justify-start"
+                    onClick={() => navigate("/admin/configuracion")}
+                  >
+                    <Settings className="mr-2 h-4 w-4" />
+                    Configuración Sistema
                   </Button>
                   <Button 
                     variant="outline" 

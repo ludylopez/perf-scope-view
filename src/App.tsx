@@ -20,6 +20,7 @@ import VistaPlanDesarrollo from "./pages/VistaPlanDesarrollo";
 import VistaResultadosFinales from "./pages/VistaResultadosFinales";
 import EstadisticasGrupales from "./pages/EstadisticasGrupales";
 import SupabaseUtils from "./pages/SupabaseUtils";
+import ConfiguracionSistema from "./pages/ConfiguracionSistema";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -156,6 +157,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <SupabaseUtils />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/configuracion"
+              element={
+                <ProtectedRoute>
+                  <ConfiguracionSistema />
                 </ProtectedRoute>
               }
             />
