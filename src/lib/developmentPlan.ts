@@ -1,7 +1,8 @@
 import { EvaluationDraft } from "@/lib/storage";
 import { Dimension, FinalScore } from "@/types/evaluation";
 import { DevelopmentPlan } from "@/types/evaluation";
-import { getGeminiApiKey } from "./gemini";
+import { generateAIAnalysis } from "./gemini";
+import { scoreToPercentage } from "./calculations";
 
 /**
  * Genera un plan de desarrollo personalizado usando IA (Google Gemini)
