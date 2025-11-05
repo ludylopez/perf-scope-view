@@ -25,7 +25,7 @@ import {
   calculateDimensionPercentage,
   calculateDimensionAverage
 } from "@/lib/calculations";
-import { ArrowLeft, CheckCircle2, FileDown, Sparkles, TrendingUp } from "lucide-react";
+import { ArrowLeft, CheckCircle2, FileDown, Sparkles, TrendingUp, Target, Award, AlertCircle, Lightbulb } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import {
@@ -88,6 +88,11 @@ const MiAutoevaluacion = () => {
     porcentaje: calculateDimensionPercentage(evaluation.responses, dim),
     puntaje: calculateDimensionAverage(evaluation.responses, dim)
   }));
+
+  // Identificar fortalezas (top 3) y áreas de mejora (bottom 3)
+  const sortedDimensions = [...radarData].sort((a, b) => b.porcentaje - a.porcentaje);
+  const fortalezas = sortedDimensions.slice(0, 3);
+  const areasDeOportunidad = sortedDimensions.slice(-3).reverse();
 
   return (
     <div className="min-h-screen bg-background">
@@ -259,6 +264,136 @@ const MiAutoevaluacion = () => {
             </div>
           </CardContent>
         </Card>
+
+        <div className="grid gap-6 mb-6 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Award className="h-5 w-5 text-success" />
+                Fortalezas Identificadas
+              </CardTitle>
+              <CardDescription>
+                Dimensiones con mejor desempeño
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {fortalezas.map((dim, idx) => (
+                  <div key={idx} className="flex items-start gap-3 p-3 rounded-lg border border-success/20 bg-success/5">
+                    <div className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-success/20 text-success font-bold text-sm">
+                      {idx + 1}
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-semibold text-sm">{dim.nombreCompleto}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Puntaje: {dim.puntaje.toFixed(2)}/5.0
+                      </p>
+                      <div className="flex items-center gap-2 mt-2">
+                        <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-success transition-all" 
+                            style={{ width: `${dim.porcentaje}%` }}
+                          />
+                        </div>
+                        <span className="text-sm font-bold text-success">{dim.porcentaje}%</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Target className="h-5 w-5 text-warning" />
+                Áreas de Oportunidad
+              </CardTitle>
+              <CardDescription>
+                Dimensiones para enfocarse en mejorar
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {areasDeOportunidad.map((dim, idx) => (
+                  <div key={idx} className="flex items-start gap-3 p-3 rounded-lg border border-warning/20 bg-warning/5">
+                    <div className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-warning/20 text-warning font-bold text-sm">
+                      {idx + 1}
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-semibold text-sm">{dim.nombreCompleto}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Puntaje: {dim.puntaje.toFixed(2)}/5.0
+                      </p>
+                      <div className="flex items-center gap-2 mt-2">
+                        <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-warning transition-all" 
+                            style={{ width: `${dim.porcentaje}%` }}
+                          />
+                        </div>
+                        <span className="text-sm font-bold text-warning">{dim.porcentaje}%</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid gap-6 mb-6 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Award className="h-5 w-5 text-primary" />
+                Logros Destacados del Periodo
+              </CardTitle>
+              <CardDescription>
+                Principales logros y resultados obtenidos
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="p-4 rounded-lg border border-dashed border-muted-foreground/30 bg-muted/30">
+                  <p className="text-sm text-muted-foreground text-center">
+                    No se han documentado logros para este periodo
+                  </p>
+                </div>
+                <Button variant="outline" className="w-full" disabled>
+                  <Lightbulb className="mr-2 h-4 w-4" />
+                  Agregar Logro
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Target className="h-5 w-5 text-primary" />
+                Plan de Desarrollo Individual
+              </CardTitle>
+              <CardDescription>
+                Objetivos y áreas de mejora para el próximo periodo
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="p-4 rounded-lg border border-dashed border-muted-foreground/30 bg-muted/30">
+                  <p className="text-sm text-muted-foreground text-center">
+                    No se han establecido objetivos para el siguiente periodo
+                  </p>
+                </div>
+                <Button variant="outline" className="w-full" disabled>
+                  <Target className="mr-2 h-4 w-4" />
+                  Establecer Objetivos
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
         <Card>
           <CardHeader>
