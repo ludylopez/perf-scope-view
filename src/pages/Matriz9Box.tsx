@@ -17,6 +17,7 @@ import {
 import { calculateCompleteFinalScore, getNineBoxDescription } from "@/lib/finalScore";
 import { getInstrumentForUser } from "@/lib/instruments";
 import { scoreToPercentage } from "@/lib/calculations";
+import { getFinalResultFromSupabase } from "@/lib/finalResultSupabase";
 
 interface TeamMember9Box {
   dpi: string;
@@ -107,28 +108,34 @@ const Matriz9Box = () => {
           continue;
         }
 
-        // Cargar evaluaciones
-        const evaluacionJefe = await getJefeEvaluationDraft(user.dpi, colaboradorDpi, "2025-1");
-        const autoevaluacion = await getSubmittedEvaluation(colaboradorDpi, "2025-1") || 
-                              getMockColaboradorEvaluation(colaboradorDpi);
+        // Primero intentar cargar desde Supabase (más eficiente)
+        let resultadoFinal = await getFinalResultFromSupabase(colaboradorDpi, "2025-1");
 
-        if (!evaluacionJefe || evaluacionJefe.estado !== "enviado" || !autoevaluacion) {
-          continue;
+        // Si no está en Supabase, calcular sobre la marcha
+        if (!resultadoFinal) {
+          // Cargar evaluaciones
+          const evaluacionJefe = await getJefeEvaluationDraft(user.dpi, colaboradorDpi, "2025-1");
+          const autoevaluacion = await getSubmittedEvaluation(colaboradorDpi, "2025-1") || 
+                                getMockColaboradorEvaluation(colaboradorDpi);
+
+          if (!evaluacionJefe || evaluacionJefe.estado !== "enviado" || !autoevaluacion) {
+            continue;
+          }
+
+          // Obtener instrumento del colaborador
+          const instrument = await getInstrumentForUser(colaborador.nivel);
+          if (!instrument) continue;
+
+          // Calcular resultado final
+          resultadoFinal = calculateCompleteFinalScore(
+            autoevaluacion,
+            evaluacionJefe,
+            instrument.dimensionesDesempeno,
+            instrument.dimensionesPotencial
+          );
+
+          if (!resultadoFinal.posicion9Box) continue;
         }
-
-        // Obtener instrumento del colaborador
-        const instrument = await getInstrumentForUser(colaborador.nivel);
-        if (!instrument) continue;
-
-        // Calcular resultado final
-        const resultadoFinal = calculateCompleteFinalScore(
-          autoevaluacion,
-          evaluacionJefe,
-          instrument.dimensionesDesempeno,
-          instrument.dimensionesPotencial
-        );
-
-        if (!resultadoFinal.posicion9Box) continue;
 
         members.push({
           dpi: colaboradorDpi,
@@ -138,7 +145,7 @@ const Matriz9Box = () => {
           nivel: colaborador.nivel,
           desempenoFinal: resultadoFinal.desempenoFinal,
           potencial: resultadoFinal.potencial,
-          posicion9Box: resultadoFinal.posicion9Box,
+          posicion9Box: resultadoFinal.posicion9Box || "medio-medio",
           desempenoPorcentaje: scoreToPercentage(resultadoFinal.desempenoFinal),
           potencialPorcentaje: resultadoFinal.potencial 
             ? scoreToPercentage(resultadoFinal.potencial) 

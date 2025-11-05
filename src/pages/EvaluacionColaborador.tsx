@@ -58,6 +58,7 @@ import { generateDevelopmentPlan } from "@/lib/developmentPlan";
 import { calculateCompleteFinalScore } from "@/lib/finalScore";
 import { getInstrumentForUser } from "@/lib/instruments";
 import { supabase } from "@/integrations/supabase/client";
+import { saveFinalResultToSupabase } from "@/lib/finalResultSupabase";
 
 // Datos mock del colaborador
 const MOCK_COLABORADORES: Record<string, any> = {
@@ -344,6 +345,35 @@ const EvaluacionColaborador = () => {
       
       if (!autoevaluacion || !evaluacionJefe) return;
       
+      // Obtener IDs de las evaluaciones desde Supabase
+      let autoevaluacionId: string | null = null;
+      let evaluacionJefeId: string | null = null;
+
+      try {
+        // Obtener ID de autoevaluación
+        const { data: autoData } = await supabase
+          .from("evaluations")
+          .select("id")
+          .eq("usuario_id", colaboradorId)
+          .eq("periodo_id", periodoId)
+          .eq("tipo", "auto")
+          .single();
+        autoevaluacionId = autoData?.id || null;
+
+        // Obtener ID de evaluación del jefe
+        const { data: jefeData } = await supabase
+          .from("evaluations")
+          .select("id")
+          .eq("colaborador_id", colaboradorId)
+          .eq("periodo_id", periodoId)
+          .eq("tipo", "jefe")
+          .eq("evaluador_id", user?.dpi)
+          .single();
+        evaluacionJefeId = jefeData?.id || null;
+      } catch (error) {
+        console.error("Error obteniendo IDs de evaluaciones:", error);
+      }
+
       // Calcular resultado final
       const resultadoFinal = calculateCompleteFinalScore(
         autoevaluacion,
@@ -352,7 +382,7 @@ const EvaluacionColaborador = () => {
         potencialDimensions
       );
       
-      // Guardar resultado final (por ahora en localStorage, luego en Supabase)
+      // Guardar resultado final en localStorage (fallback)
       const resultadoKey = `final_result_${colaboradorId}_${periodoId}`;
       localStorage.setItem(resultadoKey, JSON.stringify({
         colaboradorId,
@@ -360,6 +390,17 @@ const EvaluacionColaborador = () => {
         resultadoFinal,
         fechaGeneracion: new Date().toISOString(),
       }));
+
+      // Guardar en Supabase si tenemos los IDs
+      if (autoevaluacionId && evaluacionJefeId) {
+        await saveFinalResultToSupabase(
+          colaboradorId,
+          periodoId,
+          autoevaluacionId,
+          evaluacionJefeId,
+          resultadoFinal
+        );
+      }
       
       // Generar plan de desarrollo con IA automáticamente
       try {
