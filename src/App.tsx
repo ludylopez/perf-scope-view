@@ -19,6 +19,7 @@ import DashboardRRHH from "./pages/DashboardRRHH";
 import VistaPlanDesarrollo from "./pages/VistaPlanDesarrollo";
 import VistaResultadosFinales from "./pages/VistaResultadosFinales";
 import EstadisticasGrupales from "./pages/EstadisticasGrupales";
+import SupabaseUtils from "./pages/SupabaseUtils";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -147,6 +148,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <EstadisticasGrupales />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/supabase-utils"
+              element={
+                <ProtectedRoute>
+                  <SupabaseUtils />
                 </ProtectedRoute>
               }
             />

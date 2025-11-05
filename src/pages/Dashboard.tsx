@@ -20,7 +20,8 @@ import {
   Sparkles,
   Key,
   Save,
-  Trash2
+  Trash2,
+  Database
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { getEvaluationDraft, hasSubmittedEvaluation, saveEvaluationDraft, submitEvaluation, EvaluationDraft } from "@/lib/storage";
@@ -566,6 +567,14 @@ const Dashboard = () => {
                   >
                     <BarChart3 className="mr-2 h-4 w-4" />
                     Monitoreo
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="justify-start"
+                    onClick={() => navigate("/admin/supabase-utils")}
+                  >
+                    <Database className="mr-2 h-4 w-4" />
+                    Estado Base de Datos
                   </Button>
                   <Button 
                     variant="outline" 
