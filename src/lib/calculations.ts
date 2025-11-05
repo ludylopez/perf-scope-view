@@ -62,3 +62,19 @@ export const getDimensionProgress = (
 
   return { answered, total, percentage };
 };
+
+// Convertir puntaje Likert (1-5) a porcentaje (0-100%)
+export const scoreToPercentage = (score: number): number => {
+  // Escala 1-5 → 0-100%
+  // 1 = 0%, 2 = 25%, 3 = 50%, 4 = 75%, 5 = 100%
+  return Math.round(((score - 1) / 4) * 100);
+};
+
+// Calcular porcentaje por dimensión
+export const calculateDimensionPercentage = (
+  responses: Record<string, number>,
+  dimension: Dimension
+): number => {
+  const avg = calculateDimensionAverage(responses, dimension);
+  return scoreToPercentage(avg);
+};

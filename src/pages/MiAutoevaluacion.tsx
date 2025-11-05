@@ -18,10 +18,25 @@ import { LikertScale } from "@/components/evaluation/LikertScale";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { INSTRUMENT_A1 } from "@/data/instruments";
 import { getSubmittedEvaluation } from "@/lib/storage";
-import { calculatePerformanceScore, getDimensionProgress } from "@/lib/calculations";
-import { ArrowLeft, CheckCircle2, FileDown } from "lucide-react";
+import { 
+  calculatePerformanceScore, 
+  getDimensionProgress,
+  scoreToPercentage,
+  calculateDimensionPercentage,
+  calculateDimensionAverage
+} from "@/lib/calculations";
+import { ArrowLeft, CheckCircle2, FileDown, Sparkles, TrendingUp } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import {
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  Radar,
+  ResponsiveContainer,
+  Tooltip
+} from "recharts";
 
 const MiAutoevaluacion = () => {
   const { user } = useAuth();
@@ -60,9 +75,18 @@ const MiAutoevaluacion = () => {
     evaluation.responses,
     dimensions
   );
+  const performancePercentage = scoreToPercentage(performanceScore);
 
   const currentDim = dimensions[currentDimension];
   const dimProgress = getDimensionProgress(evaluation.responses, currentDim);
+
+  // Preparar datos para el gráfico de radar
+  const radarData = dimensions.map((dim, idx) => ({
+    dimension: `Dim. ${idx + 1}`,
+    nombre: dim.nombre.length > 30 ? dim.nombre.substring(0, 30) + "..." : dim.nombre,
+    porcentaje: calculateDimensionPercentage(evaluation.responses, dim),
+    puntaje: calculateDimensionAverage(evaluation.responses, dim)
+  }));
 
   return (
     <div className="min-h-screen bg-background">
@@ -107,22 +131,127 @@ const MiAutoevaluacion = () => {
           </AlertDescription>
         </Alert>
 
+        <div className="grid gap-6 mb-6 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5 text-primary" />
+                Puntaje Global de Autoevaluación
+              </CardTitle>
+              <CardDescription>
+                Resultado ponderado de sus respuestas
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-center gap-6">
+                <div className="text-center">
+                  <div className="text-6xl font-bold text-primary">
+                    {performancePercentage}%
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Desempeño global
+                  </p>
+                </div>
+                <div className="h-20 w-px bg-border" />
+                <div className="text-center">
+                  <div className="text-3xl font-semibold text-foreground">
+                    {performanceScore.toFixed(1)}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    de 5.0
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    escala Likert
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-primary" />
+                Análisis Personalizado con IA
+              </CardTitle>
+              <CardDescription>
+                Insights basados en sus resultados
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col items-center justify-center h-full text-center py-4">
+                <Sparkles className="h-12 w-12 text-muted-foreground/50 mb-3" />
+                <p className="text-sm text-muted-foreground">
+                  El análisis personalizado con IA estará disponible próximamente.
+                </p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Recibirá recomendaciones específicas basadas en sus fortalezas y áreas de mejora.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle>Puntaje de Autoevaluación</CardTitle>
+            <CardTitle>Perfil de Desempeño por Dimensión</CardTitle>
             <CardDescription>
-              Promedio ponderado de sus respuestas
+              Visualización de sus resultados en cada dimensión evaluada
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center gap-4">
-              <div className="text-5xl font-bold text-primary">
-                {performanceScore.toFixed(1)}
-              </div>
-              <div className="text-muted-foreground">
-                <p className="text-sm">de 5.0</p>
-                <p className="text-xs">escala Likert</p>
-              </div>
+            <div className="h-[400px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <RadarChart data={radarData}>
+                  <PolarGrid stroke="hsl(var(--border))" />
+                  <PolarAngleAxis 
+                    dataKey="dimension" 
+                    tick={{ fill: 'hsl(var(--foreground))', fontSize: 12 }}
+                  />
+                  <PolarRadiusAxis 
+                    angle={90} 
+                    domain={[0, 100]} 
+                    tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                  />
+                  <Radar
+                    name="Porcentaje"
+                    dataKey="porcentaje"
+                    stroke="hsl(var(--primary))"
+                    fill="hsl(var(--primary))"
+                    fillOpacity={0.3}
+                  />
+                  <Tooltip 
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-popover border border-border rounded-lg p-3 shadow-lg">
+                            <p className="font-semibold text-sm mb-1">{data.nombre}</p>
+                            <p className="text-xs text-muted-foreground">
+                              Puntaje: {data.puntaje.toFixed(2)}/5.0
+                            </p>
+                            <p className="text-sm font-medium text-primary">
+                              {data.porcentaje}%
+                            </p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                </RadarChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="mt-6 grid grid-cols-2 md:grid-cols-3 gap-3">
+              {radarData.map((data, idx) => (
+                <div key={idx} className="flex items-center gap-2 p-2 rounded-lg bg-muted/50">
+                  <div className="flex-shrink-0 w-2 h-2 rounded-full bg-primary" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium truncate">{data.dimension}</p>
+                    <p className="text-sm font-bold text-primary">{data.porcentaje}%</p>
+                  </div>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
