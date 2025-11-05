@@ -44,6 +44,8 @@ import {
 } from "@/lib/calculations";
 import { OpenQuestions } from "@/components/evaluation/OpenQuestions";
 import { getOpenQuestions, saveOpenQuestionResponses } from "@/lib/supabase";
+import { ArrowLeft, ArrowRight, Save, Send, AlertTriangle } from "lucide-react";
+import { toast } from "sonner";
 
 const Autoevaluacion = () => {
   const { user } = useAuth();
@@ -146,7 +148,12 @@ const Autoevaluacion = () => {
     setHasUnsavedChanges(true);
   };
 
-  const handleSaveDraft = () => {
+const handleCommentChange = (dimensionId: string, value: string) => {
+  setComments((prev) => ({ ...prev, [dimensionId]: value }));
+  setHasUnsavedChanges(true);
+};
+
+const handleSaveDraft = () => {
     performAutoSave();
     toast.success("Borrador guardado correctamente");
   };

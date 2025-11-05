@@ -8,10 +8,11 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { ArrowLeft, BarChart3, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { toast } from "sonner";
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, Cell } from "recharts";
 import { getSubmittedEvaluation, getJefeEvaluationDraft, getMockColaboradorEvaluation } from "@/lib/storage";
 import { INSTRUMENT_A1 } from "@/data/instruments";
-import { getNineBoxDescription } from "@/lib/finalScore";
+import { getNineBoxDescription, calculateCompleteFinalScore } from "@/lib/finalScore";
 
 const MOCK_COLABORADORES: Record<string, any> = {
   "1": {

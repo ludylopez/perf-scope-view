@@ -49,14 +49,18 @@ const MiAutoevaluacion = () => {
   useEffect(() => {
     if (!user) return;
 
-    const submitted = getSubmittedEvaluation(user.dpi, "2025-1");
-    
-    if (!submitted) {
-      navigate("/autoevaluacion");
-      return;
-    }
+    const loadEvaluation = async () => {
+      const submitted = await getSubmittedEvaluation(user.dpi, "2025-1");
+      
+      if (!submitted) {
+        navigate("/autoevaluacion");
+        return;
+      }
 
-    setEvaluation(submitted);
+      setEvaluation(submitted);
+    };
+
+    loadEvaluation();
   }, [user, navigate]);
 
   if (!evaluation) {

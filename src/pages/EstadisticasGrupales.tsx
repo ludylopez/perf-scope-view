@@ -3,6 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -113,8 +114,8 @@ const EstadisticasGrupales = () => {
           .eq("periodo_id", periodoId)
           .eq("tipo", "auto");
 
-        evaluacionesData?.forEach((eval) => {
-          const responses = eval.open_question_responses as any[];
+        evaluacionesData?.forEach((evaluation) => {
+          const responses = evaluation.open_question_responses as any[];
           responses?.forEach((resp) => {
             const pregunta = resp.open_questions;
             if (pregunta?.tipo === "capacitacion" && resp.respuesta) {
@@ -231,12 +232,12 @@ const EstadisticasGrupales = () => {
                         title: "Necesidades de Capacitación",
                         headers: ["Necesidad"],
                         rows: currentStats.necesidadesCapacitacion.map((n: string) => [n]),
-                      } as const] : []),
+                      }] : []),
                       ...(currentStats.necesidadesHerramientas.length > 0 ? [{
                         title: "Necesidades de Herramientas",
                         headers: ["Necesidad"],
                         rows: currentStats.necesidadesHerramientas.map((n: string) => [n]),
-                      } as const] : []),
+                      }] : []),
                     ],
                   };
                   exportToExcel(exportData, `estadisticas_grupales_${currentStats.nombreGrupo.replace(/\s+/g, "_")}_2025-1.xlsx`);
