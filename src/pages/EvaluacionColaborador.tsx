@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, useParams } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
@@ -14,49 +14,46 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Progress } from "@/components/ui/progress";
 import { LikertScale } from "@/components/evaluation/LikertScale";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { INSTRUMENT_A1 } from "@/data/instruments";
-import { getSubmittedEvaluation, getMockColaboradorEvaluation } from "@/lib/storage";
-import { 
-  calculatePerformanceScore, 
-  getDimensionProgress,
-  scoreToPercentage,
-  calculateDimensionPercentage,
-  calculateDimensionAverage
-} from "@/lib/calculations";
-import { 
-  ArrowLeft, 
-  CheckCircle2, 
-  FileDown, 
-  TrendingUp, 
-  Target, 
-  Award, 
-  AlertCircle, 
-  Users,
-  BarChart3,
-  PieChart,
-  Activity
-} from "lucide-react";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { DimensionProgress } from "@/components/evaluation/DimensionProgress";
+import { AutoSaveIndicator } from "@/components/evaluation/AutoSaveIndicator";
 import {
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  Radar,
-  ResponsiveContainer,
-  Tooltip,
-  BarChart,
-  XAxis,
-  YAxis,
-  Bar,
-  PieChart as RechartsPieChart,
-  Pie,
-  Cell,
-  Legend
-} from "recharts";
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { INSTRUMENT_A1 } from "@/data/instruments";
+import {
+  saveEvaluationDraft,
+  getJefeEvaluationDraft,
+  submitEvaluation,
+  hasJefeEvaluation,
+  getSubmittedEvaluation,
+  getMockColaboradorEvaluation,
+  EvaluationDraft,
+} from "@/lib/storage";
+import {
+  isEvaluationComplete,
+  getIncompleteDimensions,
+  getDimensionProgress,
+} from "@/lib/calculations";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Save,
+  Send,
+  AlertTriangle,
+  Eye,
+  FileEdit,
+  CheckCircle2,
+} from "lucide-react";
+import { toast } from "sonner";
 
 // Datos mock del colaborador
 const MOCK_COLABORADORES: Record<string, any> = {
@@ -70,25 +67,48 @@ const MOCK_COLABORADORES: Record<string, any> = {
   },
 };
 
-const COLORS = {
-  primary: "hsl(var(--primary))",
-  success: "hsl(var(--success))",
-  warning: "hsl(var(--warning))",
-  muted: "hsl(var(--muted-foreground))",
-};
-
 const EvaluacionColaborador = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const instrument = INSTRUMENT_A1;
 
-  const [evaluation, setEvaluation] = useState<any>(null);
   const [colaborador, setColaborador] = useState<any>(null);
-  const [currentDimension, setCurrentDimension] = useState(0);
+  const [autoevaluacion, setAutoevaluacion] = useState<any>(null);
+  const [evaluacionTab, setEvaluacionTab] = useState<"auto" | "desempeno" | "potencial">("auto");
+  
+  // Estados para evaluación de desempeño del jefe
+  const [desempenoResponses, setDesempenoResponses] = useState<Record<string, number>>({});
+  const [desempenoComments, setDesempenoComments] = useState<Record<string, string>>({});
+  const [currentDesempenoDimension, setCurrentDesempenoDimension] = useState(0);
+  
+  // Estados para evaluación de potencial del jefe
+  const [potencialResponses, setPotencialResponses] = useState<Record<string, number>>({});
+  const [potencialComments, setPotencialComments] = useState<Record<string, string>>({});
+  const [currentPotencialDimension, setCurrentPotencialDimension] = useState(0);
+  
+  const [autoSaveStatus, setAutoSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const [showSubmitDialog, setShowSubmitDialog] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  const desempenoDimensions = instrument.dimensionesDesempeno;
+  const potencialDimensions = instrument.dimensionesPotencial;
+  
+  const desempenoTotalItems = desempenoDimensions.reduce((sum, dim) => sum + dim.items.length, 0);
+  const potencialTotalItems = potencialDimensions.reduce((sum, dim) => sum + dim.items.length, 0);
+  
+  const desempenoAnsweredItems = Object.keys(desempenoResponses).length;
+  const potencialAnsweredItems = Object.keys(potencialResponses).length;
+  
+  const desempenoProgress = (desempenoAnsweredItems / desempenoTotalItems) * 100;
+  const potencialProgress = (potencialAnsweredItems / potencialTotalItems) * 100;
+  
+  const desempenoComplete = isEvaluationComplete(desempenoResponses, desempenoDimensions);
+  const potencialComplete = isEvaluationComplete(potencialResponses, potencialDimensions);
+  const isComplete = desempenoComplete && potencialComplete;
 
   useEffect(() => {
-    if (!id) {
+    if (!id || !user) {
       navigate("/evaluacion-equipo");
       return;
     }
@@ -101,14 +121,146 @@ const EvaluacionColaborador = () => {
 
     setColaborador(colaboradorData);
 
-    // Intentar obtener evaluación real, si no existe usar mock
-    const submitted = getSubmittedEvaluation(colaboradorData.dpi, "2025-1");
-    const mockEvaluation = getMockColaboradorEvaluation(colaboradorData.dpi);
-    
-    setEvaluation(submitted || mockEvaluation);
-  }, [id, navigate]);
+    // Cargar autoevaluación del colaborador
+    const submittedAuto = getSubmittedEvaluation(colaboradorData.dpi, "2025-1");
+    const mockAuto = getMockColaboradorEvaluation(colaboradorData.dpi);
+    setAutoevaluacion(submittedAuto || mockAuto);
 
-  if (!evaluation || !colaborador) {
+    // Cargar evaluación del jefe si existe
+    const jefeDraft = getJefeEvaluationDraft(user.dpi, colaboradorData.dpi, "2025-1");
+    if (jefeDraft) {
+      setDesempenoResponses(jefeDraft.responses);
+      setDesempenoComments(jefeDraft.comments);
+      if (jefeDraft.evaluacionPotencial) {
+        setPotencialResponses(jefeDraft.evaluacionPotencial.responses);
+        setPotencialComments(jefeDraft.evaluacionPotencial.comments);
+      }
+      
+      if (jefeDraft.estado === "enviado") {
+        toast.info("Esta evaluación ya fue enviada");
+      } else {
+        toast.info("Se ha cargado su borrador guardado");
+      }
+    }
+  }, [id, user, navigate]);
+
+  // Auto-save functionality
+  const performAutoSave = useCallback(() => {
+    if (!user || !colaborador) return;
+
+    setAutoSaveStatus("saving");
+    
+    const draft: EvaluationDraft = {
+      usuarioId: colaborador.dpi,
+      periodoId: "2025-1",
+      tipo: "jefe",
+      responses: desempenoResponses,
+      comments: desempenoComments,
+      evaluadorId: user.dpi,
+      colaboradorId: colaborador.dpi,
+      evaluacionPotencial: {
+        responses: potencialResponses,
+        comments: potencialComments,
+      },
+      estado: "borrador",
+      progreso: Math.round((desempenoProgress + potencialProgress) / 2),
+      fechaUltimaModificacion: new Date().toISOString(),
+    };
+
+    saveEvaluationDraft(draft);
+    
+    setTimeout(() => {
+      setAutoSaveStatus("saved");
+      setHasUnsavedChanges(false);
+      setTimeout(() => setAutoSaveStatus("idle"), 2000);
+    }, 500);
+  }, [user, colaborador, desempenoResponses, desempenoComments, potencialResponses, potencialComments, desempenoProgress, potencialProgress]);
+
+  useEffect(() => {
+    if (hasUnsavedChanges) {
+      const timer = setTimeout(() => {
+        performAutoSave();
+      }, 30000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [hasUnsavedChanges, performAutoSave]);
+
+  const handleDesempenoResponseChange = (itemId: string, value: number) => {
+    setDesempenoResponses((prev) => ({ ...prev, [itemId]: value }));
+    setHasUnsavedChanges(true);
+  };
+
+  const handleDesempenoCommentChange = (dimensionId: string, comment: string) => {
+    setDesempenoComments((prev) => ({ ...prev, [dimensionId]: comment }));
+    setHasUnsavedChanges(true);
+  };
+
+  const handlePotencialResponseChange = (itemId: string, value: number) => {
+    setPotencialResponses((prev) => ({ ...prev, [itemId]: value }));
+    setHasUnsavedChanges(true);
+  };
+
+  const handlePotencialCommentChange = (dimensionId: string, comment: string) => {
+    setPotencialComments((prev) => ({ ...prev, [dimensionId]: comment }));
+    setHasUnsavedChanges(true);
+  };
+
+  const handleSaveDraft = () => {
+    performAutoSave();
+    toast.success("Borrador guardado correctamente");
+  };
+
+  const handleSubmitClick = () => {
+    if (!desempenoComplete) {
+      const incompleteDims = getIncompleteDimensions(desempenoResponses, desempenoDimensions);
+      const dimNames = incompleteDims.map((d) => d.nombre).join(", ");
+      toast.error(
+        `Faltan ítems por responder en Desempeño: ${dimNames}`,
+        { duration: 5000 }
+      );
+      return;
+    }
+
+    if (!potencialComplete) {
+      const incompleteDims = getIncompleteDimensions(potencialResponses, potencialDimensions);
+      const dimNames = incompleteDims.map((d) => d.nombre).join(", ");
+      toast.error(
+        `Faltan ítems por responder en Potencial: ${dimNames}`,
+        { duration: 5000 }
+      );
+      return;
+    }
+
+    setShowSubmitDialog(true);
+  };
+
+  const handleConfirmSubmit = () => {
+    if (!user || !colaborador) return;
+
+    const draft: EvaluationDraft = {
+      usuarioId: colaborador.dpi,
+      periodoId: "2025-1",
+      tipo: "jefe",
+      responses: desempenoResponses,
+      comments: desempenoComments,
+      evaluadorId: user.dpi,
+      colaboradorId: colaborador.dpi,
+      evaluacionPotencial: {
+        responses: potencialResponses,
+        comments: potencialComments,
+      },
+      estado: "enviado",
+      progreso: 100,
+      fechaUltimaModificacion: new Date().toISOString(),
+    };
+
+    submitEvaluation(draft);
+    toast.success("¡Evaluación enviada exitosamente!");
+    navigate("/evaluacion-equipo");
+  };
+
+  if (!colaborador) {
     return (
       <div className="min-h-screen bg-background">
         <Header />
@@ -119,605 +271,475 @@ const EvaluacionColaborador = () => {
     );
   }
 
-  const dimensions = instrument.dimensionesDesempeno;
-  const performanceScore = calculatePerformanceScore(
-    evaluation.responses,
-    dimensions
-  );
-  const performancePercentage = scoreToPercentage(performanceScore);
-
-  const currentDim = dimensions[currentDimension];
-  const dimProgress = getDimensionProgress(evaluation.responses, currentDim);
-
-  // Preparar datos para el gráfico de radar
-  const radarData = dimensions.map((dim, idx) => ({
-    dimension: dim.nombre.length > 25 ? dim.nombre.substring(0, 25) + "..." : dim.nombre,
-    nombreCompleto: dim.nombre,
-    numero: idx + 1,
-    porcentaje: calculateDimensionPercentage(evaluation.responses, dim),
-    puntaje: calculateDimensionAverage(evaluation.responses, dim)
-  }));
-
-  // Datos para gráfico de barras
-  const barData = radarData.map((d) => ({
-    nombre: `D${d.numero}`,
-    nombreCompleto: d.nombreCompleto,
-    porcentaje: d.porcentaje,
-    puntaje: d.puntaje.toFixed(1)
-  }));
-
-  // Datos para gráfico de pastel (distribución de rendimiento)
-  const pieData = [
-    { name: "Excelente (80-100%)", value: radarData.filter(d => d.porcentaje >= 80).length, color: COLORS.success },
-    { name: "Bueno (60-79%)", value: radarData.filter(d => d.porcentaje >= 60 && d.porcentaje < 80).length, color: COLORS.primary },
-    { name: "Requiere Mejora (<60%)", value: radarData.filter(d => d.porcentaje < 60).length, color: COLORS.warning },
-  ];
-
-  // Identificar fortalezas (top 3) y áreas de mejora (bottom 3)
-  const sortedDimensions = [...radarData].sort((a, b) => b.porcentaje - a.porcentaje);
-  const fortalezas = sortedDimensions.slice(0, 3);
-  const areasDeOportunidad = sortedDimensions.slice(-3).reverse();
-
-  // Generar insights en español claro
-  const generarInsight = (porcentaje: number): string => {
-    if (porcentaje >= 85) {
-      return "Desempeño destacado";
-    } else if (porcentaje >= 70) {
-      return "Buen desempeño";
-    } else if (porcentaje >= 55) {
-      return "Desempeño aceptable";
-    } else {
-      return "Requiere atención";
-    }
-  };
-
-  const nivelGeneral = generarInsight(performancePercentage);
+  const jefeAlreadyEvaluated = hasJefeEvaluation(user?.dpi || "", colaborador.dpi, "2025-1");
 
   return (
     <div className="min-h-screen bg-background">
       <Header />
 
       <main className="container mx-auto px-4 py-8">
-        <div className="mb-6 flex items-center justify-between">
+        {/* Header */}
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <Button variant="ghost" onClick={() => navigate("/evaluacion-equipo")}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             Volver al Equipo
           </Button>
-          <div className="text-right">
-            <p className="text-sm text-muted-foreground">Periodo: 2025-1</p>
-            <p className="text-sm text-muted-foreground">Nivel: {colaborador.nivel}</p>
+          <div className="flex items-center gap-4">
+            {!jefeAlreadyEvaluated && <AutoSaveIndicator status={autoSaveStatus} />}
+            <div className="text-right text-sm text-muted-foreground">
+              <p>Periodo: 2025-1</p>
+              <p>Colaborador: {colaborador.nivel}</p>
+            </div>
           </div>
         </div>
 
-        <div className="mb-6">
-          <div className="flex items-center gap-3 mb-2">
+        {/* Title and description */}
+        <div className="mb-6 space-y-2">
+          <div className="flex items-center gap-3">
             <h1 className="text-3xl font-bold text-foreground">
               Evaluación de {colaborador.nombre}
             </h1>
-            <Badge className="bg-success text-success-foreground">
-              <CheckCircle2 className="mr-1 h-3 w-3" />
-              Completada
-            </Badge>
+            {jefeAlreadyEvaluated && (
+              <Badge className="bg-success text-success-foreground">
+                <CheckCircle2 className="mr-1 h-3 w-3" />
+                Completada
+              </Badge>
+            )}
           </div>
-          <div className="flex flex-wrap gap-4 text-muted-foreground">
+          <p className="text-xl text-muted-foreground">
+            {colaborador.cargo} - {colaborador.area} - Nivel {colaborador.nivel}
+          </p>
+          <div className="flex items-center gap-4 text-sm text-muted-foreground">
             <p>
-              <strong>Cargo:</strong> {colaborador.cargo}
+              <strong>Evaluador:</strong> {user?.nombre} {user?.apellidos}
             </p>
             <p>
-              <strong>Área:</strong> {colaborador.area}
-            </p>
-            <p>
-              <strong>Enviada el:</strong>{" "}
-              {format(new Date(evaluation.fechaEnvio || evaluation.fechaUltimaModificacion), "d 'de' MMMM, yyyy", {
-                locale: es,
-              })}
+              <strong>Periodo:</strong> Del 1 de Enero al 31 de Marzo, 2025
             </p>
           </div>
         </div>
 
-        <Alert className="mb-6 border-info bg-info/10">
-          <AlertDescription className="text-sm">
-            Esta es la autoevaluación del colaborador. Como jefe evaluador, puede revisar los resultados 
-            y compararlos con su propia evaluación para obtener una visión completa del desempeño.
-          </AlertDescription>
-        </Alert>
+        {/* Tabs principales */}
+        <Tabs value={evaluacionTab} onValueChange={(v) => setEvaluacionTab(v as any)} className="mb-6">
+          <TabsList className="w-full">
+            <TabsTrigger value="auto" className="flex-1">
+              <Eye className="mr-2 h-4 w-4" />
+              Autoevaluación del Colaborador
+            </TabsTrigger>
+            <TabsTrigger value="desempeno" className="flex-1">
+              <FileEdit className="mr-2 h-4 w-4" />
+              Evaluación de Desempeño
+              {desempenoComplete && <CheckCircle2 className="ml-2 h-4 w-4 text-success" />}
+            </TabsTrigger>
+            <TabsTrigger value="potencial" className="flex-1">
+              <FileEdit className="mr-2 h-4 w-4" />
+              Evaluación de Potencial
+              {potencialComplete && <CheckCircle2 className="ml-2 h-4 w-4 text-success" />}
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Resumen Ejecutivo */}
-        <div className="grid gap-6 mb-6 md:grid-cols-3">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <TrendingUp className="h-5 w-5 text-primary" />
-                Puntaje Global
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center">
-                <div className="text-5xl font-bold text-primary mb-2">
-                  {performancePercentage}%
-                </div>
-                <p className="text-sm text-muted-foreground mb-3">
-                  {nivelGeneral}
-                </p>
-                <div className="flex items-center justify-center gap-2 text-sm">
-                  <span className="text-muted-foreground">Escala:</span>
-                  <span className="font-semibold">{performanceScore.toFixed(1)}/5.0</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Award className="h-5 w-5 text-success" />
-                Fortalezas Principales
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center">
-                <div className="text-5xl font-bold text-success mb-2">
-                  {fortalezas.length}
-                </div>
-                <p className="text-sm text-muted-foreground mb-3">
-                  Dimensiones destacadas
-                </p>
-                <div className="space-y-1 text-xs">
-                  {fortalezas.slice(0, 2).map((f, idx) => (
-                    <p key={idx} className="truncate">{f.nombreCompleto}</p>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Target className="h-5 w-5 text-warning" />
-                Áreas de Mejora
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center">
-                <div className="text-5xl font-bold text-warning mb-2">
-                  {areasDeOportunidad.length}
-                </div>
-                <p className="text-sm text-muted-foreground mb-3">
-                  Oportunidades de desarrollo
-                </p>
-                <div className="space-y-1 text-xs">
-                  {areasDeOportunidad.slice(0, 2).map((a, idx) => (
-                    <p key={idx} className="truncate">{a.nombreCompleto}</p>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Análisis Visual */}
-        <div className="grid gap-6 mb-6 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="h-5 w-5 text-primary" />
-                Rendimiento por Dimensión
-              </CardTitle>
-              <CardDescription>
-                Comparación visual del desempeño en cada área evaluada
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[350px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={barData}>
-                    <XAxis 
-                      dataKey="nombre" 
-                      tick={{ fill: 'hsl(var(--foreground))', fontSize: 11 }}
-                    />
-                    <YAxis 
-                      domain={[0, 100]}
-                      tick={{ fill: 'hsl(var(--muted-foreground))' }}
-                    />
-                    <Tooltip 
-                      content={({ active, payload }) => {
-                        if (active && payload && payload.length) {
-                          const data = payload[0].payload;
-                          return (
-                            <div className="bg-popover border border-border rounded-lg p-3 shadow-lg">
-                              <p className="font-semibold text-sm mb-1">{data.nombreCompleto}</p>
-                              <p className="text-sm font-medium text-primary">
-                                {data.porcentaje}%
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                Puntaje: {data.puntaje}/5.0
-                              </p>
+          {/* Tab: Autoevaluación del Colaborador (solo lectura) */}
+          <TabsContent value="auto" className="space-y-6">
+            {autoevaluacion ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Autoevaluación del Colaborador</CardTitle>
+                  <CardDescription>
+                    Esta es la autoevaluación realizada por el colaborador. Revísela como referencia para su evaluación.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {desempenoDimensions.map((dim, idx) => {
+                      const dimResponses = dim.items.map(item => autoevaluacion.responses[item.id]).filter(v => v !== undefined);
+                      const avg = dimResponses.length > 0 
+                        ? dimResponses.reduce((sum, val) => sum + val, 0) / dimResponses.length 
+                        : 0;
+                      
+                      return (
+                        <div key={dim.id} className="p-4 rounded-lg border border-border bg-muted/30">
+                          <div className="mb-3">
+                            <h3 className="font-semibold">{dim.nombre}</h3>
+                            <p className="text-sm text-muted-foreground">{dim.descripcion}</p>
+                            <div className="mt-2 text-sm">
+                              <strong>Promedio:</strong> {avg.toFixed(2)}/5.0
                             </div>
-                          );
-                        }
-                        return null;
-                      }}
-                    />
-                    <Bar dataKey="porcentaje" fill={COLORS.primary} radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <PieChart className="h-5 w-5 text-primary" />
-                Distribución de Rendimiento
-              </CardTitle>
-              <CardDescription>
-                Clasificación de dimensiones según nivel de desempeño
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[350px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <RechartsPieChart>
-                    <Pie
-                      data={pieData}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={100}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {pieData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                    <Legend />
-                  </RechartsPieChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Gráfico de Radar */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Activity className="h-5 w-5 text-primary" />
-              Perfil Completo de Desempeño
-            </CardTitle>
-            <CardDescription>
-              Visualización radial que muestra las fortalezas y áreas de mejora de forma integral
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[400px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <RadarChart data={radarData}>
-                  <PolarGrid stroke="hsl(var(--border))" />
-                  <PolarAngleAxis 
-                    dataKey="dimension" 
-                    tick={{ fill: 'hsl(var(--foreground))', fontSize: 11 }}
-                  />
-                  <PolarRadiusAxis 
-                    angle={90} 
-                    domain={[0, 100]} 
-                    tick={{ fill: 'hsl(var(--muted-foreground))' }}
-                  />
-                  <Radar
-                    name="Porcentaje"
-                    dataKey="porcentaje"
-                    stroke="hsl(var(--primary))"
-                    fill="hsl(var(--primary))"
-                    fillOpacity={0.3}
-                  />
-                  <Tooltip 
-                    content={({ active, payload }) => {
-                      if (active && payload && payload.length) {
-                        const data = payload[0].payload;
-                        return (
-                          <div className="bg-popover border border-border rounded-lg p-3 shadow-lg max-w-xs">
-                            <p className="font-semibold text-sm mb-1">{data.nombreCompleto}</p>
-                            <p className="text-xs text-muted-foreground">
-                              Puntaje: {data.puntaje.toFixed(2)}/5.0
-                            </p>
-                            <p className="text-sm font-medium text-primary">
-                              {data.porcentaje}%
-                            </p>
                           </div>
-                        );
-                      }
-                      return null;
-                    }}
+                          <div className="space-y-2">
+                            {dim.items.map((item) => (
+                              <LikertScale
+                                key={item.id}
+                                itemId={item.id}
+                                itemText={`${item.orden}. ${item.texto}`}
+                                value={autoevaluacion.responses[item.id]}
+                                onChange={() => {}}
+                                disabled={true}
+                              />
+                            ))}
+                          </div>
+                          {autoevaluacion.comments[dim.id] && (
+                            <div className="mt-3 p-3 bg-background rounded border">
+                              <Label className="text-xs text-muted-foreground">Comentarios del colaborador:</Label>
+                              <p className="text-sm mt-1">{autoevaluacion.comments[dim.id]}</p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardContent className="py-8 text-center text-muted-foreground">
+                  El colaborador aún no ha completado su autoevaluación.
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          {/* Tab: Evaluación de Desempeño del Jefe */}
+          <TabsContent value="desempeno" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-xl">
+                      Evaluación de Desempeño
+                    </CardTitle>
+                    <CardDescription className="mt-2">
+                      Evalúe el desempeño del colaborador en cada dimensión
+                    </CardDescription>
+                  </div>
+                  <DimensionProgress
+                    answered={desempenoAnsweredItems}
+                    total={desempenoTotalItems}
                   />
-                </RadarChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-3">
-              {radarData.map((data, idx) => (
-                <div key={idx} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border border-border">
-                  <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 text-primary font-bold text-sm">
-                    {data.numero}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-muted-foreground mb-0.5">Dimensión {data.numero}</p>
-                    <p className="text-sm font-semibold truncate">{data.nombreCompleto}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                        <div 
-                          className={`h-full transition-all ${
-                            data.porcentaje >= 80 ? 'bg-success' : 
-                            data.porcentaje >= 60 ? 'bg-primary' : 
-                            'bg-warning'
-                          }`}
-                          style={{ width: `${data.porcentaje}%` }}
-                        />
-                      </div>
-                      <span className="text-sm font-bold text-primary">{data.porcentaje}%</span>
-                    </div>
-                  </div>
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+                <div className="mt-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium">Progreso</span>
+                    <span className="text-sm text-muted-foreground">
+                      {desempenoAnsweredItems} de {desempenoTotalItems} ítems ({Math.round(desempenoProgress)}%)
+                    </span>
+                  </div>
+                  <Progress value={desempenoProgress} className="h-2" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <Tabs value={currentDesempenoDimension.toString()} className="w-full">
+                  <TabsList className="mb-6 w-full flex-wrap justify-start h-auto gap-2">
+                    {desempenoDimensions.map((dim, idx) => {
+                      const progress = getDimensionProgress(desempenoResponses, dim);
+                      const isComplete = progress.answered === progress.total;
 
-        {/* Insights y Análisis */}
-        <div className="grid gap-6 mb-6 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Award className="h-5 w-5 text-success" />
-                Fortalezas Identificadas
-              </CardTitle>
-              <CardDescription>
-                Áreas donde el colaborador muestra mejor desempeño
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {fortalezas.map((dim, idx) => {
-                  const insight = generarInsight(dim.porcentaje);
-                  return (
-                    <div key={idx} className="flex items-start gap-3 p-3 rounded-lg border border-success/20 bg-success/5">
-                      <div className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-success/20 text-success font-bold text-sm">
-                        {idx + 1}
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-semibold text-sm mb-1">{dim.nombreCompleto}</p>
-                        <p className="text-xs text-muted-foreground mb-2">
-                          {insight} • Puntaje: {dim.puntaje.toFixed(2)}/5.0
-                        </p>
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                            <div 
-                              className="h-full bg-success transition-all" 
-                              style={{ width: `${dim.porcentaje}%` }}
-                            />
+                      return (
+                        <TabsTrigger
+                          key={dim.id}
+                          value={idx.toString()}
+                          onClick={() => setCurrentDesempenoDimension(idx)}
+                          className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span>Dim. {idx + 1}</span>
+                            {isComplete && <span>✓</span>}
+                            {!isComplete && (
+                              <Badge variant="secondary" className="text-xs">
+                                {progress.answered}/{progress.total}
+                              </Badge>
+                            )}
                           </div>
-                          <span className="text-sm font-bold text-success">{dim.porcentaje}%</span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
+                        </TabsTrigger>
+                      );
+                    })}
+                  </TabsList>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Target className="h-5 w-5 text-warning" />
-                Áreas de Oportunidad
-              </CardTitle>
-              <CardDescription>
-                Dimensiones que requieren atención para mejorar el desempeño
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {areasDeOportunidad.map((dim, idx) => {
-                  const insight = generarInsight(dim.porcentaje);
-                  return (
-                    <div key={idx} className="flex items-start gap-3 p-3 rounded-lg border border-warning/20 bg-warning/5">
-                      <div className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-warning/20 text-warning font-bold text-sm">
-                        {idx + 1}
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-semibold text-sm mb-1">{dim.nombreCompleto}</p>
-                        <p className="text-xs text-muted-foreground mb-2">
-                          {insight} • Puntaje: {dim.puntaje.toFixed(2)}/5.0
-                        </p>
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                            <div 
-                              className="h-full bg-warning transition-all" 
-                              style={{ width: `${dim.porcentaje}%` }}
-                            />
-                          </div>
-                          <span className="text-sm font-bold text-warning">{dim.porcentaje}%</span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Análisis y Recomendaciones */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-primary" />
-              Análisis y Observaciones Generales
-            </CardTitle>
-            <CardDescription>
-              Resumen ejecutivo de los hallazgos más relevantes de la evaluación
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="p-4 rounded-lg bg-muted/50 border border-border">
-                <h4 className="font-semibold mb-2 text-success">Resumen Ejecutivo</h4>
-                <p className="text-sm text-muted-foreground">
-                  El colaborador muestra un desempeño general de <strong>{performancePercentage}%</strong>, 
-                  lo que indica un nivel <strong>{nivelGeneral.toLowerCase()}</strong>. 
-                  Las dimensiones más destacadas incluyen <strong>{fortalezas[0]?.nombreCompleto}</strong> y 
-                  <strong> {fortalezas[1]?.nombreCompleto}</strong>, donde se observan resultados 
-                  consistentes y por encima del promedio esperado.
-                </p>
-              </div>
-
-              <div className="p-4 rounded-lg bg-muted/50 border border-border">
-                <h4 className="font-semibold mb-2 text-warning">Recomendaciones de Desarrollo</h4>
-                <p className="text-sm text-muted-foreground">
-                  Se recomienda enfocar esfuerzos de desarrollo en <strong>{areasDeOportunidad[0]?.nombreCompleto}</strong> y 
-                  <strong> {areasDeOportunidad[1]?.nombreCompleto}</strong>. Estas áreas presentan oportunidades 
-                  claras de mejora que, al ser fortalecidas, contribuirán significativamente al crecimiento profesional 
-                  del colaborador y al logro de los objetivos institucionales.
-                </p>
-              </div>
-
-              <div className="p-4 rounded-lg bg-muted/50 border border-border">
-                <h4 className="font-semibold mb-2 text-primary">Siguientes Pasos</h4>
-                <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-                  <li>Programar reunión de retroalimentación para compartir estos resultados</li>
-                  <li>Establecer plan de acción específico para las áreas de mejora identificadas</li>
-                  <li>Definir objetivos de desarrollo para el próximo periodo</li>
-                  <li>Monitorear el progreso en las dimensiones destacadas para mantener el nivel</li>
-                </ul>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Detalle de Respuestas */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Detalle de la Evaluación por Dimensión</CardTitle>
-            <CardDescription>
-              Revisión completa de todas las respuestas y comentarios del colaborador
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Tabs value={currentDimension.toString()} className="w-full">
-              <TabsList className="mb-6 w-full flex-wrap justify-start h-auto gap-2">
-                {dimensions.map((dim, idx) => {
-                  const progress = getDimensionProgress(evaluation.responses, dim);
-                  return (
-                    <TabsTrigger
-                      key={dim.id}
-                      value={idx.toString()}
-                      onClick={() => setCurrentDimension(idx)}
-                      className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-                    >
-                      Dim. {idx + 1}
-                      {progress.answered === progress.total && " ✓"}
-                    </TabsTrigger>
-                  );
-                })}
-              </TabsList>
-
-              {dimensions.map((dim, idx) => {
-                const dimPercentage = calculateDimensionPercentage(evaluation.responses, dim);
-                const dimPuntaje = calculateDimensionAverage(evaluation.responses, dim);
-                return (
-                  <TabsContent key={dim.id} value={idx.toString()} className="space-y-4">
-                    <div className="mb-4 p-4 rounded-lg bg-muted/50 border border-border">
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex-1">
-                          <h3 className="text-lg font-semibold mb-1">
+                  {desempenoDimensions.map((dim, idx) => {
+                    const currentDimProgress = getDimensionProgress(desempenoResponses, dim);
+                    return (
+                      <TabsContent key={dim.id} value={idx.toString()} className="space-y-4">
+                        <div>
+                          <h3 className="text-lg font-semibold">
                             {dim.nombre} ({Math.round(dim.peso * 100)}%)
                           </h3>
+                          <CardDescription className="mt-2">
+                            <strong>Peso: {Math.round(dim.peso * 100)}%</strong> •{" "}
+                            Dimensión {idx + 1} de {desempenoDimensions.length}
+                          </CardDescription>
                           {dim.descripcion && (
-                            <p className="text-sm text-muted-foreground mb-3">
+                            <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
                               {dim.descripcion}
                             </p>
                           )}
                         </div>
-                        <div className="text-right ml-4">
-                          <div className="text-2xl font-bold text-primary">{dimPercentage}%</div>
-                          <div className="text-xs text-muted-foreground">Puntaje: {dimPuntaje.toFixed(2)}/5.0</div>
+
+                        {dim.items.map((item) => (
+                          <LikertScale
+                            key={item.id}
+                            itemId={item.id}
+                            itemText={`${item.orden}. ${item.texto}`}
+                            value={desempenoResponses[item.id]}
+                            onChange={(value) => handleDesempenoResponseChange(item.id, value)}
+                            disabled={jefeAlreadyEvaluated}
+                          />
+                        ))}
+
+                        <div className="mt-6 space-y-2 pt-6 border-t">
+                          <Label htmlFor={`comment-desempeno-${dim.id}`}>
+                            Comentarios y observaciones
+                          </Label>
+                          <p className="text-xs text-muted-foreground mb-2">
+                            Agregue comentarios, ejemplos concretos o observaciones sobre el desempeño del colaborador en esta dimensión.
+                          </p>
+                          <Textarea
+                            id={`comment-desempeno-${dim.id}`}
+                            placeholder="Escriba sus comentarios aquí..."
+                            value={desempenoComments[dim.id] || ""}
+                            onChange={(e) => handleDesempenoCommentChange(dim.id, e.target.value)}
+                            rows={4}
+                            maxLength={1000}
+                            className="resize-none"
+                            disabled={jefeAlreadyEvaluated}
+                          />
+                          <p className="text-xs text-muted-foreground text-right">
+                            {desempenoComments[dim.id]?.length || 0}/1000 caracteres
+                          </p>
                         </div>
+                      </TabsContent>
+                    );
+                  })}
+                </Tabs>
+
+                <div className="mt-8 flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setCurrentDesempenoDimension(Math.max(0, currentDesempenoDimension - 1))}
+                    disabled={currentDesempenoDimension === 0 || jefeAlreadyEvaluated}
+                  >
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    Anterior
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      setCurrentDesempenoDimension(Math.min(desempenoDimensions.length - 1, currentDesempenoDimension + 1))
+                    }
+                    disabled={currentDesempenoDimension === desempenoDimensions.length - 1 || jefeAlreadyEvaluated}
+                  >
+                    Siguiente
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </div>
+
+                {!desempenoComplete && !jefeAlreadyEvaluated && (
+                  <div className="mt-4 flex items-center gap-2 text-sm text-warning">
+                    <AlertTriangle className="h-4 w-4" />
+                    <span>
+                      Complete todos los ítems de desempeño para poder enviar la evaluación
+                    </span>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Tab: Evaluación de Potencial del Jefe */}
+          <TabsContent value="potencial" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-xl">
+                      Evaluación de Potencial
+                    </CardTitle>
+                    <CardDescription className="mt-2">
+                      Evalúe el potencial futuro del colaborador
+                    </CardDescription>
+                  </div>
+                  <DimensionProgress
+                    answered={potencialAnsweredItems}
+                    total={potencialTotalItems}
+                  />
+                </div>
+                <div className="mt-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium">Progreso</span>
+                    <span className="text-sm text-muted-foreground">
+                      {potencialAnsweredItems} de {potencialTotalItems} ítems ({Math.round(potencialProgress)}%)
+                    </span>
+                  </div>
+                  <Progress value={potencialProgress} className="h-2" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <Tabs value={currentPotencialDimension.toString()} className="w-full">
+                  <TabsList className="mb-6 w-full flex-wrap justify-start h-auto gap-2">
+                    {potencialDimensions.map((dim, idx) => {
+                      const progress = getDimensionProgress(potencialResponses, dim);
+                      const isComplete = progress.answered === progress.total;
+
+                      return (
+                        <TabsTrigger
+                          key={dim.id}
+                          value={idx.toString()}
+                          onClick={() => setCurrentPotencialDimension(idx)}
+                          className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span>Pot. {idx + 1}</span>
+                            {isComplete && <span>✓</span>}
+                            {!isComplete && (
+                              <Badge variant="secondary" className="text-xs">
+                                {progress.answered}/{progress.total}
+                              </Badge>
+                            )}
+                          </div>
+                        </TabsTrigger>
+                      );
+                    })}
+                  </TabsList>
+
+                  {potencialDimensions.map((dim, idx) => (
+                    <TabsContent key={dim.id} value={idx.toString()} className="space-y-4">
+                      <div>
+                        <h3 className="text-lg font-semibold">
+                          {dim.nombre} ({Math.round(dim.peso * 100)}%)
+                        </h3>
+                        <CardDescription className="mt-2">
+                          <strong>Peso: {Math.round(dim.peso * 100)}%</strong> •{" "}
+                          Dimensión {idx + 1} de {potencialDimensions.length}
+                        </CardDescription>
+                        {dim.descripcion && (
+                          <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
+                            {dim.descripcion}
+                          </p>
+                        )}
                       </div>
-                      <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                        <div 
-                          className={`h-full transition-all ${
-                            dimPercentage >= 80 ? 'bg-success' : 
-                            dimPercentage >= 60 ? 'bg-primary' : 
-                            'bg-warning'
-                          }`}
-                          style={{ width: `${dimPercentage}%` }}
+
+                      {dim.items.map((item) => (
+                        <LikertScale
+                          key={item.id}
+                          itemId={item.id}
+                          itemText={`${item.orden}. ${item.texto}`}
+                          value={potencialResponses[item.id]}
+                          onChange={(value) => handlePotencialResponseChange(item.id, value)}
+                          disabled={jefeAlreadyEvaluated}
                         />
-                      </div>
-                    </div>
+                      ))}
 
-                    {dim.items.map((item) => (
-                      <LikertScale
-                        key={item.id}
-                        itemId={item.id}
-                        itemText={`${item.orden}. ${item.texto}`}
-                        value={evaluation.responses[item.id]}
-                        onChange={() => {}}
-                        disabled={true}
-                      />
-                    ))}
-
-                    {evaluation.comments[dim.id] && (
-                      <div className="mt-6 space-y-2">
-                        <Label>Comentarios y evidencias del colaborador:</Label>
+                      <div className="mt-6 space-y-2 pt-6 border-t">
+                        <Label htmlFor={`comment-potencial-${dim.id}`}>
+                          Comentarios y observaciones
+                        </Label>
+                        <p className="text-xs text-muted-foreground mb-2">
+                          Agregue comentarios sobre el potencial del colaborador en esta dimensión.
+                        </p>
                         <Textarea
-                          value={evaluation.comments[dim.id]}
-                          disabled
+                          id={`comment-potencial-${dim.id}`}
+                          placeholder="Escriba sus comentarios aquí..."
+                          value={potencialComments[dim.id] || ""}
+                          onChange={(e) => handlePotencialCommentChange(dim.id, e.target.value)}
                           rows={4}
-                          className="resize-none bg-muted"
+                          maxLength={1000}
+                          className="resize-none"
+                          disabled={jefeAlreadyEvaluated}
                         />
+                        <p className="text-xs text-muted-foreground text-right">
+                          {potencialComments[dim.id]?.length || 0}/1000 caracteres
+                        </p>
                       </div>
-                    )}
-                  </TabsContent>
-                );
-              })}
-            </Tabs>
+                    </TabsContent>
+                  ))}
+                </Tabs>
 
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-between">
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setCurrentDimension(Math.max(0, currentDimension - 1))}
-                  disabled={currentDimension === 0}
-                >
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Anterior
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() =>
-                    setCurrentDimension(
-                      Math.min(dimensions.length - 1, currentDimension + 1)
-                    )
-                  }
-                  disabled={currentDimension === dimensions.length - 1}
-                >
-                  Siguiente
-                  <ArrowLeft className="ml-2 h-4 w-4 rotate-180" />
-                </Button>
-              </div>
+                <div className="mt-8 flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setCurrentPotencialDimension(Math.max(0, currentPotencialDimension - 1))}
+                    disabled={currentPotencialDimension === 0 || jefeAlreadyEvaluated}
+                  >
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    Anterior
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      setCurrentPotencialDimension(Math.min(potencialDimensions.length - 1, currentPotencialDimension + 1))
+                    }
+                    disabled={currentPotencialDimension === potencialDimensions.length - 1 || jefeAlreadyEvaluated}
+                  >
+                    Siguiente
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </div>
 
-              <Button variant="outline" disabled>
-                <FileDown className="mr-2 h-4 w-4" />
-                Descargar Reporte PDF
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+                {!potencialComplete && !jefeAlreadyEvaluated && (
+                  <div className="mt-4 flex items-center gap-2 text-sm text-warning">
+                    <AlertTriangle className="h-4 w-4" />
+                    <span>
+                      Complete todos los ítems de potencial para poder enviar la evaluación
+                    </span>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+
+        {/* Action buttons */}
+        {!jefeAlreadyEvaluated && (
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+            <Button variant="outline" onClick={handleSaveDraft}>
+              <Save className="mr-2 h-4 w-4" />
+              Guardar Borrador
+            </Button>
+            <Button 
+              onClick={handleSubmitClick}
+              disabled={!isComplete}
+              className="relative"
+            >
+              <Send className="mr-2 h-4 w-4" />
+              Enviar Evaluación Completa
+            </Button>
+          </div>
+        )}
+
+        {!isComplete && !jefeAlreadyEvaluated && (
+          <div className="mt-4 flex items-center gap-2 text-sm text-warning">
+            <AlertTriangle className="h-4 w-4" />
+            <span>
+              Complete todas las secciones (Desempeño y Potencial) para poder enviar la evaluación
+            </span>
+          </div>
+        )}
       </main>
+
+      {/* Submit confirmation dialog */}
+      <AlertDialog open={showSubmitDialog} onOpenChange={setShowSubmitDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Está seguro de enviar su evaluación?</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>
+                Una vez enviada, no podrá modificarla a menos que RR.HH. reabra su
+                evaluación.
+              </p>
+              <p className="font-semibold text-foreground">
+                Desempeño: {desempenoAnsweredItems}/{desempenoTotalItems} ítems completados
+              </p>
+              <p className="font-semibold text-foreground">
+                Potencial: {potencialAnsweredItems}/{potencialTotalItems} ítems completados
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmSubmit}>
+              Sí, enviar evaluación
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

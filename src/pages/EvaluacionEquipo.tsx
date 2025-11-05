@@ -1,42 +1,76 @@
+import { useState, useEffect } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, FileEdit, CheckCircle2, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { getJefeEvaluationDraft, hasJefeEvaluation } from "@/lib/storage";
 
 const MOCK_TEAM = [
   {
     id: "1",
+    dpi: "4567890123104",
     nombre: "Roberto Hernández Silva",
     cargo: "Coordinador",
     nivel: "S2",
     area: "Tecnología",
-    estado: "completado",
-    progreso: 100,
   },
   {
     id: "2",
+    dpi: "9999999999998",
     nombre: "Carlos Méndez Juárez",
     cargo: "Analista Senior",
     nivel: "E1",
     area: "Tecnología",
-    estado: "pendiente",
-    progreso: 0,
   },
   {
     id: "3",
+    dpi: "9999999999997",
     nombre: "Laura Vásquez Cruz",
     cargo: "Especialista",
     nivel: "E2",
     area: "Tecnología",
-    estado: "pendiente",
-    progreso: 0,
   },
 ];
 
 const EvaluacionEquipo = () => {
+  const { user } = useAuth();
   const navigate = useNavigate();
+  const [teamStatus, setTeamStatus] = useState<Record<string, { estado: string; progreso: number }>>({});
+
+  useEffect(() => {
+    if (!user) return;
+
+    const status: Record<string, { estado: string; progreso: number }> = {};
+    
+    MOCK_TEAM.forEach((colaborador) => {
+      const evaluado = hasJefeEvaluation(user.dpi, colaborador.dpi, "2025-1");
+      if (evaluado) {
+        const draft = getJefeEvaluationDraft(user.dpi, colaborador.dpi, "2025-1");
+        status[colaborador.id] = {
+          estado: "completado",
+          progreso: draft?.progreso || 100,
+        };
+      } else {
+        const draft = getJefeEvaluationDraft(user.dpi, colaborador.dpi, "2025-1");
+        if (draft) {
+          status[colaborador.id] = {
+            estado: "en_progreso",
+            progreso: draft.progreso,
+          };
+        } else {
+          status[colaborador.id] = {
+            estado: "pendiente",
+            progreso: 0,
+          };
+        }
+      }
+    });
+
+    setTeamStatus(status);
+  }, [user]);
 
   const getStatusBadge = (estado: string) => {
     if (estado === "completado") {
@@ -44,6 +78,14 @@ const EvaluacionEquipo = () => {
         <Badge className="bg-success text-success-foreground">
           <CheckCircle2 className="mr-1 h-3 w-3" />
           Completado
+        </Badge>
+      );
+    }
+    if (estado === "en_progreso") {
+      return (
+        <Badge variant="outline" className="text-primary border-primary">
+          <Clock className="mr-1 h-3 w-3" />
+          En Progreso
         </Badge>
       );
     }
@@ -75,44 +117,47 @@ const EvaluacionEquipo = () => {
         </div>
 
         <div className="grid gap-4">
-          {MOCK_TEAM.map((colaborador) => (
-            <Card key={colaborador.id}>
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <CardTitle>{colaborador.nombre}</CardTitle>
-                    <CardDescription>
-                      {colaborador.cargo} • {colaborador.area} • Nivel {colaborador.nivel}
-                    </CardDescription>
-                  </div>
-                  {getStatusBadge(colaborador.estado)}
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="mb-2 flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Progreso</span>
-                      <span className="font-medium">{colaborador.progreso}%</span>
+          {MOCK_TEAM.map((colaborador) => {
+            const status = teamStatus[colaborador.id] || { estado: "pendiente", progreso: 0 };
+            return (
+              <Card key={colaborador.id}>
+                <CardHeader>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <CardTitle>{colaborador.nombre}</CardTitle>
+                      <CardDescription>
+                        {colaborador.cargo} • {colaborador.area} • Nivel {colaborador.nivel}
+                      </CardDescription>
                     </div>
-                    <div className="h-2 w-full overflow-hidden rounded-full bg-secondary">
-                      <div
-                        className="h-full bg-gradient-primary transition-all"
-                        style={{ width: `${colaborador.progreso}%` }}
-                      />
-                    </div>
+                    {getStatusBadge(status.estado)}
                   </div>
-                  <Button 
-                    className="ml-4"
-                    onClick={() => navigate(`/evaluacion-equipo/${colaborador.id}`)}
-                  >
-                    <FileEdit className="mr-2 h-4 w-4" />
-                    {colaborador.estado === "completado" ? "Ver Evaluación" : "Evaluar"}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="mb-2 flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Progreso</span>
+                        <span className="font-medium">{status.progreso}%</span>
+                      </div>
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-secondary">
+                        <div
+                          className="h-full bg-gradient-primary transition-all"
+                          style={{ width: `${status.progreso}%` }}
+                        />
+                      </div>
+                    </div>
+                    <Button 
+                      className="ml-4"
+                      onClick={() => navigate(`/evaluacion-equipo/${colaborador.id}`)}
+                    >
+                      <FileEdit className="mr-2 h-4 w-4" />
+                      {status.estado === "completado" ? "Ver Evaluación" : "Evaluar"}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       </main>
     </div>

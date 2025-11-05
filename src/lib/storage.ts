@@ -1,19 +1,29 @@
 export interface EvaluationDraft {
   usuarioId: string;
   periodoId: string;
-  tipo: "auto";
+  tipo: "auto" | "jefe";
   responses: Record<string, number>;
   comments: Record<string, string>;
   estado: "borrador" | "enviado";
   progreso: number;
   fechaUltimaModificacion: string;
   fechaEnvio?: string;
+  // Solo para evaluaciones del jefe
+  evaluadorId?: string; // DPI del jefe que evalúa
+  colaboradorId?: string; // DPI del colaborador evaluado
+  evaluacionPotencial?: {
+    responses: Record<string, number>;
+    comments: Record<string, string>;
+  };
 }
 
 const STORAGE_KEY_PREFIX = "evaluation_";
+const JEFE_EVALUATION_PREFIX = "jefe_evaluation_";
 
 export const saveEvaluationDraft = (draft: EvaluationDraft): void => {
-  const key = `${STORAGE_KEY_PREFIX}${draft.usuarioId}_${draft.periodoId}`;
+  const key = draft.tipo === "jefe" && draft.evaluadorId && draft.colaboradorId
+    ? `${JEFE_EVALUATION_PREFIX}${draft.evaluadorId}_${draft.colaboradorId}_${draft.periodoId}`
+    : `${STORAGE_KEY_PREFIX}${draft.usuarioId}_${draft.periodoId}`;
   draft.fechaUltimaModificacion = new Date().toISOString();
   localStorage.setItem(key, JSON.stringify(draft));
 };
@@ -31,6 +41,32 @@ export const getEvaluationDraft = (
   } catch {
     return null;
   }
+};
+
+// Funciones específicas para evaluaciones del jefe
+export const getJefeEvaluationDraft = (
+  evaluadorId: string,
+  colaboradorId: string,
+  periodoId: string
+): EvaluationDraft | null => {
+  const key = `${JEFE_EVALUATION_PREFIX}${evaluadorId}_${colaboradorId}_${periodoId}`;
+  const stored = localStorage.getItem(key);
+  if (!stored) return null;
+  
+  try {
+    return JSON.parse(stored) as EvaluationDraft;
+  } catch {
+    return null;
+  }
+};
+
+export const hasJefeEvaluation = (
+  evaluadorId: string,
+  colaboradorId: string,
+  periodoId: string
+): boolean => {
+  const draft = getJefeEvaluationDraft(evaluadorId, colaboradorId, periodoId);
+  return draft?.estado === "enviado" || false;
 };
 
 export const submitEvaluation = (draft: EvaluationDraft): void => {
@@ -63,7 +99,7 @@ export const calculateProgress = (
   return Math.round((answeredItems / totalItems) * 100);
 };
 
-// Generar evaluación de prueba para Roberto Hernández Silva
+// Generar autoevaluación de prueba para Roberto Hernández Silva
 export const getMockColaboradorEvaluation = (colaboradorId: string): EvaluationDraft | null => {
   if (colaboradorId !== "4567890123104") return null; // Solo para Roberto Hernández Silva
   
