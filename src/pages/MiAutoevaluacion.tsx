@@ -82,8 +82,9 @@ const MiAutoevaluacion = () => {
 
   // Preparar datos para el gráfico de radar
   const radarData = dimensions.map((dim, idx) => ({
-    dimension: `Dim. ${idx + 1}`,
-    nombre: dim.nombre.length > 30 ? dim.nombre.substring(0, 30) + "..." : dim.nombre,
+    dimension: dim.nombre.length > 25 ? dim.nombre.substring(0, 25) + "..." : dim.nombre,
+    nombreCompleto: dim.nombre,
+    numero: idx + 1,
     porcentaje: calculateDimensionPercentage(evaluation.responses, dim),
     puntaje: calculateDimensionAverage(evaluation.responses, dim)
   }));
@@ -206,7 +207,7 @@ const MiAutoevaluacion = () => {
                   <PolarGrid stroke="hsl(var(--border))" />
                   <PolarAngleAxis 
                     dataKey="dimension" 
-                    tick={{ fill: 'hsl(var(--foreground))', fontSize: 12 }}
+                    tick={{ fill: 'hsl(var(--foreground))', fontSize: 11 }}
                   />
                   <PolarRadiusAxis 
                     angle={90} 
@@ -225,8 +226,8 @@ const MiAutoevaluacion = () => {
                       if (active && payload && payload.length) {
                         const data = payload[0].payload;
                         return (
-                          <div className="bg-popover border border-border rounded-lg p-3 shadow-lg">
-                            <p className="font-semibold text-sm mb-1">{data.nombre}</p>
+                          <div className="bg-popover border border-border rounded-lg p-3 shadow-lg max-w-xs">
+                            <p className="font-semibold text-sm mb-1">{data.nombreCompleto}</p>
                             <p className="text-xs text-muted-foreground">
                               Puntaje: {data.puntaje.toFixed(2)}/5.0
                             </p>
@@ -242,13 +243,16 @@ const MiAutoevaluacion = () => {
                 </RadarChart>
               </ResponsiveContainer>
             </div>
-            <div className="mt-6 grid grid-cols-2 md:grid-cols-3 gap-3">
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-3">
               {radarData.map((data, idx) => (
-                <div key={idx} className="flex items-center gap-2 p-2 rounded-lg bg-muted/50">
-                  <div className="flex-shrink-0 w-2 h-2 rounded-full bg-primary" />
+                <div key={idx} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border border-border">
+                  <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 text-primary font-bold text-sm">
+                    {data.numero}
+                  </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium truncate">{data.dimension}</p>
-                    <p className="text-sm font-bold text-primary">{data.porcentaje}%</p>
+                    <p className="text-xs font-medium text-muted-foreground mb-0.5">Dimensión {data.numero}</p>
+                    <p className="text-sm font-semibold truncate">{data.nombreCompleto}</p>
+                    <p className="text-lg font-bold text-primary mt-1">{data.porcentaje}%</p>
                   </div>
                 </div>
               ))}
