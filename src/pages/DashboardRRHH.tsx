@@ -19,7 +19,8 @@ import {
   FileText,
   Download,
   Filter,
-  RefreshCw
+  RefreshCw,
+  Zap
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
