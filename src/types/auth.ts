@@ -1,0 +1,25 @@
+export type UserRole = "colaborador" | "jefe" | "admin_rrhh" | "admin_general";
+
+export interface User {
+  dpi: string;
+  nombre: string;
+  apellidos: string;
+  fechaNacimiento: string;
+  correo?: string;
+  telefono?: string;
+  nivel: string;
+  cargo: string;
+  area: string;
+  jefeInmediato?: string;
+  rol: UserRole;
+  estado: "activo" | "inactivo";
+  primerIngreso: boolean;
+}
+
+export interface AuthContextType {
+  user: User | null;
+  login: (dpi: string, password: string) => Promise<void>;
+  logout: () => void;
+  changePassword: (newPassword: string) => void;
+  isAuthenticated: boolean;
+}
