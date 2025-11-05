@@ -81,14 +81,61 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
+  // Cargar sesión persistente al iniciar
   useEffect(() => {
-    const storedUser = localStorage.getItem("user");
-    if (storedUser) {
-      const userObj = JSON.parse(storedUser);
-      setUser(userObj);
-      setIsAuthenticated(true);
-    }
+    const restoreSession = async () => {
+      try {
+        const storedUser = localStorage.getItem("user");
+        const sessionTimestamp = localStorage.getItem("session_timestamp");
+        
+        if (storedUser && sessionTimestamp) {
+          // Verificar si la sesión no ha expirado (30 días)
+          const sessionAge = Date.now() - parseInt(sessionTimestamp);
+          const maxAge = 30 * 24 * 60 * 60 * 1000; // 30 días en milisegundos
+          
+          if (sessionAge < maxAge) {
+            const userObj = JSON.parse(storedUser);
+            
+            // Verificar que el usuario siga activo en Supabase
+            try {
+              const { supabase } = await import("@/integrations/supabase/client");
+              const { data, error } = await supabase
+                .from("users")
+                .select("estado")
+                .eq("dpi", userObj.dpi)
+                .single();
+              
+              if (!error && data && data.estado === "activo") {
+                setUser(userObj);
+                setIsAuthenticated(true);
+              } else {
+                // Usuario inactivo o no encontrado, limpiar sesión
+                localStorage.removeItem("user");
+                localStorage.removeItem("session_timestamp");
+              }
+            } catch {
+              // Si hay error al verificar, usar el usuario guardado (fallback)
+              setUser(userObj);
+              setIsAuthenticated(true);
+            }
+          } else {
+            // Sesión expirada
+            localStorage.removeItem("user");
+            localStorage.removeItem("session_timestamp");
+          }
+        }
+      } catch (error) {
+        console.error("Error restoring session:", error);
+        localStorage.removeItem("user");
+        localStorage.removeItem("session_timestamp");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    restoreSession();
   }, []);
 
   const login = async (dpi: string, password: string) => {
@@ -138,7 +185,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
     setUser(foundUser);
     setIsAuthenticated(true);
+    // Guardar usuario y timestamp de sesión para persistencia
     localStorage.setItem("user", JSON.stringify(foundUser));
+    localStorage.setItem("session_timestamp", Date.now().toString());
     
     toast.success(`Bienvenido, ${foundUser.nombre}`);
   };
@@ -146,13 +195,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const logout = () => {
     setUser(null);
     setIsAuthenticated(false);
+    // Limpiar toda la información de sesión
     localStorage.removeItem("user");
+    localStorage.removeItem("session_timestamp");
     toast.info("Sesión cerrada");
   };
 
   return (
     <AuthContext.Provider
-      value={{ user, login, logout, isAuthenticated }}
+      value={{ user, login, logout, isAuthenticated, isLoading }}
     >
       {children}
     </AuthContext.Provider>

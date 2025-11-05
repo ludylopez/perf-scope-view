@@ -21,4 +21,5 @@ export interface AuthContextType {
   login: (dpi: string, password: string) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
+  isLoading?: boolean;
 }

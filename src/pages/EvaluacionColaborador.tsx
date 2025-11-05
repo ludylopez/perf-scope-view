@@ -236,8 +236,8 @@ const EvaluacionColaborador = () => {
     loadData();
   }, [id, user, navigate]);
 
-  // Auto-save functionality
-  const performAutoSave = useCallback(() => {
+  // Auto-save functionality mejorado con hook personalizado
+  const performAutoSave = useCallback(async () => {
     if (!user || !colaborador || !periodoId) return;
 
     setAutoSaveStatus("saving");
@@ -259,24 +259,21 @@ const EvaluacionColaborador = () => {
       fechaUltimaModificacion: new Date().toISOString(),
     };
 
-    saveEvaluationDraft(draft);
+    await saveEvaluationDraft(draft);
     
-    setTimeout(() => {
-      setAutoSaveStatus("saved");
-      setHasUnsavedChanges(false);
-      setTimeout(() => setAutoSaveStatus("idle"), 2000);
-    }, 500);
+    setAutoSaveStatus("saved");
+    setHasUnsavedChanges(false);
+    setTimeout(() => setAutoSaveStatus("idle"), 2000);
   }, [user, colaborador, periodoId, desempenoResponses, desempenoComments, potencialResponses, potencialComments, desempenoProgress, potencialProgress]);
 
-  useEffect(() => {
-    if (hasUnsavedChanges) {
-      const timer = setTimeout(() => {
-        performAutoSave();
-      }, 30000);
-
-      return () => clearTimeout(timer);
-    }
-  }, [hasUnsavedChanges, performAutoSave]);
+  // Usar hook de auto-guardado mejorado
+  // Guarda automáticamente 2 segundos después de la última edición
+  // También guarda antes de cerrar la página y cada 30 segundos como respaldo
+  useAutoSave(performAutoSave, hasUnsavedChanges, {
+    debounceMs: 2000, // Guardar 2 segundos después de dejar de escribir
+    periodicSaveMs: 30000, // Guardado periódico cada 30 segundos como respaldo
+    saveBeforeUnload: true, // Guardar antes de cerrar la página
+  });
 
   const handleDesempenoResponseChange = (itemId: string, value: number) => {
     setDesempenoResponses((prev) => ({ ...prev, [itemId]: value }));

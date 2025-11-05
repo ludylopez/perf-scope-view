@@ -44,8 +44,10 @@ import {
 } from "@/lib/calculations";
 import { OpenQuestions } from "@/components/evaluation/OpenQuestions";
 import { getOpenQuestions, saveOpenQuestionResponses } from "@/lib/supabase";
+import { getActivePeriod } from "@/lib/supabase";
 import { ArrowLeft, ArrowRight, Save, Send, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import { useAutoSave } from "@/hooks/useAutoSave";
 
 const Autoevaluacion = () => {
   const { user } = useAuth();
@@ -66,6 +68,7 @@ const Autoevaluacion = () => {
   const [autoSaveStatus, setAutoSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [periodoId, setPeriodoId] = useState<string>("");
 
   const dimensions = instrument.dimensionesDesempeno;
   const totalItems = dimensions.reduce((sum, dim) => sum + dim.items.length, 0);
@@ -78,38 +81,65 @@ const Autoevaluacion = () => {
     if (!user) return;
 
     const loadData = async () => {
-      // Check if already submitted
-      const alreadySubmitted = await hasSubmittedEvaluation(user.dpi, "2025-1");
-      if (alreadySubmitted) {
-        navigate("/mi-autoevaluacion");
-        return;
-      }
+      try {
+        // Obtener período activo
+        const activePeriod = await getActivePeriod();
+        if (activePeriod) {
+          setPeriodoId(activePeriod.id);
+        } else {
+          // Fallback: buscar período 2025-1 por nombre
+          const { supabase } = await import("@/integrations/supabase/client");
+          const { data: periodData } = await supabase
+            .from("evaluation_periods")
+            .select("id")
+            .eq("nombre", "2025-1")
+            .single();
+          if (periodData) {
+            setPeriodoId(periodData.id);
+          } else {
+            toast.error("No se encontró un período de evaluación activo");
+            return;
+          }
+        }
 
-      // Load draft
-      const draft = await getEvaluationDraft(user.dpi, "2025-1");
-      if (draft) {
-        setResponses(draft.responses);
-        setComments(draft.comments);
-        toast.info("Se ha cargado su borrador guardado");
-      }
+        const periodoIdFinal = activePeriod?.id || periodoId;
 
-      // Load open questions
-      const questions = await getOpenQuestions();
-      setOpenQuestions(questions);
+        // Check if already submitted
+        const alreadySubmitted = await hasSubmittedEvaluation(user.dpi, periodoIdFinal);
+        if (alreadySubmitted) {
+          navigate("/mi-autoevaluacion");
+          return;
+        }
+
+        // Load draft
+        const draft = await getEvaluationDraft(user.dpi, periodoIdFinal);
+        if (draft) {
+          setResponses(draft.responses);
+          setComments(draft.comments);
+          toast.info("Se ha cargado su borrador guardado");
+        }
+
+        // Load open questions
+        const questions = await getOpenQuestions();
+        setOpenQuestions(questions);
+      } catch (error) {
+        console.error("Error loading data:", error);
+        toast.error("Error al cargar datos");
+      }
     };
 
     loadData();
   }, [user, navigate]);
 
-  // Auto-save functionality
-  const performAutoSave = useCallback(() => {
-    if (!user) return;
+  // Auto-save functionality mejorado con hook personalizado
+  const performAutoSave = useCallback(async () => {
+    if (!user || !periodoId) return;
 
     setAutoSaveStatus("saving");
     
     const draft: EvaluationDraft = {
       usuarioId: user.dpi,
-      periodoId: "2025-1",
+      periodoId: periodoId,
       tipo: "auto",
       responses,
       comments,
@@ -118,25 +148,27 @@ const Autoevaluacion = () => {
       fechaUltimaModificacion: new Date().toISOString(),
     };
 
-    saveEvaluationDraft(draft);
+    await saveEvaluationDraft(draft);
     
-    setTimeout(() => {
-      setAutoSaveStatus("saved");
-      setHasUnsavedChanges(false);
-      setTimeout(() => setAutoSaveStatus("idle"), 2000);
-    }, 500);
-  }, [user, responses, comments, progressPercentage]);
-
-  // Auto-save every 30 seconds
-  useEffect(() => {
-    if (hasUnsavedChanges) {
-      const timer = setTimeout(() => {
-        performAutoSave();
-      }, 30000);
-
-      return () => clearTimeout(timer);
+    // Guardar también respuestas a preguntas abiertas
+    if (Object.keys(openQuestionResponses).length > 0) {
+      const openQuestionsKey = `open_questions_${user.dpi}_${periodoId}`;
+      localStorage.setItem(openQuestionsKey, JSON.stringify(openQuestionResponses));
     }
-  }, [hasUnsavedChanges, performAutoSave]);
+    
+    setAutoSaveStatus("saved");
+    setHasUnsavedChanges(false);
+    setTimeout(() => setAutoSaveStatus("idle"), 2000);
+  }, [user, periodoId, responses, comments, progressPercentage, openQuestionResponses]);
+
+  // Usar hook de auto-guardado mejorado
+  // Guarda automáticamente 2 segundos después de la última edición
+  // También guarda antes de cerrar la página y cada 30 segundos como respaldo
+  useAutoSave(performAutoSave, hasUnsavedChanges, {
+    debounceMs: 2000, // Guardar 2 segundos después de dejar de escribir
+    periodicSaveMs: 30000, // Guardado periódico cada 30 segundos como respaldo
+    saveBeforeUnload: true, // Guardar antes de cerrar la página
+  });
 
   const handleResponseChange = (itemId: string, value: number) => {
     setResponses((prev) => ({ ...prev, [itemId]: value }));
