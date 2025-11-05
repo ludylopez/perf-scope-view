@@ -50,6 +50,9 @@ const DashboardRRHH = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [advancedStats, setAdvancedStats] = useState<any>(null);
+  const [executiveKPIs, setExecutiveKPIs] = useState<any>(null);
+  const [desarrolloStats, setDesarrolloStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [periodoId, setPeriodoId] = useState<string>("2025-1");
   const [selectedArea, setSelectedArea] = useState<string>("all");
@@ -107,6 +110,42 @@ const DashboardRRHH = () => {
         { semana: "Sem 4", completadas: Math.floor(completadas * 0.75) },
         { semana: "Actual", completadas },
       ];
+
+      // Cargar métricas avanzadas
+      const { data: advancedStatsData, error: advancedError } = await supabase
+        .rpc("get_advanced_dashboard_stats", { periodo_id_param: activePeriodId });
+
+      if (!advancedError && advancedStatsData) {
+        setAdvancedStats(advancedStatsData);
+      }
+
+      // Cargar KPIs ejecutivos
+      const { data: executiveKPIsData, error: executiveError } = await supabase
+        .rpc("get_executive_kpis", { periodo_id_param: activePeriodId });
+
+      if (!executiveError && executiveKPIsData) {
+        setExecutiveKPIs(executiveKPIsData);
+      }
+
+      // Cargar métricas de desarrollo (si hay período anterior)
+      const { data: periodosData } = await supabase
+        .from("evaluation_periods")
+        .select("id, nombre")
+        .order("nombre", { ascending: false })
+        .limit(2);
+
+      if (periodosData && periodosData.length >= 2) {
+        const periodoAnteriorId = periodosData[1].id;
+        const { data: desarrolloData, error: desarrolloError } = await supabase
+          .rpc("get_desarrollo_metrics", { 
+            periodo_actual_id: activePeriodId,
+            periodo_anterior_id: periodoAnteriorId
+          });
+
+        if (!desarrolloError && desarrolloData) {
+          setDesarrolloStats(desarrolloData);
+        }
+      }
 
       setStats({
         totalUsuarios: statsData.totalUsuarios || 0,
@@ -546,70 +585,618 @@ const DashboardRRHH = () => {
         </Card>
 
         {/* Gráficos Detallados */}
-        <div className="grid gap-6 mb-6 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Evaluaciones por Área</CardTitle>
-              <CardDescription>
-                Completitud de evaluaciones por área organizacional
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={stats.evaluacionesPorArea}>
-                  <XAxis dataKey="area" angle={-45} textAnchor="end" height={100} />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="completadas" fill="#10b981" name="Completadas" />
-                  <Bar dataKey="total" fill="#e5e7eb" name="Total" />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
+        <Tabs defaultValue="general" className="mb-6">
+          <TabsList className="grid w-full grid-cols-6">
+            <TabsTrigger value="general">General</TabsTrigger>
+            <TabsTrigger value="antiguedad">Antigüedad</TabsTrigger>
+            <TabsTrigger value="genero">Equidad</TabsTrigger>
+            <TabsTrigger value="rotacion">Rotación</TabsTrigger>
+            <TabsTrigger value="desarrollo">Desarrollo</TabsTrigger>
+            <TabsTrigger value="ejecutivo">Ejecutivo</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="general" className="space-y-6">
+            <div className="grid gap-6 md:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Evaluaciones por Área</CardTitle>
+                  <CardDescription>
+                    Completitud de evaluaciones por área organizacional
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={stats.evaluacionesPorArea}>
+                      <XAxis dataKey="area" angle={-45} textAnchor="end" height={100} />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Bar dataKey="completadas" fill="#10b981" name="Completadas" />
+                      <Bar dataKey="total" fill="#e5e7eb" name="Total" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Evaluaciones por Nivel</CardTitle>
-              <CardDescription>
-                Distribución de evaluaciones completadas por nivel
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={stats.evaluacionesPorNivel}>
-                  <XAxis dataKey="nivel" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="completadas" fill="#8884d8" name="Completadas" />
-                  <Bar dataKey="total" fill="#e5e7eb" name="Total" />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </div>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Evaluaciones por Nivel</CardTitle>
+                  <CardDescription>
+                    Distribución de evaluaciones completadas por nivel
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={stats.evaluacionesPorNivel}>
+                      <XAxis dataKey="nivel" />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Bar dataKey="completadas" fill="#8884d8" name="Completadas" />
+                      <Bar dataKey="total" fill="#e5e7eb" name="Total" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            </div>
 
-        {/* Tendencia Semanal */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Tendencia de Completitud</CardTitle>
-            <CardDescription>
-              Evolución semanal de evaluaciones completadas
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={stats.tendenciaSemanal}>
-                <XAxis dataKey="semana" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Line type="monotone" dataKey="completadas" stroke="#8884d8" strokeWidth={2} name="Completadas" />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+            {/* Tendencia Semanal */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Tendencia de Completitud</CardTitle>
+                <CardDescription>
+                  Evolución semanal de evaluaciones completadas
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={stats.tendenciaSemanal}>
+                    <XAxis dataKey="semana" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Line type="monotone" dataKey="completadas" stroke="#8884d8" strokeWidth={2} name="Completadas" />
+                  </LineChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="antiguedad" className="space-y-6">
+            {/* Elegibilidad */}
+            {advancedStats?.elegibilidad && (
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium">Elegibles</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-3xl font-bold text-success">{advancedStats.elegibilidad.elegibles}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {advancedStats.elegibilidad.porcentajeElegibles}% del total
+                    </p>
+                    <Progress value={advancedStats.elegibilidad.porcentajeElegibles} className="mt-2 h-2" />
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium">No Elegibles</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-3xl font-bold text-warning">{advancedStats.elegibilidad.noElegibles}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Requieren datos o antigüedad
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium">Admin. Elegibles</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-3xl font-bold text-info">{advancedStats.elegibilidad.elegiblesAdministrativos}</p>
+                    <p className="text-xs text-muted-foreground mt-1">≥3 meses</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium">Op. Elegibles</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-3xl font-bold text-info">{advancedStats.elegibilidad.elegiblesOperativos}</p>
+                    <p className="text-xs text-muted-foreground mt-1">≥6 meses</p>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {/* Distribución de Antigüedad */}
+            {advancedStats?.antiguedadDistribution && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Distribución de Antigüedad</CardTitle>
+                  <CardDescription>
+                    Colaboradores por rangos de tiempo en la organización
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={[
+                      { rango: "0-3 meses", cantidad: advancedStats.antiguedadDistribution.rango0_3 },
+                      { rango: "3-6 meses", cantidad: advancedStats.antiguedadDistribution.rango3_6 },
+                      { rango: "6-12 meses", cantidad: advancedStats.antiguedadDistribution.rango6_12 },
+                      { rango: "1-3 años", cantidad: advancedStats.antiguedadDistribution.rango1_3 },
+                      { rango: "3-5 años", cantidad: advancedStats.antiguedadDistribution.rango3_5 },
+                      { rango: "5+ años", cantidad: advancedStats.antiguedadDistribution.rango5_plus },
+                    ]}>
+                      <XAxis dataKey="rango" />
+                      <YAxis />
+                      <Tooltip />
+                      <Bar dataKey="cantidad" fill="#8884d8" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                  <div className="mt-4 p-4 bg-muted/50 rounded-lg">
+                    <p className="text-sm text-muted-foreground">
+                      <strong>Promedio de antigüedad:</strong> {Math.round(advancedStats.antiguedadDistribution.promedioMeses)} meses
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Antigüedad vs Desempeño */}
+            {advancedStats?.antiguedadVsDesempeno && advancedStats.antiguedadVsDesempeno.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Correlación Antigüedad vs Desempeño</CardTitle>
+                  <CardDescription>
+                    Desempeño promedio por rango de antigüedad
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={advancedStats.antiguedadVsDesempeno}>
+                      <XAxis dataKey="rangoAntiguedad" />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Line type="monotone" dataKey="promedioDesempeno" stroke="#8884d8" strokeWidth={2} name="Desempeño %" />
+                      <Line type="monotone" dataKey="promedioPotencial" stroke="#82ca9d" strokeWidth={2} name="Potencial %" />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Tiempo Promedio por Área */}
+            {advancedStats?.tiempoPromedioPorArea && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Tiempo Promedio en el Puesto por Área</CardTitle>
+                  <CardDescription>
+                    Antigüedad promedio de colaboradores por área
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={advancedStats.tiempoPromedioPorArea.map(a => ({
+                      area: a.area,
+                      meses: Math.round(a.promedioMeses)
+                    }))}>
+                      <XAxis dataKey="area" angle={-45} textAnchor="end" height={100} />
+                      <YAxis />
+                      <Tooltip />
+                      <Bar dataKey="meses" fill="#10b981" name="Meses promedio" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="genero" className="space-y-6">
+            {/* Estadísticas por Género */}
+            {advancedStats?.generoStats && advancedStats.generoStats.length > 0 && (
+              <>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Distribución por Género</CardTitle>
+                    <CardDescription>
+                      Total de colaboradores por género
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={advancedStats.generoStats.map(g => ({
+                        genero: g.genero === 'no_especificado' ? 'No especificado' : g.genero,
+                        total: g.totalColaboradores,
+                        completadas: g.evaluacionesCompletadas,
+                      }))}>
+                        <XAxis dataKey="genero" />
+                        <YAxis />
+                        <Tooltip />
+                        <Legend />
+                        <Bar dataKey="total" fill="#8884d8" name="Total" />
+                        <Bar dataKey="completadas" fill="#10b981" name="Evaluadas" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Desempeño Promedio por Género</CardTitle>
+                    <CardDescription>
+                      Comparación de desempeño y potencial por género
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={advancedStats.generoStats
+                        .filter(g => g.promedioDesempeno != null)
+                        .map(g => ({
+                          genero: g.genero === 'no_especificado' ? 'No especificado' : g.genero,
+                          desempeno: Math.round(g.promedioDesempeno || 0),
+                          potencial: Math.round(g.promedioPotencial || 0),
+                        }))}>
+                        <XAxis dataKey="genero" />
+                        <YAxis />
+                        <Tooltip />
+                        <Legend />
+                        <Bar dataKey="desempeno" fill="#8884d8" name="Desempeño %" />
+                        <Bar dataKey="potencial" fill="#82ca9d" name="Potencial %" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              </>
+            )}
+          </TabsContent>
+
+          <TabsContent value="rotacion" className="space-y-6">
+            {/* Rotación por Área */}
+            {advancedStats?.rotacionStats && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Estabilidad del Equipo por Área</CardTitle>
+                  <CardDescription>
+                    Análisis de rotación y estabilidad organizacional
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Área</TableHead>
+                        <TableHead>Total</TableHead>
+                        <TableHead>Antigüedad Promedio</TableHead>
+                        <TableHead>Nuevos (&lt;6 meses)</TableHead>
+                        <TableHead>Estables (≥1 año)</TableHead>
+                        <TableHead>Veteranos (≥3 años)</TableHead>
+                        <TableHead>Tasa Estabilidad</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {advancedStats.rotacionStats.map((area: any, idx: number) => (
+                        <TableRow key={idx}>
+                          <TableCell className="font-medium">{area.area}</TableCell>
+                          <TableCell>{area.totalColaboradores}</TableCell>
+                          <TableCell>{Math.round(area.promedioAntiguedad || 0)} meses</TableCell>
+                          <TableCell>{area.colaboradoresNuevos}</TableCell>
+                          <TableCell>{area.colaboradoresEstables}</TableCell>
+                          <TableCell>{area.colaboradoresVeteranos}</TableCell>
+                          <TableCell>
+                            <Badge variant={area.tasaEstabilidad >= 70 ? "default" : area.tasaEstabilidad >= 50 ? "secondary" : "destructive"}>
+                              {area.tasaEstabilidad}%
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="desarrollo" className="space-y-6">
+            {/* Resumen de Progresión */}
+            {desarrolloStats?.resumenProgresion && (
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium">Con Mejora</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-3xl font-bold text-success">
+                      {desarrolloStats.resumenProgresion.colaboradoresConMejora}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {desarrolloStats.resumenProgresion.totalColaboradoresComparados > 0
+                        ? Math.round((desarrolloStats.resumenProgresion.colaboradoresConMejora / desarrolloStats.resumenProgresion.totalColaboradoresComparados) * 100)
+                        : 0}% del total
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium">Sin Cambio</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-3xl font-bold text-muted-foreground">
+                      {desarrolloStats.resumenProgresion.colaboradoresSinCambio}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium">Con Retroceso</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-3xl font-bold text-destructive">
+                      {desarrolloStats.resumenProgresion.colaboradoresConRetroceso}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium">Promedio Mejora</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-3xl font-bold text-primary">
+                      {desarrolloStats.resumenProgresion.promedioMejora 
+                        ? Math.round(desarrolloStats.resumenProgresion.promedioMejora * 10) / 10
+                        : 0}%
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {desarrolloStats.resumenProgresion.promedioTasaMejora 
+                        ? `Tasa: ${Math.round(desarrolloStats.resumenProgresion.promedioTasaMejora * 10) / 10}%`
+                        : 'Sin datos'}
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {/* Top Mejoras */}
+            {desarrolloStats?.topMejoras && desarrolloStats.topMejoras.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Top 10 Mejoras de Desempeño</CardTitle>
+                  <CardDescription>
+                    Colaboradores con mayor mejora entre períodos
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Colaborador</TableHead>
+                        <TableHead>Área</TableHead>
+                        <TableHead>Desempeño Anterior</TableHead>
+                        <TableHead>Desempeño Actual</TableHead>
+                        <TableHead>Mejora</TableHead>
+                        <TableHead>Tasa Mejora</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {desarrolloStats.topMejoras.slice(0, 10).map((colaborador: any, idx: number) => (
+                        <TableRow key={idx}>
+                          <TableCell className="font-medium">{colaborador.nombreCompleto}</TableCell>
+                          <TableCell>{colaborador.area}</TableCell>
+                          <TableCell>{Math.round(colaborador.desempenoAnterior)}%</TableCell>
+                          <TableCell>{Math.round(colaborador.desempenoActual)}%</TableCell>
+                          <TableCell>
+                            <Badge variant="default" className="bg-success">
+                              +{Math.round(colaborador.mejora)}%
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {colaborador.tasaMejora ? `${Math.round(colaborador.tasaMejora)}%` : 'N/A'}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Desarrollo por Área */}
+            {desarrolloStats?.desarrolloPorArea && desarrolloStats.desarrolloPorArea.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Índice de Desarrollo por Área</CardTitle>
+                  <CardDescription>
+                    Métricas de desarrollo y potencial por área organizacional
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={desarrolloStats.desarrolloPorArea
+                      .filter((a: any) => a.indiceDesarrollo != null)
+                      .map((a: any) => ({
+                        area: a.area,
+                        indice: Math.round(a.indiceDesarrollo || 0),
+                        desempeno: Math.round(a.promedioDesempeno || 0),
+                        potencial: Math.round(a.promedioPotencial || 0),
+                      }))}>
+                      <XAxis dataKey="area" angle={-45} textAnchor="end" height={100} />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Bar dataKey="indice" fill="#8884d8" name="Índice Desarrollo" />
+                      <Bar dataKey="desempeno" fill="#82ca9d" name="Desempeño %" />
+                      <Bar dataKey="potencial" fill="#ffc658" name="Potencial %" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="ejecutivo" className="space-y-6">
+            {/* KPIs Estratégicos */}
+            {executiveKPIs && (
+              <>
+                {/* Scorecards de KPIs */}
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-medium">Índice Completitud</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-3xl font-bold text-primary">
+                        {Math.round(executiveKPIs.indiceCompletitud)}%
+                      </p>
+                      <Badge 
+                        variant={
+                          executiveKPIs.scorecards?.completitud === 'excelente' ? 'default' :
+                          executiveKPIs.scorecards?.completitud === 'bueno' ? 'secondary' :
+                          executiveKPIs.scorecards?.completitud === 'regular' ? 'outline' : 'destructive'
+                        }
+                        className="mt-2"
+                      >
+                        {executiveKPIs.scorecards?.completitud === 'excelente' ? 'Excelente' :
+                         executiveKPIs.scorecards?.completitud === 'bueno' ? 'Bueno' :
+                         executiveKPIs.scorecards?.completitud === 'regular' ? 'Regular' : 'Bajo'}
+                      </Badge>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        {executiveKPIs.evaluacionesCompletadas} de {executiveKPIs.totalActivos} evaluaciones
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-medium">Índice Desempeño</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-3xl font-bold text-success">
+                        {Math.round(executiveKPIs.indiceDesempenoOrganizacional)}%
+                      </p>
+                      <Badge 
+                        variant={
+                          executiveKPIs.scorecards?.desempeno === 'excelente' ? 'default' :
+                          executiveKPIs.scorecards?.desempeno === 'bueno' ? 'secondary' :
+                          executiveKPIs.scorecards?.desempeno === 'regular' ? 'outline' : 'destructive'
+                        }
+                        className="mt-2"
+                      >
+                        {executiveKPIs.scorecards?.desempeno === 'excelente' ? 'Excelente' :
+                         executiveKPIs.scorecards?.desempeno === 'bueno' ? 'Bueno' :
+                         executiveKPIs.scorecards?.desempeno === 'regular' ? 'Regular' : 'Bajo'}
+                      </Badge>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Desempeño organizacional promedio
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-medium">Índice Desarrollo</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-3xl font-bold text-info">
+                        {Math.round(executiveKPIs.indiceDesarrolloTalento)}%
+                      </p>
+                      <Badge 
+                        variant={
+                          executiveKPIs.scorecards?.desarrollo === 'excelente' ? 'default' :
+                          executiveKPIs.scorecards?.desarrollo === 'bueno' ? 'secondary' :
+                          executiveKPIs.scorecards?.desarrollo === 'regular' ? 'outline' : 'destructive'
+                        }
+                        className="mt-2"
+                      >
+                        {executiveKPIs.scorecards?.desarrollo === 'excelente' ? 'Excelente' :
+                         executiveKPIs.scorecards?.desarrollo === 'bueno' ? 'Bueno' :
+                         executiveKPIs.scorecards?.desarrollo === 'regular' ? 'Regular' : 'Bajo'}
+                      </Badge>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Desarrollo del talento
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-medium">Índice Estabilidad</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-3xl font-bold text-accent">
+                        {Math.round(executiveKPIs.indiceEstabilidadEquipo)}%
+                      </p>
+                      <Badge 
+                        variant={
+                          executiveKPIs.scorecards?.estabilidad === 'excelente' ? 'default' :
+                          executiveKPIs.scorecards?.estabilidad === 'bueno' ? 'secondary' :
+                          executiveKPIs.scorecards?.estabilidad === 'regular' ? 'outline' : 'destructive'
+                        }
+                        className="mt-2"
+                      >
+                        {executiveKPIs.scorecards?.estabilidad === 'excelente' ? 'Excelente' :
+                         executiveKPIs.scorecards?.estabilidad === 'bueno' ? 'Bueno' :
+                         executiveKPIs.scorecards?.estabilidad === 'regular' ? 'Regular' : 'Bajo'}
+                      </Badge>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Estabilidad del equipo
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Métricas Adicionales */}
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-medium">Alto Potencial</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-3xl font-bold text-success">
+                        {executiveKPIs.colaboradoresAltoPotencial}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {executiveKPIs.tasaAltoPotencial}% del total evaluado
+                      </p>
+                      <Progress value={executiveKPIs.tasaAltoPotencial} className="mt-2 h-2" />
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-medium">En Riesgo</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-3xl font-bold text-destructive">
+                        {executiveKPIs.colaboradoresRiesgo}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {executiveKPIs.tasaRiesgo}% del total evaluado
+                      </p>
+                      <Progress value={executiveKPIs.tasaRiesgo} className="mt-2 h-2" />
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-medium">Elegibles</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-3xl font-bold text-primary">
+                        {executiveKPIs.totalElegibles}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {executiveKPIs.porcentajeElegibles}% del total activo
+                      </p>
+                      <Progress value={executiveKPIs.porcentajeElegibles} className="mt-2 h-2" />
+                    </CardContent>
+                  </Card>
+                </div>
+              </>
+            )}
+          </TabsContent>
+        </Tabs>
 
         {/* Lista de Pendientes */}
         <Card>

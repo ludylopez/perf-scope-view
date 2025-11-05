@@ -13,13 +13,30 @@ export interface ImportedUser {
   cargo: string;
   area: string;
   tipoPuesto?: 'administrativo' | 'operativo';
+  genero?: 'masculino' | 'femenino' | 'otro' | 'prefiero_no_decir';
 }
 
 /**
- * Determina el tipo de puesto basado en el nivel
- * Administrativos: A1, A2, S1, S2
- * Operativos: E1, E2, O1, O2
+ * Normaliza el género desde diferentes formatos posibles en el CSV
  */
+export const normalizarGenero = (genero: string): 'masculino' | 'femenino' | 'otro' | 'prefiero_no_decir' | null => {
+  const generoLower = genero.trim().toLowerCase();
+  
+  if (generoLower.includes('masc') || generoLower === 'm' || generoLower === 'masculino') {
+    return 'masculino';
+  }
+  if (generoLower.includes('femen') || generoLower === 'f' || generoLower === 'femenino') {
+    return 'femenino';
+  }
+  if (generoLower.includes('otro') || generoLower === 'o') {
+    return 'otro';
+  }
+  if (generoLower.includes('prefiero') || generoLower.includes('no') || generoLower === 'n/a') {
+    return 'prefiero_no_decir';
+  }
+  
+  return null;
+};
 export const inferTipoPuesto = (nivel: string): 'administrativo' | 'operativo' | null => {
   const nivelUpper = nivel.toUpperCase().trim();
   if (['A1', 'A2', 'S1', 'S2'].includes(nivelUpper)) {
@@ -192,6 +209,7 @@ export const parsearArchivoUsuarios = async (file: File): Promise<{ usuarios: Im
         if (headerLower.includes('puesto') && !headerLower.includes('nivel')) columnMap.cargo = i;
         if (headerLower.includes('departamento') || headerLower.includes('dependencia')) columnMap.area = i;
         if (headerLower.includes('direccion') || headerLower.includes('unidad')) columnMap.direccion = i;
+        if (headerLower.includes('sexo') || headerLower.includes('género') || headerLower.includes('genero')) columnMap.genero = i;
       });
       
       // Procesar líneas de datos
@@ -210,6 +228,7 @@ export const parsearArchivoUsuarios = async (file: File): Promise<{ usuarios: Im
           const nivel = partsTrimmed[columnMap.nivel]?.trim().toUpperCase() || '';
           const cargo = partsTrimmed[columnMap.cargo]?.trim() || '';
           const area = partsTrimmed[columnMap.area]?.trim() || partsTrimmed[columnMap.direccion]?.trim() || '';
+          const generoRaw = partsTrimmed[columnMap.genero]?.trim() || '';
           
           if (!dpi || dpi.length < 10) {
             errores.push(`Línea ${i + 1}: DPI inválido o faltante`);
@@ -230,6 +249,7 @@ export const parsearArchivoUsuarios = async (file: File): Promise<{ usuarios: Im
           const fechaNacFormato = convertirFechaNacimiento(fechaNac);
           const fechaIngFormato = convertirFechaIngreso(fechaIng);
           const tipoPuesto = inferTipoPuesto(nivel);
+          const genero = generoRaw ? normalizarGenero(generoRaw) : undefined;
           
           if (!fechaNacFormato) {
             errores.push(`Línea ${i + 1}: No se pudo convertir fecha de nacimiento: ${fechaNac}`);
@@ -246,6 +266,7 @@ export const parsearArchivoUsuarios = async (file: File): Promise<{ usuarios: Im
             cargo,
             area,
             tipoPuesto: tipoPuesto || undefined,
+            genero: genero || undefined,
           });
         } catch (error: any) {
           errores.push(`Línea ${i + 1}: ${error.message || 'Error al procesar'}`);
@@ -278,6 +299,7 @@ export const parsearArchivoUsuarios = async (file: File): Promise<{ usuarios: Im
         if (h.includes('puesto') && !h.includes('nivel')) columnMap.cargo = i;
         if (h.includes('departamento') || h.includes('dependencia')) columnMap.area = i;
         if (h.includes('direccion') || h.includes('unidad')) columnMap.direccion = i;
+        if (h.includes('sexo') || h.includes('género') || h.includes('genero')) columnMap.genero = i;
       });
       
       // Procesar filas de datos
@@ -293,6 +315,7 @@ export const parsearArchivoUsuarios = async (file: File): Promise<{ usuarios: Im
           const nivel = String(row[columnMap.nivel] || '').trim().toUpperCase();
           const cargo = String(row[columnMap.cargo] || '').trim();
           const area = String(row[columnMap.area] || row[columnMap.direccion] || '').trim();
+          const generoRaw = String(row[columnMap.genero] || '').trim();
           
           if (!dpi || dpi.length < 10) {
             errores.push(`Fila ${i + 1}: DPI inválido o faltante`);
@@ -313,6 +336,7 @@ export const parsearArchivoUsuarios = async (file: File): Promise<{ usuarios: Im
           const fechaNacFormato = convertirFechaNacimiento(fechaNac);
           const fechaIngFormato = convertirFechaIngreso(fechaIng);
           const tipoPuesto = inferTipoPuesto(nivel);
+          const genero = generoRaw ? normalizarGenero(generoRaw) : undefined;
           
           if (!fechaNacFormato) {
             errores.push(`Fila ${i + 1}: No se pudo convertir fecha de nacimiento`);
@@ -329,6 +353,7 @@ export const parsearArchivoUsuarios = async (file: File): Promise<{ usuarios: Im
             cargo,
             area,
             tipoPuesto: tipoPuesto || undefined,
+            genero: genero || undefined,
           });
         } catch (error: any) {
           errores.push(`Fila ${i + 1}: ${error.message || 'Error al procesar'}`);
@@ -367,6 +392,7 @@ export const importarUsuarios = async (usuarios: ImportedUser[]): Promise<{ exit
       cargo: u.cargo,
       area: u.area,
       tipo_puesto: u.tipoPuesto || null,
+      genero: u.genero || null,
       rol: 'colaborador' as const,
       estado: 'activo' as const,
       primer_ingreso: true,

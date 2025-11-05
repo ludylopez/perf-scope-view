@@ -54,6 +54,7 @@ const AdminUsuarios = () => {
     fechaNacimiento: "",
     fechaIngreso: "",
     tipoPuesto: "" as "" | "administrativo" | "operativo",
+    genero: "" as "" | "masculino" | "femenino" | "otro" | "prefiero_no_decir",
     correo: "",
     telefono: "",
     nivel: "",
@@ -102,6 +103,9 @@ const AdminUsuarios = () => {
         nombre: item.nombre,
         apellidos: item.apellidos,
         fechaNacimiento: item.fecha_nacimiento,
+        fechaIngreso: item.fecha_ingreso || "",
+        tipoPuesto: item.tipo_puesto || "",
+        genero: item.genero || "",
         correo: item.correo,
         telefono: item.telefono,
         nivel: item.nivel,
@@ -151,6 +155,7 @@ const AdminUsuarios = () => {
           fecha_nacimiento: fechaNacFormato,
           fecha_ingreso: newUser.fechaIngreso || null,
           tipo_puesto: newUser.tipoPuesto || null,
+          genero: newUser.genero || null,
           correo: newUser.correo || null,
           telefono: newUser.telefono || null,
           nivel: newUser.nivel,
@@ -173,6 +178,7 @@ const AdminUsuarios = () => {
         fechaNacimiento: "",
         fechaIngreso: "",
         tipoPuesto: "",
+        genero: "",
         correo: "",
         telefono: "",
         nivel: "",
@@ -210,6 +216,7 @@ const AdminUsuarios = () => {
           fecha_nacimiento: fechaNacFormato,
           fecha_ingreso: (editingUser as any).fechaIngreso || null,
           tipo_puesto: (editingUser as any).tipoPuesto || null,
+          genero: (editingUser as any).genero || null,
           correo: editingUser.correo || null,
           telefono: editingUser.telefono || null,
           nivel: editingUser.nivel,
@@ -390,6 +397,24 @@ const AdminUsuarios = () => {
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground">Administrativo: 3 meses mínimo | Operativo: 6 meses mínimo</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Género</Label>
+                    <Select
+                      value={newUser.genero}
+                      onValueChange={(value: any) => setNewUser({ ...newUser, genero: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar género" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="masculino">Masculino</SelectItem>
+                        <SelectItem value="femenino">Femenino</SelectItem>
+                        <SelectItem value="otro">Otro</SelectItem>
+                        <SelectItem value="prefiero_no_decir">Prefiero no decir</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">Para análisis estadísticos</p>
                   </div>
                   <div className="space-y-2">
                     <Label>Nombre *</Label>
@@ -706,6 +731,49 @@ const AdminUsuarios = () => {
                       value={editingUser.fechaNacimiento}
                       onChange={(e) => setEditingUser({ ...editingUser, fechaNacimiento: e.target.value })}
                     />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Fecha de Ingreso</Label>
+                    <Input
+                      type="date"
+                      value={(editingUser as any).fechaIngreso || ""}
+                      onChange={(e) => setEditingUser({ ...editingUser, fechaIngreso: e.target.value } as any)}
+                    />
+                    <p className="text-xs text-muted-foreground">Para cálculo de elegibilidad</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Tipo de Puesto</Label>
+                    <Select
+                      value={(editingUser as any).tipoPuesto || ""}
+                      onValueChange={(value: any) => setEditingUser({ ...editingUser, tipoPuesto: value } as any)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar tipo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="administrativo">Administrativo</SelectItem>
+                        <SelectItem value="operativo">Operativo</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">Administrativo: 3 meses mínimo | Operativo: 6 meses mínimo</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Género</Label>
+                    <Select
+                      value={(editingUser as any).genero || ""}
+                      onValueChange={(value: any) => setEditingUser({ ...editingUser, genero: value } as any)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar género" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="masculino">Masculino</SelectItem>
+                        <SelectItem value="femenino">Femenino</SelectItem>
+                        <SelectItem value="otro">Otro</SelectItem>
+                        <SelectItem value="prefiero_no_decir">Prefiero no decir</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">Para análisis estadísticos</p>
                   </div>
                   <div className="space-y-2">
                     <Label>Nombre</Label>
