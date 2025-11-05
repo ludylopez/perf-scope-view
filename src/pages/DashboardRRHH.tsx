@@ -27,6 +27,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { exportToPDF, exportToExcel, ExportData } from "@/lib/exports";
+import { getAPIUsageStats } from "@/lib/gemini";
 
 interface DashboardStats {
   totalUsuarios: number;
@@ -50,6 +51,7 @@ const DashboardRRHH = () => {
   const [loading, setLoading] = useState(true);
   const [periodoId, setPeriodoId] = useState<string>("2025-1");
   const [selectedArea, setSelectedArea] = useState<string>("all");
+  const [apiUsageStats, setApiUsageStats] = useState(getAPIUsageStats());
 
   useEffect(() => {
     if (!user || (user.rol !== "admin_rrhh" && user.rol !== "admin_general")) {
@@ -204,6 +206,7 @@ const DashboardRRHH = () => {
       toast.error("Error al cargar estadísticas");
     } finally {
       setLoading(false);
+      setApiUsageStats(getAPIUsageStats());
     }
   };
 
@@ -432,6 +435,57 @@ const DashboardRRHH = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Tarjeta de Uso de API de IA */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Zap className="h-5 w-5 text-info" />
+              Uso de API de Google AI (Gemini)
+            </CardTitle>
+            <CardDescription>
+              Consumo de créditos de IA para generación de planes de desarrollo
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-4">
+              <div className="p-4 rounded-lg border">
+                <p className="text-sm text-muted-foreground mb-1">Total de Llamadas</p>
+                <p className="text-2xl font-bold text-primary">{apiUsageStats.totalCalls || 0}</p>
+              </div>
+              <div className="p-4 rounded-lg border">
+                <p className="text-sm text-muted-foreground mb-1">Exitosas</p>
+                <p className="text-2xl font-bold text-success">{apiUsageStats.successfulCalls || 0}</p>
+                {apiUsageStats.totalCalls > 0 && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {Math.round((apiUsageStats.successfulCalls / apiUsageStats.totalCalls) * 100)}% éxito
+                  </p>
+                )}
+              </div>
+              <div className="p-4 rounded-lg border">
+                <p className="text-sm text-muted-foreground mb-1">Fallidas</p>
+                <p className="text-2xl font-bold text-destructive">{apiUsageStats.failedCalls || 0}</p>
+              </div>
+              <div className="p-4 rounded-lg border">
+                <p className="text-sm text-muted-foreground mb-1">Tokens Estimados</p>
+                <p className="text-2xl font-bold text-info">{(apiUsageStats.totalTokens || 0).toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  ~${((apiUsageStats.totalTokens || 0) / 1000000 * 0.10).toFixed(4)} USD
+                </p>
+              </div>
+            </div>
+            {apiUsageStats.lastCallDate && (
+              <div className="mt-4 p-3 rounded-lg bg-muted/50">
+                <p className="text-sm text-muted-foreground">
+                  Última llamada: {new Date(apiUsageStats.lastCallDate).toLocaleString("es-GT", {
+                    dateStyle: "short",
+                    timeStyle: "short",
+                  })}
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Gráficos Detallados */}
         <div className="grid gap-6 mb-6 md:grid-cols-2">

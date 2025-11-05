@@ -34,38 +34,9 @@ export const generateDevelopmentPlan = async (
     // Generar prompt para Gemini
     const prompt = buildDevelopmentPlanPrompt(contexto);
 
-    // Llamar a Gemini API
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: prompt,
-                },
-              ],
-            },
-          ],
-        }),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`Gemini API error: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (!generatedText) {
-      throw new Error("No content generated from Gemini");
-    }
+    // Llamar a Gemini API usando la función centralizada que registra uso
+    const { generateAIAnalysis } = await import("./gemini");
+    const generatedText = await generateAIAnalysis(prompt);
 
     // Parsear la respuesta de Gemini
     const plan = parseGeminiResponse(generatedText, colaboradorId, periodoId, evaluacionJefe.usuarioId || "");

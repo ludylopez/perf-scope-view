@@ -1,5 +1,4 @@
 // @ts-nocheck
-import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Header } from "@/components/layout/Header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -58,17 +57,9 @@ const Dashboard = () => {
           setProgress(0);
         }
       }
-<<<<<<< HEAD
-    }
-=======
     };
 
     checkStatus();
-
-    // Check if API key exists
-    const existingKey = getGeminiApiKey();
-    setHasApiKey(!!existingKey);
->>>>>>> 77ac5de6011491e2c919e2e47ff48a854fff91d1
   }, [user]);
 
   const getStatusBadge = () => {
