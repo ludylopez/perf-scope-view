@@ -16,12 +16,6 @@ export const generateDevelopmentPlan = async (
   dimensions: Dimension[],
   potencialDimensions?: Dimension[]
 ): Promise<DevelopmentPlan | null> => {
-  const apiKey = getGeminiApiKey();
-  if (!apiKey) {
-    console.warn("No API key found for Gemini. Skipping AI generation.");
-    return null;
-  }
-
   try {
     // Construir contexto de la evaluación
     const contexto = buildEvaluationContext(
@@ -36,7 +30,7 @@ export const generateDevelopmentPlan = async (
     const prompt = buildDevelopmentPlanPrompt(contexto);
 
     // Llamar a Gemini API usando la función centralizada que registra uso
-    const { generateAIAnalysis } = await import("./gemini");
+    // La función generateAIAnalysis maneja internamente la verificación de API key
     const generatedText = await generateAIAnalysis(prompt);
 
     // Parsear la respuesta de Gemini
