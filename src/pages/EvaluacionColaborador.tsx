@@ -54,6 +54,9 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { generateDevelopmentPlan } from "@/lib/developmentPlan";
+import { calculateCompleteFinalScore } from "@/lib/finalScore";
+import { getInstrumentForUser } from "@/lib/instruments";
 
 // Datos mock del colaborador
 const MOCK_COLABORADORES: Record<string, any> = {
@@ -71,11 +74,12 @@ const EvaluacionColaborador = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const instrument = INSTRUMENT_A1;
+  const [instrument, setInstrument] = useState(INSTRUMENT_A1);
 
   const [colaborador, setColaborador] = useState<any>(null);
   const [autoevaluacion, setAutoevaluacion] = useState<any>(null);
-  const [evaluacionTab, setEvaluacionTab] = useState<"auto" | "desempeno" | "potencial">("auto");
+  const [jefeAlreadyEvaluated, setJefeAlreadyEvaluated] = useState(false);
+  const [evaluacionTab, setEvaluacionTab] = useState<"auto" | "desempeno" | "potencial">("desempeno");
   
   // Estados para evaluación de desempeño del jefe
   const [desempenoResponses, setDesempenoResponses] = useState<Record<string, number>>({});
@@ -122,35 +126,58 @@ const EvaluacionColaborador = () => {
       return;
     }
 
-    const colaboradorData = MOCK_COLABORADORES[id];
-    if (!colaboradorData) {
-      navigate("/evaluacion-equipo");
-      return;
-    }
-
-    setColaborador(colaboradorData);
-
-    // Cargar autoevaluación del colaborador
-    const submittedAuto = getSubmittedEvaluation(colaboradorData.dpi, "2025-1");
-    const mockAuto = getMockColaboradorEvaluation(colaboradorData.dpi);
-    setAutoevaluacion(submittedAuto || mockAuto);
-
-    // Cargar evaluación del jefe si existe
-    const jefeDraft = getJefeEvaluationDraft(user.dpi, colaboradorData.dpi, "2025-1");
-    if (jefeDraft) {
-      setDesempenoResponses(jefeDraft.responses);
-      setDesempenoComments(jefeDraft.comments);
-      if (jefeDraft.evaluacionPotencial) {
-        setPotencialResponses(jefeDraft.evaluacionPotencial.responses);
-        setPotencialComments(jefeDraft.evaluacionPotencial.comments);
+    const loadData = async () => {
+      const colaboradorData = MOCK_COLABORADORES[id];
+      if (!colaboradorData) {
+        navigate("/evaluacion-equipo");
+        return;
       }
+
+      setColaborador(colaboradorData);
+
+      // Cargar instrumento según el nivel del colaborador
+      if (colaboradorData.nivel) {
+        const userInstrument = await getInstrumentForUser(colaboradorData.nivel);
+        if (userInstrument) {
+          setInstrument(userInstrument);
+        }
+      }
+
+      // Cargar autoevaluación del colaborador solo si el jefe ya completó su evaluación
+      const jefeDraft = await getJefeEvaluationDraft(user.dpi, colaboradorData.dpi, "2025-1");
+      const jefeCompleto = jefeDraft?.estado === "enviado";
+      setJefeAlreadyEvaluated(jefeCompleto);
       
-      if (jefeDraft.estado === "enviado") {
-        toast.info("Esta evaluación ya fue enviada");
+      if (jefeCompleto) {
+        // Solo mostrar autoevaluación si el jefe ya completó su evaluación
+        const submittedAuto = await getSubmittedEvaluation(colaboradorData.dpi, "2025-1");
+        const mockAuto = getMockColaboradorEvaluation(colaboradorData.dpi);
+        setAutoevaluacion(submittedAuto || mockAuto);
+        // Cambiar a la pestaña de autoevaluación cuando está disponible
+        setEvaluacionTab("auto");
       } else {
-        toast.info("Se ha cargado su borrador guardado");
+        // Si el jefe no ha completado, empezar en desempeño
+        setEvaluacionTab("desempeno");
       }
-    }
+
+      // Cargar evaluación del jefe si existe
+      if (jefeDraft) {
+        setDesempenoResponses(jefeDraft.responses);
+        setDesempenoComments(jefeDraft.comments);
+        if (jefeDraft.evaluacionPotencial) {
+          setPotencialResponses(jefeDraft.evaluacionPotencial.responses);
+          setPotencialComments(jefeDraft.evaluacionPotencial.comments);
+        }
+        
+        if (jefeDraft.estado === "enviado") {
+          toast.info("Esta evaluación ya fue enviada");
+        } else {
+          toast.info("Se ha cargado su borrador guardado");
+        }
+      }
+    };
+
+    loadData();
   }, [id, user, navigate]);
 
   // Auto-save functionality
@@ -244,7 +271,7 @@ const EvaluacionColaborador = () => {
     setShowSubmitDialog(true);
   };
 
-  const handleConfirmSubmit = () => {
+  const handleConfirmSubmit = async () => {
     if (!user || !colaborador) return;
 
     const draft: EvaluationDraft = {
@@ -264,9 +291,89 @@ const EvaluacionColaborador = () => {
       fechaUltimaModificacion: new Date().toISOString(),
     };
 
-    submitEvaluation(draft);
-    toast.success("¡Evaluación enviada exitosamente!");
+    await submitEvaluation(draft);
+    
+    // Generar resultado final automáticamente
+    await generateFinalResult(colaborador.dpi, "2025-1");
+    
+    toast.success("¡Evaluación enviada exitosamente! Se ha generado el resultado final.");
     navigate("/evaluacion-equipo");
+  };
+  
+  // Función para generar resultado final automáticamente
+  const generateFinalResult = async (colaboradorId: string, periodoId: string) => {
+    try {
+      const autoevaluacion = await getSubmittedEvaluation(colaboradorId, periodoId) || 
+                           getMockColaboradorEvaluation(colaboradorId);
+      const evaluacionJefe = await getJefeEvaluationDraft(user?.dpi || "", colaboradorId, periodoId);
+      
+      if (!autoevaluacion || !evaluacionJefe) return;
+      
+      // Calcular resultado final
+      const resultadoFinal = calculateCompleteFinalScore(
+        autoevaluacion,
+        evaluacionJefe,
+        desempenoDimensions,
+        potencialDimensions
+      );
+      
+      // Guardar resultado final (por ahora en localStorage, luego en Supabase)
+      const resultadoKey = `final_result_${colaboradorId}_${periodoId}`;
+      localStorage.setItem(resultadoKey, JSON.stringify({
+        colaboradorId,
+        periodoId,
+        resultadoFinal,
+        fechaGeneracion: new Date().toISOString(),
+      }));
+      
+      // Generar plan de desarrollo con IA automáticamente
+      try {
+        const plan = await generateDevelopmentPlan(
+          colaboradorId,
+          periodoId,
+          autoevaluacion,
+          evaluacionJefe,
+          resultadoFinal,
+          desempenoDimensions,
+          potencialDimensions
+        );
+        
+        if (plan) {
+          const planKey = `development_plan_${colaboradorId}_${periodoId}`;
+          localStorage.setItem(planKey, JSON.stringify(plan));
+          
+          // Guardar en Supabase también
+          await saveDevelopmentPlanToSupabase(plan);
+        }
+      } catch (error) {
+        console.error("Error generando plan de desarrollo:", error);
+        // Continuar aunque falle la generación del plan
+      }
+    } catch (error) {
+      console.error("Error generando resultado final:", error);
+    }
+  };
+  
+  // Función auxiliar para guardar plan en Supabase
+  const saveDevelopmentPlanToSupabase = async (plan: any) => {
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { error } = await supabase
+        .from("development_plans")
+        .insert({
+          evaluacion_id: plan.evaluacionId,
+          colaborador_id: plan.colaboradorId,
+          periodo_id: plan.periodoId,
+          competencias_desarrollar: plan.competenciasDesarrollar,
+          feedback_individual: plan.feedbackIndividual,
+          feedback_grupal: plan.feedbackGrupal,
+          editable: plan.editable,
+        });
+      
+      if (error) throw error;
+    } catch (error) {
+      console.error("Error saving plan to Supabase:", error);
+    }
   };
 
   if (!colaborador) {
@@ -280,7 +387,6 @@ const EvaluacionColaborador = () => {
     );
   }
 
-  const jefeAlreadyEvaluated = hasJefeEvaluation(user?.dpi || "", colaborador.dpi, "2025-1");
 
   return (
     <div className="min-h-screen bg-background">
@@ -309,10 +415,18 @@ const EvaluacionColaborador = () => {
               Evaluación de {colaborador.nombre}
             </h1>
             {jefeAlreadyEvaluated && (
-              <Badge className="bg-success text-success-foreground">
-                <CheckCircle2 className="mr-1 h-3 w-3" />
-                Completada
-              </Badge>
+              <>
+                <Badge className="bg-success text-success-foreground">
+                  <CheckCircle2 className="mr-1 h-3 w-3" />
+                  Completada
+                </Badge>
+                <Button
+                  variant="outline"
+                  onClick={() => navigate(`/evaluacion-equipo/${id}/comparativa`)}
+                >
+                  Ver Comparativa
+                </Button>
+              </>
             )}
           </div>
           <p className="text-xl text-muted-foreground">
@@ -331,9 +445,14 @@ const EvaluacionColaborador = () => {
         {/* Tabs principales */}
         <Tabs value={evaluacionTab} onValueChange={(v) => setEvaluacionTab(v as any)} className="mb-6">
           <TabsList className="w-full">
-            <TabsTrigger value="auto" className="flex-1">
+            <TabsTrigger 
+              value="auto" 
+              className="flex-1"
+              disabled={!jefeAlreadyEvaluated}
+            >
               <Eye className="mr-2 h-4 w-4" />
               Autoevaluación del Colaborador
+              {!jefeAlreadyEvaluated && <AlertTriangle className="ml-2 h-4 w-4 text-warning" />}
             </TabsTrigger>
             <TabsTrigger value="desempeno" className="flex-1">
               <FileEdit className="mr-2 h-4 w-4" />
@@ -347,14 +466,14 @@ const EvaluacionColaborador = () => {
             </TabsTrigger>
           </TabsList>
 
-          {/* Tab: Autoevaluación del Colaborador (solo lectura) */}
+          {/* Tab: Autoevaluación del Colaborador (solo lectura) - Solo visible cuando el jefe completó */}
           <TabsContent value="auto" className="space-y-6">
-            {autoevaluacion ? (
+            {jefeAlreadyEvaluated && autoevaluacion ? (
               <Card>
                 <CardHeader>
                   <CardTitle>Autoevaluación del Colaborador</CardTitle>
                   <CardDescription>
-                    Esta es la autoevaluación realizada por el colaborador. Revísela como referencia para su evaluación.
+                    Esta es la autoevaluación realizada por el colaborador. Ahora puede compararla con su evaluación.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -398,10 +517,20 @@ const EvaluacionColaborador = () => {
                   </div>
                 </CardContent>
               </Card>
-            ) : (
+            ) : jefeAlreadyEvaluated ? (
               <Card>
                 <CardContent className="py-8 text-center text-muted-foreground">
                   El colaborador aún no ha completado su autoevaluación.
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardContent className="py-8 text-center">
+                  <AlertTriangle className="h-12 w-12 text-warning mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">Autoevaluación no disponible</h3>
+                  <p className="text-muted-foreground">
+                    Complete primero su evaluación de desempeño y potencial para poder ver la autoevaluación del colaborador y realizar la comparación.
+                  </p>
                 </CardContent>
               </Card>
             )}

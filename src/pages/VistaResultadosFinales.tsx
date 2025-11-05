@@ -1,0 +1,306 @@
+import { useState, useEffect } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
+import { Header } from "@/components/layout/Header";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ArrowLeft, BarChart3, FileText, TrendingUp, Download } from "lucide-react";
+import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts";
+import { getSubmittedEvaluation } from "@/lib/storage";
+import { getNineBoxDescription } from "@/lib/finalScore";
+import { toast } from "sonner";
+import { exportResultadoIndividualPDF } from "@/lib/exports";
+
+const VistaResultadosFinales = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [resultadoFinal, setResultadoFinal] = useState<any>(null);
+  const [planDesarrollo, setPlanDesarrollo] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user) {
+      navigate("/login");
+      return;
+    }
+    loadResultados();
+  }, [user, navigate]);
+
+  const loadResultados = async () => {
+    try {
+      // Cargar resultado final desde localStorage
+      const resultadoKey = `final_result_${user?.dpi}_2025-1`;
+      const stored = localStorage.getItem(resultadoKey);
+      
+      if (stored) {
+        const resultadoData = JSON.parse(stored);
+        setResultadoFinal(resultadoData.resultadoFinal);
+      } else {
+        // Intentar cargar desde Supabase
+        const { supabase } = await import("@/integrations/supabase/client");
+        const { data, error } = await supabase
+          .from("final_evaluation_results")
+          .select("*")
+          .eq("colaborador_id", user?.dpi)
+          .eq("periodo_id", "2025-1")
+          .single();
+
+        if (!error && data) {
+          setResultadoFinal(data.resultado_final);
+        } else {
+          toast.error("No se encontraron resultados finales");
+          navigate("/dashboard");
+          return;
+        }
+      }
+
+      // Cargar plan de desarrollo
+      const planKey = `development_plan_${user?.dpi}_2025-1`;
+      const planStored = localStorage.getItem(planKey);
+      if (planStored) {
+        setPlanDesarrollo(JSON.parse(planStored));
+      } else {
+        const { supabase } = await import("@/integrations/supabase/client");
+        const { data } = await supabase
+          .from("development_plans")
+          .select("*")
+          .eq("colaborador_id", user?.dpi)
+          .eq("periodo_id", "2025-1")
+          .single();
+        
+        if (data) {
+          setPlanDesarrollo({
+            id: data.id,
+            competenciasDesarrollar: data.competencias_desarrollar,
+            feedbackIndividual: data.feedback_individual,
+            feedbackGrupal: data.feedback_grupal,
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Error loading resultados:", error);
+      toast.error("Error al cargar resultados");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container mx-auto px-4 py-8">
+          <p>Cargando...</p>
+        </main>
+      </div>
+    );
+  }
+
+  if (!resultadoFinal) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container mx-auto px-4 py-8">
+          <Card>
+            <CardContent className="py-12 text-center">
+              <p className="text-muted-foreground">
+                Los resultados finales estarán disponibles cuando su jefe complete la evaluación y el período cierre.
+              </p>
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      <Header />
+      
+      <main className="container mx-auto px-4 py-8">
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <Button variant="ghost" onClick={() => navigate("/dashboard")}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Volver al Dashboard
+            </Button>
+            <h1 className="text-3xl font-bold text-foreground mt-4">
+              Mis Resultados Finales - Periodo 2025-1
+            </h1>
+            <p className="text-muted-foreground mt-2">
+              Resultado de su evaluación 180° y plan de desarrollo
+            </p>
+          </div>
+        </div>
+
+        {/* Resumen de Resultados */}
+        <div className="grid gap-6 mb-6 md:grid-cols-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm">Desempeño Final</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-bold text-primary">
+                {resultadoFinal.desempenoFinal?.toFixed(2) || "N/A"}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">/5.0 puntos</p>
+              <Progress value={((resultadoFinal.desempenoFinal || 0) / 5) * 100} className="mt-2" />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm">Autoevaluación</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-bold text-accent">
+                {resultadoFinal.desempenoAuto?.toFixed(2) || "N/A"}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">/5.0 puntos</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm">Evaluación Jefe</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-bold text-info">
+                {resultadoFinal.desempenoJefe?.toFixed(2) || "N/A"}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">/5.0 puntos</p>
+            </CardContent>
+          </Card>
+
+          {resultadoFinal.potencial && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm">Potencial</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold text-success">
+                  {resultadoFinal.potencial.toFixed(2)}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">/5.0 puntos</p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {/* Posición 9-Box */}
+        {resultadoFinal.posicion9Box && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Posición en Matriz 9-Box</CardTitle>
+              <CardDescription>
+                Clasificación basada en desempeño y potencial
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-center p-8">
+                <Badge className="text-lg px-6 py-3">
+                  {getNineBoxDescription(resultadoFinal.posicion9Box)}
+                </Badge>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Plan de Desarrollo */}
+        {planDesarrollo && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Plan de Desarrollo Personalizado</CardTitle>
+              <CardDescription>
+                Acciones específicas para su crecimiento profesional
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {planDesarrollo.competenciasDesarrollar?.map((comp: any, index: number) => (
+                  <div key={index} className="border rounded-lg p-4">
+                    <h3 className="font-semibold mb-2">{comp.competencia}</h3>
+                    <div className="grid gap-2 md:grid-cols-3 mb-3">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Nivel Actual</p>
+                        <Badge variant="outline">{comp.nivelActual}/5</Badge>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Nivel Objetivo</p>
+                        <Badge>{comp.nivelObjetivo}/5</Badge>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Plazo</p>
+                        <p className="text-sm">{comp.plazo}</p>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium mb-1">Acciones:</p>
+                      <ul className="list-disc list-inside space-y-1 text-sm">
+                        {comp.acciones.map((accion: string, accIdx: number) => (
+                          <li key={accIdx}>{accion}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              {planDesarrollo.feedbackIndividual && (
+                <div className="mt-6 pt-6 border-t">
+                  <h3 className="font-semibold mb-2">Feedback Individual</h3>
+                  <p className="text-sm whitespace-pre-wrap">{planDesarrollo.feedbackIndividual}</p>
+                </div>
+              )}
+
+              <div className="mt-4">
+                <Button 
+                  variant="outline"
+                  onClick={() => navigate(`/plan-desarrollo/${user?.dpi}`)}
+                >
+                  <FileText className="mr-2 h-4 w-4" />
+                  Ver Plan Completo e Imprimible
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Acciones */}
+        <div className="flex gap-4">
+          <Button variant="outline" onClick={() => navigate("/dashboard")}>
+            Volver al Dashboard
+          </Button>
+          {planDesarrollo && (
+            <Button onClick={() => navigate(`/plan-desarrollo/${user?.dpi}`)}>
+              Ver Plan de Desarrollo Completo
+            </Button>
+          )}
+          {resultadoFinal && (
+            <Button 
+              variant="outline"
+              onClick={() => {
+                exportResultadoIndividualPDF(
+                  `${user?.nombre} ${user?.apellidos}`,
+                  "2025-1",
+                  resultadoFinal,
+                  planDesarrollo
+                );
+                toast.success("Resultado exportado a PDF");
+              }}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Exportar PDF
+            </Button>
+          )}
+        </div>
+      </main>
+    </div>
+  );
+};
+
+export default VistaResultadosFinales;
+

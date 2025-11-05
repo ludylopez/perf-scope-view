@@ -56,3 +56,43 @@ export interface FinalScore {
   potencial?: number;
   posicion9Box?: string;
 }
+
+export interface DevelopmentPlan {
+  id: string;
+  evaluacionId: string;
+  colaboradorId: string;
+  periodoId: string;
+  competenciasDesarrollar: Array<{
+    competencia: string;
+    nivelActual: number;
+    nivelObjetivo: number;
+    acciones: string[];
+    plazo: string;
+  }>;
+  feedbackIndividual?: string;
+  feedbackGrupal?: string;
+  editable: boolean;
+  editadoPor?: string;
+  fechaCreacion: string;
+  fechaModificacion?: string;
+}
+
+export interface FinalEvaluationResult {
+  id: string;
+  colaboradorId: string;
+  periodoId: string;
+  autoevaluacionId: string;
+  evaluacionJefeId: string;
+  resultadoFinal: FinalScore;
+  comparativo: {
+    dimensiones: Array<{
+      dimensionId: string;
+      nombre: string;
+      autoevaluacion: number;
+      evaluacionJefe: number;
+      diferencia: number;
+    }>;
+  };
+  planDesarrolloId?: string;
+  fechaGeneracion: string;
+}

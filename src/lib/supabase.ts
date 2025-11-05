@@ -1,0 +1,354 @@
+import { supabase } from "@/integrations/supabase/client";
+import { EvaluationDraft } from "@/lib/storage";
+import { EvaluationPeriod, PeriodStatus } from "@/types/period";
+import { UserAssignment, AssignmentWithUsers } from "@/types/assignment";
+import { Group, GroupWithMembers, GroupMember } from "@/types/group";
+import { OpenQuestion, OpenQuestionResponse } from "@/types/openQuestions";
+
+// Verificar si Supabase está disponible
+const isSupabaseAvailable = () => {
+  try {
+    return supabase !== null && typeof supabase !== 'undefined';
+  } catch {
+    return false;
+  }
+};
+
+// PERÍODOS DE EVALUACIÓN
+export const getActivePeriod = async (): Promise<EvaluationPeriod | null> => {
+  if (!isSupabaseAvailable()) return null;
+  
+  try {
+    const { data, error } = await supabase
+      .from('evaluation_periods')
+      .select('*')
+      .eq('estado', 'en_curso')
+      .single();
+    
+    if (error || !data) return null;
+    
+    return {
+      id: data.id,
+      nombre: data.nombre,
+      fechaInicio: data.fecha_inicio,
+      fechaFin: data.fecha_fin,
+      fechaCierreAutoevaluacion: data.fecha_cierre_autoevaluacion,
+      fechaCierreEvaluacionJefe: data.fecha_cierre_evaluacion_jefe,
+      estado: data.estado as any,
+      descripcion: data.descripcion,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+    };
+  } catch {
+    return null;
+  }
+};
+
+export const getPeriodStatus = async (periodId: string): Promise<PeriodStatus> => {
+  if (!isSupabaseAvailable()) {
+    return { isActive: true, canSubmitAuto: true, canSubmitJefe: true };
+  }
+  
+  try {
+    const { data, error } = await supabase
+      .from('evaluation_periods')
+      .select('*')
+      .eq('id', periodId)
+      .single();
+    
+    if (error || !data) {
+      return { isActive: false, canSubmitAuto: false, canSubmitJefe: false };
+    }
+    
+    const now = new Date();
+    const fechaInicio = new Date(data.fecha_inicio);
+    const fechaFin = new Date(data.fecha_fin);
+    const fechaCierreAuto = new Date(data.fecha_cierre_autoevaluacion);
+    const fechaCierreJefe = new Date(data.fecha_cierre_evaluacion_jefe);
+    
+    const isActive = data.estado === 'en_curso' && now >= fechaInicio && now <= fechaFin;
+    const canSubmitAuto = isActive && now <= fechaCierreAuto;
+    const canSubmitJefe = isActive && now <= fechaCierreJefe;
+    
+    return {
+      isActive,
+      canSubmitAuto,
+      canSubmitJefe,
+      period: {
+        id: data.id,
+        nombre: data.nombre,
+        fechaInicio: data.fecha_inicio,
+        fechaFin: data.fecha_fin,
+        fechaCierreAutoevaluacion: data.fecha_cierre_autoevaluacion,
+        fechaCierreEvaluacionJefe: data.fecha_cierre_evaluacion_jefe,
+        estado: data.estado as any,
+        descripcion: data.descripcion,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
+      },
+    };
+  } catch {
+    return { isActive: false, canSubmitAuto: false, canSubmitJefe: false };
+  }
+};
+
+// ASIGNACIONES
+export const getUserAssignments = async (jefeId: string): Promise<AssignmentWithUsers[]> => {
+  if (!isSupabaseAvailable()) return [];
+  
+  try {
+    const { data, error } = await supabase
+      .from('user_assignments')
+      .select(`
+        *,
+        colaborador:users!user_assignments_colaborador_id_fkey(dpi, nombre, apellidos, cargo, nivel, area),
+        jefe:users!user_assignments_jefe_id_fkey(dpi, nombre, apellidos, cargo)
+      `)
+      .eq('jefe_id', jefeId)
+      .eq('activo', true);
+    
+    if (error || !data) return [];
+    
+    return data.map((item: any) => ({
+      id: item.id,
+      colaboradorId: item.colaborador_id,
+      jefeId: item.jefe_id,
+      grupoId: item.grupo_id,
+      activo: item.activo,
+      createdAt: item.created_at,
+      updatedAt: item.updated_at,
+      colaborador: item.colaborador ? {
+        nombre: item.colaborador.nombre,
+        apellidos: item.colaborador.apellidos,
+        cargo: item.colaborador.cargo,
+        nivel: item.colaborador.nivel,
+        area: item.colaborador.area,
+      } : undefined,
+      jefe: item.jefe ? {
+        nombre: item.jefe.nombre,
+        apellidos: item.jefe.apellidos,
+        cargo: item.jefe.cargo,
+      } : undefined,
+    }));
+  } catch {
+    return [];
+  }
+};
+
+export const getColaboradorJefe = async (colaboradorId: string): Promise<string | null> => {
+  if (!isSupabaseAvailable()) return null;
+  
+  try {
+    const { data, error } = await supabase
+      .from('user_assignments')
+      .select('jefe_id')
+      .eq('colaborador_id', colaboradorId)
+      .eq('activo', true)
+      .single();
+    
+    if (error || !data) return null;
+    return data.jefe_id;
+  } catch {
+    return null;
+  }
+};
+
+// GRUPOS
+export const getGroupsByJefe = async (jefeId: string): Promise<GroupWithMembers[]> => {
+  if (!isSupabaseAvailable()) return [];
+  
+  try {
+    const { data, error } = await supabase
+      .from('groups')
+      .select(`
+        *,
+        miembros:group_members(
+          colaborador_id,
+          colaborador:users!group_members_colaborador_id_fkey(dpi, nombre, apellidos, cargo, nivel)
+        )
+      `)
+      .eq('jefe_id', jefeId)
+      .eq('activo', true);
+    
+    if (error || !data) return [];
+    
+    return data.map((item: any) => ({
+      id: item.id,
+      nombre: item.nombre,
+      descripcion: item.descripcion,
+      jefeId: item.jefe_id,
+      tipo: item.tipo as any,
+      activo: item.activo,
+      createdAt: item.created_at,
+      updatedAt: item.updated_at,
+      miembros: item.miembros?.map((m: any) => ({
+        colaboradorId: m.colaborador_id,
+        nombre: m.colaborador?.nombre || '',
+        apellidos: m.colaborador?.apellidos || '',
+        cargo: m.colaborador?.cargo || '',
+        nivel: m.colaborador?.nivel || '',
+      })) || [],
+    }));
+  } catch {
+    return [];
+  }
+};
+
+// PREGUNTAS ABIERTAS
+export const getOpenQuestions = async (): Promise<OpenQuestion[]> => {
+  if (!isSupabaseAvailable()) return [];
+  
+  try {
+    const { data, error } = await supabase
+      .from('open_questions')
+      .select('*')
+      .eq('activa', true)
+      .order('orden');
+    
+    if (error || !data) return [];
+    
+    return data.map((item: any) => ({
+      id: item.id,
+      pregunta: item.pregunta,
+      tipo: item.tipo as any,
+      orden: item.orden,
+      obligatoria: item.obligatoria,
+    }));
+  } catch {
+    return [];
+  }
+};
+
+export const saveOpenQuestionResponses = async (
+  evaluacionId: string,
+  responses: Record<string, string>
+): Promise<boolean> => {
+  if (!isSupabaseAvailable()) return false;
+  
+  try {
+    const responsesArray = Object.entries(responses).map(([preguntaId, respuesta]) => ({
+      evaluacion_id: evaluacionId,
+      pregunta_id: preguntaId,
+      respuesta,
+    }));
+    
+    const { error } = await supabase
+      .from('open_question_responses')
+      .upsert(responsesArray, { onConflict: 'evaluacion_id,pregunta_id' });
+    
+    return !error;
+  } catch {
+    return false;
+  }
+};
+
+// GUARDAR EVALUACIÓN EN SUPABASE
+export const saveEvaluationToSupabase = async (draft: EvaluationDraft): Promise<string | null> => {
+  if (!isSupabaseAvailable()) return null;
+  
+  try {
+    const evaluationData: any = {
+      usuario_id: draft.usuarioId,
+      periodo_id: draft.periodoId,
+      tipo: draft.tipo,
+      responses: draft.responses,
+      comments: draft.comments,
+      estado: draft.estado,
+      progreso: draft.progreso,
+      fecha_ultima_modificacion: draft.fechaUltimaModificacion,
+    };
+    
+    if (draft.tipo === 'jefe' && draft.evaluadorId && draft.colaboradorId) {
+      evaluationData.evaluador_id = draft.evaluadorId;
+      evaluationData.colaborador_id = draft.colaboradorId;
+      if (draft.evaluacionPotencial) {
+        evaluationData.evaluacion_potencial = draft.evaluacionPotencial;
+      }
+    }
+    
+    if (draft.fechaEnvio) {
+      evaluationData.fecha_envio = draft.fechaEnvio;
+    }
+    
+    // Buscar si ya existe
+    const { data: existing } = await supabase
+      .from('evaluations')
+      .select('id')
+      .eq('usuario_id', draft.usuarioId)
+      .eq('periodo_id', draft.periodoId)
+      .eq('tipo', draft.tipo)
+      .single();
+    
+    if (existing) {
+      const { data, error } = await supabase
+        .from('evaluations')
+        .update(evaluationData)
+        .eq('id', existing.id)
+        .select('id')
+        .single();
+      
+      if (error) return null;
+      return data.id;
+    } else {
+      const { data, error } = await supabase
+        .from('evaluations')
+        .insert(evaluationData)
+        .select('id')
+        .single();
+      
+      if (error) return null;
+      return data.id;
+    }
+  } catch {
+    return null;
+  }
+};
+
+// OBTENER EVALUACIÓN DE SUPABASE
+export const getEvaluationFromSupabase = async (
+  usuarioId: string,
+  periodoId: string,
+  tipo: "auto" | "jefe",
+  evaluadorId?: string,
+  colaboradorId?: string
+): Promise<EvaluationDraft | null> => {
+  if (!isSupabaseAvailable()) return null;
+  
+  try {
+    let query = supabase
+      .from('evaluations')
+      .select('*')
+      .eq('usuario_id', usuarioId)
+      .eq('periodo_id', periodoId)
+      .eq('tipo', tipo);
+    
+    if (tipo === 'jefe' && evaluadorId && colaboradorId) {
+      query = query.eq('evaluador_id', evaluadorId).eq('colaborador_id', colaboradorId);
+    }
+    
+    const { data, error } = await query.single();
+    
+    if (error || !data) return null;
+    
+    return {
+      usuarioId: data.usuario_id,
+      periodoId: data.periodo_id,
+      tipo: data.tipo as any,
+      responses: data.responses || {},
+      comments: data.comments || {},
+      estado: data.estado as any,
+      progreso: data.progreso || 0,
+      fechaUltimaModificacion: data.fecha_ultima_modificacion,
+      fechaEnvio: data.fecha_envio,
+      evaluadorId: data.evaluador_id,
+      colaboradorId: data.colaborador_id,
+      evaluacionPotencial: data.evaluacion_potencial ? {
+        responses: data.evaluacion_potencial.responses || {},
+        comments: data.evaluacion_potencial.comments || {},
+      } : undefined,
+    };
+  } catch {
+    return null;
+  }
+};
+

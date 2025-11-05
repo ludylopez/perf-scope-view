@@ -358,7 +358,11 @@ const Dashboard = () => {
                   Los resultados finales estarán disponibles cuando su jefe complete la
                   evaluación y el periodo cierre.
                 </p>
-                <Button variant="outline" className="w-full" disabled>
+                <Button 
+                  variant="outline" 
+                  className="w-full" 
+                  onClick={() => navigate("/mis-resultados")}
+                >
                   Ver Resultados
                 </Button>
               </CardContent>
@@ -477,6 +481,14 @@ const Dashboard = () => {
                   <BarChart3 className="mr-2 h-4 w-4" />
                   Comparativo de Equipo
                 </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start"
+                  onClick={() => navigate("/estadisticas-grupales")}
+                >
+                  <Users className="mr-2 h-4 w-4" />
+                  Estadísticas Grupales
+                </Button>
               </CardContent>
             </Card>
           </div>
@@ -531,19 +543,52 @@ const Dashboard = () => {
               </CardHeader>
               <CardContent>
                 <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-                  <Button variant="outline" className="justify-start">
+                  <Button 
+                    variant="outline" 
+                    className="justify-start"
+                    onClick={() => navigate("/admin/grupos")}
+                  >
                     <Users className="mr-2 h-4 w-4" />
-                    Gestionar Usuarios
+                    Grupos/Cuadrillas
                   </Button>
-                  <Button variant="outline" className="justify-start">
+                  <Button 
+                    variant="outline" 
+                    className="justify-start"
+                    onClick={() => navigate("/admin/asignaciones")}
+                  >
                     <Settings className="mr-2 h-4 w-4" />
                     Asignaciones
                   </Button>
-                  <Button variant="outline" className="justify-start">
+                  <Button 
+                    variant="outline" 
+                    className="justify-start"
+                    onClick={() => navigate("/admin/dashboard")}
+                  >
                     <BarChart3 className="mr-2 h-4 w-4" />
                     Monitoreo
                   </Button>
-                  <Button variant="outline" className="justify-start">
+                  <Button 
+                    variant="outline" 
+                    className="justify-start"
+                    onClick={() => {
+                      // Crear reporte básico para admin
+                      const reportData = {
+                        title: "Reporte de Administración",
+                        periodo: "2025-1",
+                        fecha: new Date().toLocaleDateString("es-GT"),
+                        summary: [
+                          { label: "Total Usuarios", value: "124" },
+                          { label: "Evaluaciones Completadas", value: "45" },
+                          { label: "Pendientes", value: "79" },
+                        ],
+                      };
+                      toast({
+                        title: "Exportación",
+                        description: "Función de exportación disponible en Dashboard de RR.HH.",
+                      });
+                      navigate("/admin/dashboard");
+                    }}
+                  >
                     <FileText className="mr-2 h-4 w-4" />
                     Exportar Datos
                   </Button>
@@ -605,7 +650,11 @@ const Dashboard = () => {
               </CardHeader>
               <CardContent>
                 <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                  <Button variant="outline" className="justify-start h-auto py-4">
+                  <Button 
+                    variant="outline" 
+                    className="justify-start h-auto py-4"
+                    onClick={() => navigate("/admin/periodos")}
+                  >
                     <div className="flex flex-col items-start">
                       <div className="flex items-center gap-2">
                         <Settings className="h-4 w-4" />

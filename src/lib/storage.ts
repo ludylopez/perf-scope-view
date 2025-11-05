@@ -1,3 +1,5 @@
+import { saveEvaluationToSupabase, getEvaluationFromSupabase } from "./supabase";
+
 export interface EvaluationDraft {
   usuarioId: string;
   periodoId: string;
@@ -20,18 +22,30 @@ export interface EvaluationDraft {
 const STORAGE_KEY_PREFIX = "evaluation_";
 const JEFE_EVALUATION_PREFIX = "jefe_evaluation_";
 
-export const saveEvaluationDraft = (draft: EvaluationDraft): void => {
-  const key = draft.tipo === "jefe" && draft.evaluadorId && draft.colaboradorId
-    ? `${JEFE_EVALUATION_PREFIX}${draft.evaluadorId}_${draft.colaboradorId}_${draft.periodoId}`
-    : `${STORAGE_KEY_PREFIX}${draft.usuarioId}_${draft.periodoId}`;
+export const saveEvaluationDraft = async (draft: EvaluationDraft): Promise<void> => {
   draft.fechaUltimaModificacion = new Date().toISOString();
-  localStorage.setItem(key, JSON.stringify(draft));
+  
+  // Intentar guardar en Supabase primero
+  const supabaseId = await saveEvaluationToSupabase(draft);
+  
+  // Si Supabase no está disponible, usar localStorage como fallback
+  if (!supabaseId) {
+    const key = draft.tipo === "jefe" && draft.evaluadorId && draft.colaboradorId
+      ? `${JEFE_EVALUATION_PREFIX}${draft.evaluadorId}_${draft.colaboradorId}_${draft.periodoId}`
+      : `${STORAGE_KEY_PREFIX}${draft.usuarioId}_${draft.periodoId}`;
+    localStorage.setItem(key, JSON.stringify(draft));
+  }
 };
 
-export const getEvaluationDraft = (
+export const getEvaluationDraft = async (
   usuarioId: string,
   periodoId: string
-): EvaluationDraft | null => {
+): Promise<EvaluationDraft | null> => {
+  // Intentar obtener de Supabase primero
+  const supabaseDraft = await getEvaluationFromSupabase(usuarioId, periodoId, "auto");
+  if (supabaseDraft) return supabaseDraft;
+  
+  // Fallback a localStorage
   const key = `${STORAGE_KEY_PREFIX}${usuarioId}_${periodoId}`;
   const stored = localStorage.getItem(key);
   if (!stored) return null;
@@ -44,11 +58,16 @@ export const getEvaluationDraft = (
 };
 
 // Funciones específicas para evaluaciones del jefe
-export const getJefeEvaluationDraft = (
+export const getJefeEvaluationDraft = async (
   evaluadorId: string,
   colaboradorId: string,
   periodoId: string
-): EvaluationDraft | null => {
+): Promise<EvaluationDraft | null> => {
+  // Intentar obtener de Supabase primero
+  const supabaseDraft = await getEvaluationFromSupabase(colaboradorId, periodoId, "jefe", evaluadorId, colaboradorId);
+  if (supabaseDraft) return supabaseDraft;
+  
+  // Fallback a localStorage
   const key = `${JEFE_EVALUATION_PREFIX}${evaluadorId}_${colaboradorId}_${periodoId}`;
   const stored = localStorage.getItem(key);
   if (!stored) return null;
@@ -60,34 +79,34 @@ export const getJefeEvaluationDraft = (
   }
 };
 
-export const hasJefeEvaluation = (
+export const hasJefeEvaluation = async (
   evaluadorId: string,
   colaboradorId: string,
   periodoId: string
-): boolean => {
-  const draft = getJefeEvaluationDraft(evaluadorId, colaboradorId, periodoId);
+): Promise<boolean> => {
+  const draft = await getJefeEvaluationDraft(evaluadorId, colaboradorId, periodoId);
   return draft?.estado === "enviado" || false;
 };
 
-export const submitEvaluation = (draft: EvaluationDraft): void => {
+export const submitEvaluation = async (draft: EvaluationDraft): Promise<void> => {
   draft.estado = "enviado";
   draft.fechaEnvio = new Date().toISOString();
-  saveEvaluationDraft(draft);
+  await saveEvaluationDraft(draft);
 };
 
-export const getSubmittedEvaluation = (
+export const getSubmittedEvaluation = async (
   usuarioId: string,
   periodoId: string
-): EvaluationDraft | null => {
-  const draft = getEvaluationDraft(usuarioId, periodoId);
+): Promise<EvaluationDraft | null> => {
+  const draft = await getEvaluationDraft(usuarioId, periodoId);
   return draft?.estado === "enviado" ? draft : null;
 };
 
-export const hasSubmittedEvaluation = (
+export const hasSubmittedEvaluation = async (
   usuarioId: string,
   periodoId: string
-): boolean => {
-  const draft = getEvaluationDraft(usuarioId, periodoId);
+): Promise<boolean> => {
+  const draft = await getEvaluationDraft(usuarioId, periodoId);
   return draft?.estado === "enviado" || false;
 };
 

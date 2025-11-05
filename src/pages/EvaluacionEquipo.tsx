@@ -43,33 +43,37 @@ const EvaluacionEquipo = () => {
   useEffect(() => {
     if (!user) return;
 
-    const status: Record<string, { estado: string; progreso: number }> = {};
-    
-    MOCK_TEAM.forEach((colaborador) => {
-      const evaluado = hasJefeEvaluation(user.dpi, colaborador.dpi, "2025-1");
-      if (evaluado) {
-        const draft = getJefeEvaluationDraft(user.dpi, colaborador.dpi, "2025-1");
-        status[colaborador.id] = {
-          estado: "completado",
-          progreso: draft?.progreso || 100,
-        };
-      } else {
-        const draft = getJefeEvaluationDraft(user.dpi, colaborador.dpi, "2025-1");
-        if (draft) {
+    const loadStatus = async () => {
+      const status: Record<string, { estado: string; progreso: number }> = {};
+      
+      for (const colaborador of MOCK_TEAM) {
+        const evaluado = await hasJefeEvaluation(user.dpi, colaborador.dpi, "2025-1");
+        if (evaluado) {
+          const draft = await getJefeEvaluationDraft(user.dpi, colaborador.dpi, "2025-1");
           status[colaborador.id] = {
-            estado: "en_progreso",
-            progreso: draft.progreso,
+            estado: "completado",
+            progreso: draft?.progreso || 100,
           };
         } else {
-          status[colaborador.id] = {
-            estado: "pendiente",
-            progreso: 0,
-          };
+          const draft = await getJefeEvaluationDraft(user.dpi, colaborador.dpi, "2025-1");
+          if (draft) {
+            status[colaborador.id] = {
+              estado: "en_progreso",
+              progreso: draft.progreso,
+            };
+          } else {
+            status[colaborador.id] = {
+              estado: "pendiente",
+              progreso: 0,
+            };
+          }
         }
       }
-    });
 
-    setTeamStatus(status);
+      setTeamStatus(status);
+    };
+
+    loadStatus();
   }, [user]);
 
   const getStatusBadge = (estado: string) => {
@@ -146,13 +150,20 @@ const EvaluacionEquipo = () => {
                         />
                       </div>
                     </div>
-                    <Button 
-                      className="ml-4"
-                      onClick={() => navigate(`/evaluacion-equipo/${colaborador.id}`)}
-                    >
-                      <FileEdit className="mr-2 h-4 w-4" />
-                      {status.estado === "completado" ? "Ver Evaluación" : "Evaluar"}
-                    </Button>
+                           <Button 
+                             className="ml-4"
+                             onClick={() => {
+                               const jefeEvaluado = status.estado === "completado";
+                               if (jefeEvaluado) {
+                                 navigate(`/evaluacion-equipo/${colaborador.id}/comparativa`);
+                               } else {
+                                 navigate(`/evaluacion-equipo/${colaborador.id}`);
+                               }
+                             }}
+                           >
+                             <FileEdit className="mr-2 h-4 w-4" />
+                             {status.estado === "completado" ? "Ver Comparativa" : "Evaluar"}
+                           </Button>
                   </div>
                 </CardContent>
               </Card>

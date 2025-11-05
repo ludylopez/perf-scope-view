@@ -10,6 +10,15 @@ import Autoevaluacion from "./pages/Autoevaluacion";
 import MiAutoevaluacion from "./pages/MiAutoevaluacion";
 import EvaluacionEquipo from "./pages/EvaluacionEquipo";
 import EvaluacionColaborador from "./pages/EvaluacionColaborador";
+import VistaComparativa from "./pages/VistaComparativa";
+import AdminAsignaciones from "./pages/AdminAsignaciones";
+import AdminGrupos from "./pages/AdminGrupos";
+import AdminPeriodos from "./pages/AdminPeriodos";
+import AdminUsuarios from "./pages/AdminUsuarios";
+import DashboardRRHH from "./pages/DashboardRRHH";
+import VistaPlanDesarrollo from "./pages/VistaPlanDesarrollo";
+import VistaResultadosFinales from "./pages/VistaResultadosFinales";
+import EstadisticasGrupales from "./pages/EstadisticasGrupales";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -66,6 +75,78 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <EvaluacionColaborador />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/evaluacion-equipo/:id/comparativa"
+              element={
+                <ProtectedRoute>
+                  <VistaComparativa />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/asignaciones"
+              element={
+                <ProtectedRoute>
+                  <AdminAsignaciones />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/grupos"
+              element={
+                <ProtectedRoute>
+                  <AdminGrupos />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/periodos"
+              element={
+                <ProtectedRoute>
+                  <AdminPeriodos />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/usuarios"
+              element={
+                <ProtectedRoute>
+                  <AdminUsuarios />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/dashboard"
+              element={
+                <ProtectedRoute>
+                  <DashboardRRHH />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/plan-desarrollo/:id"
+              element={
+                <ProtectedRoute>
+                  <VistaPlanDesarrollo />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/mis-resultados"
+              element={
+                <ProtectedRoute>
+                  <VistaResultadosFinales />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/estadisticas-grupales"
+              element={
+                <ProtectedRoute>
+                  <EstadisticasGrupales />
                 </ProtectedRoute>
               }
             />

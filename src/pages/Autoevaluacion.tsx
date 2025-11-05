@@ -42,8 +42,8 @@ import {
   getIncompleteDimensions,
   getDimensionProgress,
 } from "@/lib/calculations";
-import { ArrowLeft, ArrowRight, Save, Send, AlertTriangle } from "lucide-react";
-import { toast } from "sonner";
+import { OpenQuestions } from "@/components/evaluation/OpenQuestions";
+import { getOpenQuestions, saveOpenQuestionResponses } from "@/lib/supabase";
 
 const Autoevaluacion = () => {
   const { user } = useAuth();
@@ -52,6 +52,14 @@ const Autoevaluacion = () => {
 
   const [responses, setResponses] = useState<Record<string, number>>({});
   const [comments, setComments] = useState<Record<string, string>>({});
+  const [openQuestionResponses, setOpenQuestionResponses] = useState<Record<string, string>>({});
+  const [openQuestions, setOpenQuestions] = useState<Array<{
+    id: string;
+    pregunta: string;
+    tipo: "capacitacion" | "herramienta" | "otro";
+    orden: number;
+    obligatoria: boolean;
+  }>>([]);
   const [currentDimension, setCurrentDimension] = useState(0);
   const [autoSaveStatus, setAutoSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
@@ -63,22 +71,32 @@ const Autoevaluacion = () => {
   const progressPercentage = (answeredItems / totalItems) * 100;
   const isComplete = isEvaluationComplete(responses, dimensions);
 
-  // Load existing draft on mount
+  // Load existing draft and open questions on mount
   useEffect(() => {
     if (!user) return;
 
-    // Check if already submitted
-    if (hasSubmittedEvaluation(user.dpi, "2025-1")) {
-      navigate("/mi-autoevaluacion");
-      return;
-    }
+    const loadData = async () => {
+      // Check if already submitted
+      const alreadySubmitted = await hasSubmittedEvaluation(user.dpi, "2025-1");
+      if (alreadySubmitted) {
+        navigate("/mi-autoevaluacion");
+        return;
+      }
 
-    const draft = getEvaluationDraft(user.dpi, "2025-1");
-    if (draft) {
-      setResponses(draft.responses);
-      setComments(draft.comments);
-      toast.info("Se ha cargado su borrador guardado");
-    }
+      // Load draft
+      const draft = await getEvaluationDraft(user.dpi, "2025-1");
+      if (draft) {
+        setResponses(draft.responses);
+        setComments(draft.comments);
+        toast.info("Se ha cargado su borrador guardado");
+      }
+
+      // Load open questions
+      const questions = await getOpenQuestions();
+      setOpenQuestions(questions);
+    };
+
+    loadData();
   }, [user, navigate]);
 
   // Auto-save functionality
@@ -123,8 +141,8 @@ const Autoevaluacion = () => {
     setHasUnsavedChanges(true);
   };
 
-  const handleCommentChange = (dimensionId: string, comment: string) => {
-    setComments((prev) => ({ ...prev, [dimensionId]: comment }));
+  const handleOpenQuestionChange = (questionId: string, respuesta: string) => {
+    setOpenQuestionResponses((prev) => ({ ...prev, [questionId]: respuesta }));
     setHasUnsavedChanges(true);
   };
 
@@ -147,7 +165,7 @@ const Autoevaluacion = () => {
     setShowSubmitDialog(true);
   };
 
-  const handleConfirmSubmit = () => {
+  const handleConfirmSubmit = async () => {
     if (!user) return;
 
     const draft: EvaluationDraft = {
@@ -161,7 +179,19 @@ const Autoevaluacion = () => {
       fechaUltimaModificacion: new Date().toISOString(),
     };
 
-    submitEvaluation(draft);
+    await submitEvaluation(draft);
+    
+    // Guardar respuestas a preguntas abiertas
+    if (Object.keys(openQuestionResponses).length > 0) {
+      // Obtener el ID de la evaluación guardada (necesitaríamos obtenerlo de Supabase)
+      // Por ahora guardamos en localStorage como backup
+      const openQuestionsKey = `open_questions_${user.dpi}_2025-1`;
+      localStorage.setItem(openQuestionsKey, JSON.stringify(openQuestionResponses));
+      
+      // Intentar guardar en Supabase también
+      await saveOpenQuestionResponses("", openQuestionResponses); // El ID se obtendría de Supabase
+    }
+    
     toast.success("¡Autoevaluación enviada exitosamente!");
     navigate("/dashboard");
   };
@@ -365,6 +395,15 @@ const Autoevaluacion = () => {
             )}
           </CardContent>
         </Card>
+
+        {/* Preguntas Abiertas */}
+        {openQuestions.length > 0 && (
+          <OpenQuestions
+            questions={openQuestions}
+            responses={openQuestionResponses}
+            onChange={handleOpenQuestionChange}
+          />
+        )}
       </main>
 
       {/* Submit confirmation dialog */}
