@@ -58,6 +58,7 @@ import { generateDevelopmentPlan } from "@/lib/developmentPlan";
 import { getInstrumentForUser } from "@/lib/instruments";
 import { getActivePeriod } from "@/lib/supabase";
 import { supabase } from "@/integrations/supabase/client";
+import { useAutoSave } from "@/hooks/useAutoSave";
 
 // Datos mock del colaborador
 const MOCK_COLABORADORES: Record<string, any> = {
