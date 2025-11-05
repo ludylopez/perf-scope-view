@@ -46,7 +46,11 @@ export const isEvaluationComplete = (
   dimensions: Dimension[]
 ): boolean => {
   return dimensions.every((dim) =>
-    dim.items.every((item) => responses[item.id] !== undefined)
+    dim.items.every((item) => {
+      const value = responses[item.id];
+      // Verificar que el valor existe y está en el rango válido (1-5)
+      return value !== undefined && value !== null && value >= 1 && value <= 5;
+    })
   );
 };
 

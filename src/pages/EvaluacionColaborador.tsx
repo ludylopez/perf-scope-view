@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, useParams } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
@@ -103,8 +103,17 @@ const EvaluacionColaborador = () => {
   const desempenoProgress = (desempenoAnsweredItems / desempenoTotalItems) * 100;
   const potencialProgress = (potencialAnsweredItems / potencialTotalItems) * 100;
   
-  const desempenoComplete = isEvaluationComplete(desempenoResponses, desempenoDimensions);
-  const potencialComplete = isEvaluationComplete(potencialResponses, potencialDimensions);
+  // Usar useMemo para recalcular cuando cambien las respuestas
+  const desempenoComplete = useMemo(() => 
+    isEvaluationComplete(desempenoResponses, desempenoDimensions),
+    [desempenoResponses, desempenoDimensions]
+  );
+  
+  const potencialComplete = useMemo(() => 
+    isEvaluationComplete(potencialResponses, potencialDimensions),
+    [potencialResponses, potencialDimensions]
+  );
+  
   const isComplete = desempenoComplete && potencialComplete;
 
   useEffect(() => {
@@ -705,11 +714,17 @@ const EvaluacionColaborador = () => {
         )}
 
         {!isComplete && !jefeAlreadyEvaluated && (
-          <div className="mt-4 flex items-center gap-2 text-sm text-warning">
-            <AlertTriangle className="h-4 w-4" />
-            <span>
-              Complete todas las secciones (Desempeño y Potencial) para poder enviar la evaluación
-            </span>
+          <div className="mt-4 space-y-2">
+            <div className="flex items-center gap-2 text-sm text-warning">
+              <AlertTriangle className="h-4 w-4" />
+              <span>
+                Complete todas las secciones (Desempeño y Potencial) para poder enviar la evaluación
+              </span>
+            </div>
+            <div className="text-xs text-muted-foreground space-y-1">
+              <p>Estado Desempeño: {desempenoComplete ? "✓ Completo" : `Faltan ${desempenoTotalItems - desempenoAnsweredItems} ítems`}</p>
+              <p>Estado Potencial: {potencialComplete ? "✓ Completo" : `Faltan ${potencialTotalItems - potencialAnsweredItems} ítems`}</p>
+            </div>
           </div>
         )}
       </main>
