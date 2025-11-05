@@ -47,21 +47,25 @@ const Dashboard = () => {
   useEffect(() => {
     if (!user) return;
 
-    // Check evaluation status
-    const isSubmitted = hasSubmittedEvaluation(user.dpi, "2025-1");
-    if (isSubmitted) {
-      setEvaluationStatus("submitted");
-      setProgress(100);
-    } else {
-      const draft = getEvaluationDraft(user.dpi, "2025-1");
-      if (draft && Object.keys(draft.responses).length > 0) {
-        setEvaluationStatus("in_progress");
-        setProgress(draft.progreso);
+    const checkStatus = async () => {
+      // Check evaluation status
+      const isSubmitted = await hasSubmittedEvaluation(user.dpi, "2025-1");
+      if (isSubmitted) {
+        setEvaluationStatus("submitted");
+        setProgress(100);
       } else {
-        setEvaluationStatus("not_started");
-        setProgress(0);
+        const draft = await getEvaluationDraft(user.dpi, "2025-1");
+        if (draft && Object.keys(draft.responses).length > 0) {
+          setEvaluationStatus("in_progress");
+          setProgress(draft.progreso);
+        } else {
+          setEvaluationStatus("not_started");
+          setProgress(0);
+        }
       }
-    }
+    };
+
+    checkStatus();
 
     // Check if API key exists
     const existingKey = getGeminiApiKey();

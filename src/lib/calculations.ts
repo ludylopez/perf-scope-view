@@ -4,6 +4,8 @@ export const calculateDimensionAverage = (
   responses: Record<string, number>,
   dimension: Dimension
 ): number => {
+  if (!responses || typeof responses !== 'object') return 0;
+  
   const itemResponses = dimension.items
     .map((item) => responses[item.id])
     .filter((value) => value !== undefined);
@@ -22,6 +24,8 @@ export const calculatePerformanceScore = (
   responses: Record<string, number>,
   dimensions: Dimension[]
 ): number => {
+  if (!responses || typeof responses !== 'object') return 0;
+  
   let totalScore = 0;
 
   for (const dimension of dimensions) {
@@ -36,6 +40,8 @@ export const getIncompleteDimensions = (
   responses: Record<string, number>,
   dimensions: Dimension[]
 ): Dimension[] => {
+  if (!responses || typeof responses !== 'object') return dimensions;
+  
   return dimensions.filter((dim) =>
     dim.items.some((item) => responses[item.id] === undefined)
   );
@@ -45,6 +51,8 @@ export const isEvaluationComplete = (
   responses: Record<string, number>,
   dimensions: Dimension[]
 ): boolean => {
+  if (!responses || typeof responses !== 'object') return false;
+  
   return dimensions.every((dim) =>
     dim.items.every((item) => {
       const value = responses[item.id];
@@ -58,6 +66,10 @@ export const getDimensionProgress = (
   responses: Record<string, number>,
   dimension: Dimension
 ): { answered: number; total: number; percentage: number } => {
+  if (!responses || typeof responses !== 'object') {
+    return { answered: 0, total: dimension.items.length, percentage: 0 };
+  }
+  
   const total = dimension.items.length;
   const answered = dimension.items.filter(
     (item) => responses[item.id] !== undefined
