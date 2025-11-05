@@ -4,7 +4,7 @@ import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, FileEdit, CheckCircle2, Clock } from "lucide-react";
+import { ArrowLeft, FileEdit, CheckCircle2, Clock, Grid3x3 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { getJefeEvaluationDraft, hasJefeEvaluation } from "@/lib/storage";
 import { supabase } from "@/integrations/supabase/client";
@@ -146,10 +146,24 @@ const EvaluacionEquipo = () => {
         </div>
 
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-2">Mi Equipo</h1>
-          <p className="text-muted-foreground">
-            Evalúe el desempeño y potencial de sus colaboradores
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-foreground mb-2">Mi Equipo</h1>
+              <p className="text-muted-foreground">
+                Evalúe el desempeño y potencial de sus colaboradores
+              </p>
+            </div>
+            {teamMembers.length > 0 && (
+              <Button 
+                variant="outline"
+                onClick={() => navigate("/matriz-9box")}
+                className="flex items-center gap-2"
+              >
+                <Grid3x3 className="h-4 w-4" />
+                Ver Matriz 9-Box
+              </Button>
+            )}
+          </div>
         </div>
 
         <div className="grid gap-4">

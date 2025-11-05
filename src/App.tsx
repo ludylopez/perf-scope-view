@@ -21,6 +21,7 @@ import VistaResultadosFinales from "./pages/VistaResultadosFinales";
 import EstadisticasGrupales from "./pages/EstadisticasGrupales";
 import SupabaseUtils from "./pages/SupabaseUtils";
 import AdminInstrumentos from "./pages/AdminInstrumentos";
+import Matriz9Box from "./pages/Matriz9Box";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -173,6 +174,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <AdminInstrumentos />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/matriz-9box"
+              element={
+                <ProtectedRoute>
+                  <Matriz9Box />
                 </ProtectedRoute>
               }
             />
