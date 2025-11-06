@@ -22,6 +22,8 @@ import EstadisticasGrupales from "./pages/EstadisticasGrupales";
 import SupabaseUtils from "./pages/SupabaseUtils";
 import AdminInstrumentos from "./pages/AdminInstrumentos";
 import Matriz9Box from "./pages/Matriz9Box";
+import EvaluacionJefes from "./pages/EvaluacionJefes";
+import EvaluacionJefeIndividual from "./pages/EvaluacionJefeIndividual";
 import NotFound from "./pages/NotFound";
 import ConfiguracionSistema from "./pages/ConfiguracionSistema";
 
@@ -196,6 +198,22 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Matriz9Box />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/evaluacion-jefes"
+              element={
+                <ProtectedRoute>
+                  <EvaluacionJefes />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/evaluacion-jefe/:id"
+              element={
+                <ProtectedRoute>
+                  <EvaluacionJefeIndividual />
                 </ProtectedRoute>
               }
             />

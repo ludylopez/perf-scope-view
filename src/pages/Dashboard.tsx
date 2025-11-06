@@ -26,6 +26,7 @@ import { useNavigate } from "react-router-dom";
 import { getEvaluationDraft, hasSubmittedEvaluation, saveEvaluationDraft, submitEvaluation, EvaluationDraft } from "@/lib/storage";
 import { INSTRUMENT_A1 } from "@/data/instruments";
 import { toast } from "@/hooks/use-toast";
+import { getJerarquiaInfo } from "@/lib/jerarquias";
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -33,6 +34,7 @@ const Dashboard = () => {
   
   const [evaluationStatus, setEvaluationStatus] = useState<"not_started" | "in_progress" | "submitted">("not_started");
   const [progress, setProgress] = useState(0);
+  const [jerarquiaInfo, setJerarquiaInfo] = useState<any>(null);
 
   const isColaborador = user?.rol === "colaborador";
   const isJefe = user?.rol === "jefe";
@@ -61,6 +63,22 @@ const Dashboard = () => {
     };
 
     checkStatus();
+  }, [user]);
+
+  // Cargar información de jerarquía
+  useEffect(() => {
+    if (!user) return;
+
+    const loadJerarquia = async () => {
+      try {
+        const info = await getJerarquiaInfo(user.dpi);
+        setJerarquiaInfo(info);
+      } catch (error) {
+        console.error("Error loading hierarchy info:", error);
+      }
+    };
+
+    loadJerarquia();
   }, [user]);
 
   const getStatusBadge = () => {
@@ -322,31 +340,64 @@ const Dashboard = () => {
         {/* Jefe Dashboard */}
         {isJefe && (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            <Card className="md:col-span-2">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5 text-primary" />
-                  Mi Equipo
-                </CardTitle>
-                <CardDescription>
-                  Evaluaciones pendientes y completadas
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-3">
-                  <div className="rounded-lg border bg-card p-4 text-center">
-                    <p className="text-3xl font-bold text-primary">5</p>
-                    <p className="text-sm text-muted-foreground">Total Colaboradores</p>
+            {/* Autoevaluación del jefe */}
+            {(jerarquiaInfo?.tieneJefeSuperior || true) && (
+              <Card className="md:col-span-2">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <ClipboardCheck className="h-5 w-5 text-primary" />
+                    Mi Autoevaluación
+                  </CardTitle>
+                  <CardDescription>
+                    Complete su evaluación de desempeño
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">Periodo: 2025-1</p>
+                    </div>
+                    {getStatusBadge()}
                   </div>
-                  <div className="rounded-lg border bg-card p-4 text-center">
-                    <p className="text-3xl font-bold text-warning">5</p>
-                    <p className="text-sm text-muted-foreground">Pendientes</p>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span>Progreso</span>
+                      <span className="font-medium">{Math.round(progress)}%</span>
+                    </div>
+                    <Progress value={progress} className="h-2" />
                   </div>
-                  <div className="rounded-lg border bg-card p-4 text-center">
-                    <p className="text-3xl font-bold text-success">0</p>
-                    <p className="text-sm text-muted-foreground">Completadas</p>
+                  {getActionButton()}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Equipo de colaboradores directos */}
+            {jerarquiaInfo?.tieneColaboradores && (
+              <Card className="md:col-span-2">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5 text-primary" />
+                    Mi Equipo
+                  </CardTitle>
+                  <CardDescription>
+                    Evaluaciones pendientes y completadas
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <div className="rounded-lg border bg-card p-4 text-center">
+                      <p className="text-3xl font-bold text-primary">{jerarquiaInfo?.totalColaboradores || 0}</p>
+                      <p className="text-sm text-muted-foreground">Total Colaboradores</p>
+                    </div>
+                    <div className="rounded-lg border bg-card p-4 text-center">
+                      <p className="text-3xl font-bold text-warning">-</p>
+                      <p className="text-sm text-muted-foreground">Pendientes</p>
+                    </div>
+                    <div className="rounded-lg border bg-card p-4 text-center">
+                      <p className="text-3xl font-bold text-success">-</p>
+                      <p className="text-sm text-muted-foreground">Completadas</p>
+                    </div>
                   </div>
-                </div>
                 
                 <Button className="w-full" size="lg" onClick={() => navigate("/evaluacion-equipo")}>
                   Evaluar Mi Equipo
