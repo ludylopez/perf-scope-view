@@ -405,32 +405,47 @@ const Dashboard = () => {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5 text-accent" />
-                  Reportes
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Button variant="outline" className="w-full justify-start">
-                  <FileText className="mr-2 h-4 w-4" />
-                  Avance por Colaborador
-                </Button>
-                <Button variant="outline" className="w-full justify-start">
-                  <BarChart3 className="mr-2 h-4 w-4" />
-                  Comparativo de Equipo
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start"
-                  onClick={() => navigate("/estadisticas-grupales")}
-                >
-                  <Users className="mr-2 h-4 w-4" />
-                  Estadísticas Grupales
-                </Button>
-              </CardContent>
-            </Card>
+            {/* Dashboard Consolidado (si tiene jefes subordinados O colaboradores) */}
+            {(jerarquiaInfo?.tieneJefesSubordinados || jerarquiaInfo?.tieneColaboradores) && (
+              <Card className="md:col-span-2 lg:col-span-3">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5 text-accent" />
+                    Dashboard Consolidado
+                  </CardTitle>
+                  <CardDescription>
+                    Vista consolidada de toda su jerarquía organizacional y equipos
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <div className="p-4 rounded-lg border bg-card">
+                      <p className="text-sm text-muted-foreground mb-1">Total Colaboradores Directos</p>
+                      <p className="text-2xl font-bold text-primary">{jerarquiaInfo?.totalColaboradores || 0}</p>
+                    </div>
+                    <div className="p-4 rounded-lg border bg-card">
+                      <p className="text-sm text-muted-foreground mb-1">Jefes Subordinados</p>
+                      <p className="text-2xl font-bold text-info">{jerarquiaInfo?.totalJefesSubordinados || 0}</p>
+                    </div>
+                    <div className="p-4 rounded-lg border bg-card">
+                      <p className="text-sm text-muted-foreground mb-1">Posición</p>
+                      <p className="text-lg font-bold text-accent">
+                        {jerarquiaInfo?.esJefeIntermedio ? 'Jefe Intermedio' : 
+                         jerarquiaInfo?.esJefeSinJefe ? 'Jefe Superior' : 'Jefe'}
+                      </p>
+                    </div>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    className="w-full mt-4" 
+                    onClick={() => navigate("/dashboard-consolidado")}
+                  >
+                    <BarChart3 className="mr-2 h-4 w-4" />
+                    Ver Dashboard Consolidado Completo
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </div>
         )}
 

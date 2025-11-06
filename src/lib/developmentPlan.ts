@@ -14,7 +14,8 @@ export const generateDevelopmentPlan = async (
   evaluacionJefe: EvaluationDraft,
   resultadoFinal: FinalScore,
   dimensions: Dimension[],
-  potencialDimensions?: Dimension[]
+  potencialDimensions?: Dimension[],
+  generarFeedbackGrupal: boolean = false
 ): Promise<DevelopmentPlan | null> => {
   try {
     // Construir contexto de la evaluación
@@ -27,7 +28,7 @@ export const generateDevelopmentPlan = async (
     );
 
     // Generar prompt para Gemini
-    const prompt = buildDevelopmentPlanPrompt(contexto);
+    const prompt = buildDevelopmentPlanPrompt(contexto, generarFeedbackGrupal);
 
     // Llamar a Gemini API usando la función centralizada que registra uso
     // La función generateAIAnalysis maneja internamente la verificación de API key
@@ -106,7 +107,15 @@ const buildEvaluationContext = (
 /**
  * Construye el prompt para Gemini
  */
-const buildDevelopmentPlanPrompt = (contexto: string): string => {
+const buildDevelopmentPlanPrompt = (contexto: string, generarFeedbackGrupal: boolean = false): string => {
+  const instruccionesFeedbackGrupal = generarFeedbackGrupal 
+    ? `\n7. Si el colaborador pertenece a una cuadrilla, genera un feedback grupal adicional que:
+   - Se enfoque en el desempeño colectivo del equipo
+   - Identifique fortalezas y áreas de mejora a nivel grupal
+   - Proponga acciones de desarrollo para toda la cuadrilla
+   - Sea apropiado para ser compartido en una sesión grupal de feedback`
+    : "";
+
   return `Eres un experto en desarrollo de talento y gestión de recursos humanos en el sector público guatemalteco.
 
 ${contexto}
@@ -124,16 +133,16 @@ Genera un PLAN DE DESARROLLO PERSONALIZADO en formato JSON con la siguiente estr
     }
   ],
   "feedbackIndividual": "Texto completo de feedback personalizado para el colaborador, máximo 500 palabras, en español, sin tecnicismos ni palabras en inglés",
-  "feedbackGrupal": "Texto opcional de feedback grupal si aplica, máximo 300 palabras"
+  "feedbackGrupal": "${generarFeedbackGrupal ? "Texto de feedback grupal para toda la cuadrilla, máximo 300 palabras, enfocado en el desempeño colectivo" : null}"
 }
 
 INSTRUCCIONES:
 1. Identifica 3-5 competencias clave para desarrollar basándote en las brechas encontradas
-2. El feedback debe ser constructivo, específico y accionable
+2. El feedback individual debe ser constructivo, específico y accionable
 3. Usa un lenguaje claro y profesional, sin jerga técnica
 4. Considera el contexto del sector público guatemalteco
 5. Las acciones deben ser concretas y realistas
-6. Todo el texto debe estar en español
+6. Todo el texto debe estar en español${instruccionesFeedbackGrupal}
 
 Responde SOLO con el JSON, sin texto adicional.`;
 };

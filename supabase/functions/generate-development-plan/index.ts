@@ -9,6 +9,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 interface GenerateDevelopmentPlanRequest {
   resultado_final_id: string;
+  generar_feedback_grupal?: boolean; // Opcional: si se debe generar feedback grupal
 }
 
 interface DevelopmentPlanResponse {
@@ -90,6 +91,21 @@ Deno.serve(async (req: Request): Promise<Response> => {
       );
     }
 
+    // Verificar si el colaborador pertenece a una cuadrilla/grupo
+    const { data: gruposColaborador } = await supabase
+      .from("group_members")
+      .select("grupo_id, groups!group_members_grupo_id_fkey(nombre, tipo)")
+      .eq("colaborador_id", resultadoFinal.colaborador_id)
+      .eq("activo", true);
+    
+    const perteneceACuadrilla = gruposColaborador && gruposColaborador.length > 0;
+    const gruposNombres = gruposColaborador?.map((g: any) => g.groups?.nombre).filter(Boolean) || [];
+    
+    // Si se pasó el parámetro generar_feedback_grupal, usarlo; si no, detectar automáticamente
+    const generarFeedbackGrupal = generar_feedback_grupal !== undefined 
+      ? generar_feedback_grupal 
+      : perteneceACuadrilla;
+
     // Preparar contexto para la IA
     const contexto = {
       colaborador: {
@@ -148,7 +164,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
             {
               parts: [
                 {
-                  text: `Eres un experto en recursos humanos y desarrollo organizacional. Genera un plan de desarrollo personalizado para el colaborador ${contexto.colaborador.nombre}, cargo: ${contexto.colaborador.cargo}, nivel: ${contexto.colaborador.nivel}.
+                  text: `Eres un experto en recursos humanos y desarrollo organizacional. Genera un plan de desarrollo personalizado para el colaborador ${contexto.colaborador.nombre}, cargo: ${contexto.colaborador.cargo}, nivel: ${contexto.colaborador.nivel}.${perteneceACuadrilla ? `\n\nNOTA: Este colaborador pertenece a ${gruposNombres.length > 0 ? `la(s) cuadrilla(s): ${gruposNombres.join(', ')}` : 'una cuadrilla'}. ${generarFeedbackGrupal ? 'Genera también un feedback grupal adicional.' : ''}` : ''}
 
 RESULTADOS DE EVALUACIÓN:
 - Desempeño (Autoevaluación): ${contexto.resultados.desempenoAuto} (${contexto.resultados.desempenoPorcentaje}%)
@@ -160,12 +176,19 @@ RESULTADOS DE EVALUACIÓN:
 Genera un plan de desarrollo estructurado en formato JSON con los siguientes campos:
 {
   "competenciasDesarrollar": ["competencia1", "competencia2", ...],
-  "feedbackIndividual": "Feedback personalizado y constructivo para el colaborador",
-  "feedbackGrupal": "Feedback para compartir en contexto grupal si aplica",
+  "feedbackIndividual": "Feedback personalizado y constructivo para el colaborador, máximo 500 palabras, en español, sin tecnicismos ni palabras en inglés",
+  "feedbackGrupal": ${generarFeedbackGrupal ? `"Feedback grupal para toda la cuadrilla, máximo 300 palabras, enfocado en el desempeño colectivo y acciones de desarrollo para el equipo, en español"` : `null`},
   "recomendaciones": ["recomendación1", "recomendación2", ...]
 }
 
-El feedback debe ser claro, constructivo, específico y orientado a la acción. Usa español.`,
+INSTRUCCIONES:
+1. El feedback individual debe ser constructivo, específico y accionable
+2. Usa un lenguaje claro y profesional, sin jerga técnica
+3. Considera el contexto del sector público guatemalteco
+4. Las acciones deben ser concretas y realistas
+5. Todo el texto debe estar en español${generarFeedbackGrupal ? '\n6. El feedback grupal debe enfocarse en el desempeño colectivo del equipo y proponer acciones de desarrollo para toda la cuadrilla' : ''}
+
+Responde SOLO con el JSON, sin texto adicional.`,
                 },
               ],
             },

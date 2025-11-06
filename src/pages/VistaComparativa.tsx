@@ -7,13 +7,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, BarChart3, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { ArrowLeft, BarChart3, TrendingUp, TrendingDown, Minus, Users2, User } from "lucide-react";
 import { toast } from "sonner";
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, Cell } from "recharts";
 import { getSubmittedEvaluation, getJefeEvaluationDraft, getMockColaboradorEvaluation } from "@/lib/storage";
 import { INSTRUMENT_A1 } from "@/data/instruments";
 import { getNineBoxDescription, calculateCompleteFinalScore } from "@/lib/finalScore";
 import { scoreToPercentage } from "@/lib/calculations";
+import { perteneceACuadrilla, getGruposDelColaborador, getEquipoStats } from "@/lib/jerarquias";
+import { supabase } from "@/integrations/supabase/client";
+import { getActivePeriod } from "@/lib/supabase";
 
 const MOCK_COLABORADORES: Record<string, any> = {
   "1": {
@@ -38,6 +41,11 @@ const VistaComparativa = () => {
   const [resultadoFinal, setResultadoFinal] = useState<any>(null);
   const [comparativo, setComparativo] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [vistaModo, setVistaModo] = useState<"individual" | "grupal">("individual");
+  const [perteneceCuadrilla, setPerteneceCuadrilla] = useState(false);
+  const [gruposColaborador, setGruposColaborador] = useState<any[]>([]);
+  const [planDesarrollo, setPlanDesarrollo] = useState<any>(null);
+  const [promedioGrupo, setPromedioGrupo] = useState<number | null>(null);
 
   useEffect(() => {
     if (!id || !user) {
@@ -46,61 +54,146 @@ const VistaComparativa = () => {
     }
 
     const loadData = async () => {
-      const colaboradorData = MOCK_COLABORADORES[id];
-      if (!colaboradorData) {
-        navigate("/evaluacion-equipo");
-        return;
-      }
+      try {
+        // Obtener período activo
+        const activePeriod = await getActivePeriod();
+        let periodoId = "2025-1";
+        if (activePeriod) {
+          periodoId = activePeriod.id;
+        } else {
+          const { data: periodData } = await supabase
+            .from("evaluation_periods")
+            .select("id")
+            .eq("nombre", "2025-1")
+            .single();
+          if (periodData) {
+            periodoId = periodData.id;
+          }
+        }
 
-      setColaborador(colaboradorData);
+        // Cargar colaborador desde Supabase
+        const { data: colaboradorData, error: colaboradorError } = await supabase
+          .from("users")
+          .select("*")
+          .eq("dpi", id)
+          .single();
 
-      // Cargar ambas evaluaciones
-      const auto = await getSubmittedEvaluation(colaboradorData.dpi, "2025-1") || 
-                  getMockColaboradorEvaluation(colaboradorData.dpi);
-      const jefe = await getJefeEvaluationDraft(user.dpi, colaboradorData.dpi, "2025-1");
-
-      if (!auto || !jefe || jefe.estado !== "enviado") {
-        toast.error("Ambas evaluaciones deben estar completas para ver la comparación");
-        navigate("/evaluacion-equipo");
-        return;
-      }
-
-      setAutoevaluacion(auto);
-      setEvaluacionJefe(jefe);
-
-      // Calcular resultado final y comparativo
-      const resultado = calculateCompleteFinalScore(
-        auto,
-        jefe,
-        instrument.dimensionesDesempeno,
-        instrument.dimensionesPotencial
-      );
-      setResultadoFinal(resultado);
-
-      // Calcular comparativo por dimensión
-      const comparativoData = instrument.dimensionesDesempeno.map((dim) => {
-        const autoItems = dim.items.map(item => auto.responses[item.id]).filter(v => v !== undefined);
-        const jefeItems = dim.items.map(item => jefe.responses[item.id]).filter(v => v !== undefined);
+        let colaboradorFormatted: any;
         
-        const autoAvg = autoItems.length > 0 
-          ? autoItems.reduce((sum, val) => sum + val, 0) / autoItems.length 
-          : 0;
-        const jefeAvg = jefeItems.length > 0 
-          ? jefeItems.reduce((sum, val) => sum + val, 0) / jefeItems.length 
-          : 0;
-        const diferencia = jefeAvg - autoAvg;
-        
-        return {
-          dimensionId: dim.id,
-          nombre: dim.nombre,
-          autoevaluacion: autoAvg,
-          evaluacionJefe: jefeAvg,
-          diferencia,
-        };
-      });
-      setComparativo(comparativoData);
+        if (colaboradorError || !colaboradorData) {
+          // Fallback a datos mock
+          const mockColaborador = MOCK_COLABORADORES[id];
+          if (!mockColaborador) {
+            toast.error("Colaborador no encontrado");
+            navigate("/evaluacion-equipo");
+            return;
+          }
+          colaboradorFormatted = mockColaborador;
+        } else {
+          colaboradorFormatted = {
+            id: colaboradorData.dpi,
+            dpi: colaboradorData.dpi,
+            nombre: `${colaboradorData.nombre} ${colaboradorData.apellidos}`,
+            cargo: colaboradorData.cargo,
+            nivel: colaboradorData.nivel,
+            area: colaboradorData.area,
+          };
+        }
 
-      setLoading(false);
+        setColaborador(colaboradorFormatted);
+
+        // Verificar si pertenece a una cuadrilla
+        const enCuadrilla = await perteneceACuadrilla(colaboradorFormatted.dpi);
+        setPerteneceCuadrilla(enCuadrilla);
+
+        if (enCuadrilla) {
+          const grupos = await getGruposDelColaborador(colaboradorFormatted.dpi);
+          setGruposColaborador(grupos);
+          
+          // Obtener promedio del grupo si hay grupos
+          if (grupos.length > 0 && user) {
+            // Obtener estadísticas del equipo del jefe que incluye este colaborador
+            const { data: assignment } = await supabase
+              .from("user_assignments")
+              .select("jefe_id")
+              .eq("colaborador_id", colaboradorFormatted.dpi)
+              .eq("activo", true)
+              .single();
+            
+            if (assignment) {
+              const stats = await getEquipoStats(assignment.jefe_id, periodoId);
+              setPromedioGrupo(stats?.promedioDesempeno || null);
+            }
+          }
+        }
+
+        // Cargar plan de desarrollo para verificar si hay feedback grupal
+        const { data: planData } = await supabase
+          .from("development_plans")
+          .select("*")
+          .eq("colaborador_id", colaboradorFormatted.dpi)
+          .eq("periodo_id", periodoId)
+          .maybeSingle();
+
+        if (planData) {
+          setPlanDesarrollo({
+            feedbackIndividual: planData.feedback_individual,
+            feedbackGrupal: planData.feedback_grupal,
+          });
+        }
+
+        // Cargar ambas evaluaciones
+        const auto = await getSubmittedEvaluation(colaboradorFormatted.dpi, periodoId) || 
+                    getMockColaboradorEvaluation(colaboradorFormatted.dpi);
+        const jefe = await getJefeEvaluationDraft(user.dpi, colaboradorFormatted.dpi, periodoId);
+
+        if (!auto || !jefe || jefe.estado !== "enviado") {
+          toast.error("Ambas evaluaciones deben estar completas para ver la comparación");
+          navigate("/evaluacion-equipo");
+          return;
+        }
+
+        setAutoevaluacion(auto);
+        setEvaluacionJefe(jefe);
+
+        // Calcular resultado final y comparativo
+        const resultado = calculateCompleteFinalScore(
+          auto,
+          jefe,
+          instrument.dimensionesDesempeno,
+          instrument.dimensionesPotencial
+        );
+        setResultadoFinal(resultado);
+
+        // Calcular comparativo por dimensión
+        const comparativoData = instrument.dimensionesDesempeno.map((dim) => {
+          const autoItems = dim.items.map(item => auto.responses[item.id]).filter(v => v !== undefined);
+          const jefeItems = dim.items.map(item => jefe.responses[item.id]).filter(v => v !== undefined);
+          
+          const autoAvg = autoItems.length > 0 
+            ? autoItems.reduce((sum, val) => sum + val, 0) / autoItems.length 
+            : 0;
+          const jefeAvg = jefeItems.length > 0 
+            ? jefeItems.reduce((sum, val) => sum + val, 0) / jefeItems.length 
+            : 0;
+          const diferencia = jefeAvg - autoAvg;
+          
+          return {
+            dimensionId: dim.id,
+            nombre: dim.nombre,
+            autoevaluacion: autoAvg,
+            evaluacionJefe: jefeAvg,
+            diferencia,
+          };
+        });
+        setComparativo(comparativoData);
+
+        setLoading(false);
+      } catch (error) {
+        console.error("Error loading data:", error);
+        toast.error("Error al cargar datos");
+        setLoading(false);
+      }
     };
 
     loadData();
@@ -222,18 +315,73 @@ const VistaComparativa = () => {
           </Card>
         </div>
 
+        {/* Toggle Individual/Grupal */}
+        {perteneceCuadrilla && gruposColaborador.length > 0 && (
+          <Card className="mb-6">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Users2 className="h-5 w-5 text-info" />
+                  <div>
+                    <p className="font-medium">Vista de Comparación</p>
+                    <p className="text-sm text-muted-foreground">
+                      Este colaborador pertenece a {gruposColaborador.length} cuadrilla{gruposColaborador.length > 1 ? 's' : ''}: {gruposColaborador.map(g => g.nombre).join(', ')}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-2 border rounded-lg p-1">
+                  <Button
+                    variant={vistaModo === "individual" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setVistaModo("individual")}
+                  >
+                    <User className="mr-2 h-4 w-4" />
+                    Individual
+                  </Button>
+                  <Button
+                    variant={vistaModo === "grupal" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setVistaModo("grupal")}
+                  >
+                    <Users2 className="mr-2 h-4 w-4" />
+                    Grupal
+                  </Button>
+                </div>
+              </div>
+              {promedioGrupo !== null && (
+                <div className="mt-4 p-3 bg-info/10 border border-info/20 rounded-lg">
+                  <p className="text-sm">
+                    <strong>Promedio del Equipo:</strong> {Math.round(promedioGrupo)}% 
+                    <span className="text-muted-foreground ml-2">
+                      (Comparar con el desempeño individual del colaborador: {scoreToPercentage(resultadoFinal.desempenoFinal)}%)
+                    </span>
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Gráficos Comparativos */}
         <div className="grid gap-6 mb-6 md:grid-cols-2">
           <Card>
             <CardHeader>
-              <CardTitle>Comparativo por Dimensión</CardTitle>
+              <CardTitle>
+                {vistaModo === "grupal" && perteneceCuadrilla 
+                  ? "Comparativo Individual vs Promedio Grupal"
+                  : "Comparativo por Dimensión"}
+              </CardTitle>
               <CardDescription>
-                Radar comparativo autoevaluación vs evaluación jefe
+                {vistaModo === "grupal" && perteneceCuadrilla
+                  ? "Comparación del colaborador individual vs promedio de su cuadrilla"
+                  : "Radar comparativo autoevaluación vs evaluación jefe"}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
-                <RadarChart data={radarData}>
+                <RadarChart data={vistaModo === "grupal" && promedioGrupo !== null
+                  ? radarData.map(d => ({ ...d, promedioGrupo: promedioGrupo }))
+                  : radarData}>
                   <PolarGrid />
                   <PolarAngleAxis dataKey="dimension" />
                   <PolarRadiusAxis angle={90} domain={[0, 100]} />
@@ -251,6 +399,15 @@ const VistaComparativa = () => {
                     fill={COLORS.jefe}
                     fillOpacity={0.6}
                   />
+                  {vistaModo === "grupal" && promedioGrupo !== null && (
+                    <Radar
+                      name="Promedio Grupo"
+                      dataKey="promedioGrupo"
+                      stroke="#ffc658"
+                      fill="#ffc658"
+                      fillOpacity={0.4}
+                    />
+                  )}
                   <Tooltip />
                   <Legend />
                 </RadarChart>
@@ -267,25 +424,83 @@ const VistaComparativa = () => {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={barData}>
+                <BarChart data={vistaModo === "grupal" && promedioGrupo !== null
+                  ? barData.map(d => ({ ...d, promedioGrupo: promedioGrupo }))
+                  : barData}>
                   <XAxis dataKey="dimension" angle={-45} textAnchor="end" height={80} />
                   <YAxis domain={[0, 100]} />
                   <Tooltip />
                   <Legend />
                   <Bar dataKey="autoevaluacion" fill={COLORS.auto} name="Autoevaluación (%)" />
                   <Bar dataKey="evaluacionJefe" fill={COLORS.jefe} name="Evaluación Jefe (%)" />
+                  {vistaModo === "grupal" && promedioGrupo !== null && (
+                    <Bar dataKey="promedioGrupo" fill="#ffc658" name="Promedio Grupo (%)" />
+                  )}
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
         </div>
 
+        {/* Feedback Individual y Grupal */}
+        {planDesarrollo && (
+          <div className="grid gap-6 mb-6 md:grid-cols-2">
+            {planDesarrollo.feedbackIndividual && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <User className="h-5 w-5 text-primary" />
+                    Feedback Individual
+                  </CardTitle>
+                  <CardDescription>
+                    Retroalimentación personalizada para el colaborador
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="p-4 bg-background rounded-lg border">
+                    <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                      {planDesarrollo.feedbackIndividual}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+            
+            {planDesarrollo.feedbackGrupal && (
+              <Card className="border-info/20 bg-info/5">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users2 className="h-5 w-5 text-info" />
+                    Feedback Grupal
+                  </CardTitle>
+                  <CardDescription>
+                    Retroalimentación para toda la cuadrilla
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="p-4 bg-background rounded-lg border border-info/20">
+                    <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                      {planDesarrollo.feedbackGrupal}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
+
         {/* Tabla Comparativa Detallada */}
         <Card>
           <CardHeader>
-            <CardTitle>Análisis Detallado por Dimensión</CardTitle>
+            <CardTitle>
+              {vistaModo === "grupal" && perteneceCuadrilla
+                ? "Análisis Individual vs Promedio Grupal"
+                : "Análisis Detallado por Dimensión"}
+            </CardTitle>
             <CardDescription>
-              Comparación punto por punto con diferencias identificadas
+              {vistaModo === "grupal" && perteneceCuadrilla
+                ? "Comparación del desempeño individual con el promedio de la cuadrilla"
+                : "Comparación punto por punto con diferencias identificadas"}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -318,7 +533,11 @@ const VistaComparativa = () => {
                       )}
                     </div>
                     
-                    <div className="grid gap-4 md:grid-cols-3 mb-3">
+                    <div className={`grid gap-4 mb-3 ${
+                      vistaModo === "grupal" && perteneceCuadrilla && promedioGrupo !== null
+                        ? "md:grid-cols-4"
+                        : "md:grid-cols-3"
+                    }`}>
                       <div>
                         <p className="text-sm text-muted-foreground mb-1">Autoevaluación</p>
                         <div className="flex items-center gap-2">
@@ -339,6 +558,18 @@ const VistaComparativa = () => {
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">({item.evaluacionJefe.toFixed(2)}/5.0)</p>
                       </div>
+                      {vistaModo === "grupal" && perteneceCuadrilla && promedioGrupo !== null && (
+                        <div>
+                          <p className="text-sm text-muted-foreground mb-1">Promedio Cuadrilla</p>
+                          <div className="flex items-center gap-2">
+                            <Progress value={promedioGrupo} className="flex-1" />
+                            <span className="font-medium w-16 text-right text-info">
+                              {Math.round(promedioGrupo)}%
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">Promedio del grupo</p>
+                        </div>
+                      )}
                       <div>
                         <p className="text-sm text-muted-foreground mb-1">Diferencia</p>
                         <div className="flex items-center gap-2">
@@ -386,4 +617,3 @@ const VistaComparativa = () => {
 };
 
 export default VistaComparativa;
-

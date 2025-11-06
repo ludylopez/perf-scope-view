@@ -24,6 +24,7 @@ import AdminInstrumentos from "./pages/AdminInstrumentos";
 import Matriz9Box from "./pages/Matriz9Box";
 import EvaluacionJefes from "./pages/EvaluacionJefes";
 import EvaluacionJefeIndividual from "./pages/EvaluacionJefeIndividual";
+import DashboardConsolidado from "./pages/DashboardConsolidado";
 import NotFound from "./pages/NotFound";
 import ConfiguracionSistema from "./pages/ConfiguracionSistema";
 
@@ -214,6 +215,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <EvaluacionJefeIndividual />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard-consolidado"
+              element={
+                <ProtectedRoute>
+                  <DashboardConsolidado />
                 </ProtectedRoute>
               }
             />

@@ -52,12 +52,15 @@ import {
   Eye,
   FileEdit,
   CheckCircle2,
+  Users2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { generateDevelopmentPlan } from "@/lib/developmentPlan";
 import { getInstrumentForUser } from "@/lib/instruments";
 import { getActivePeriod } from "@/lib/supabase";
 import { supabase } from "@/integrations/supabase/client";
+import { perteneceACuadrilla, getGruposDelColaborador } from "@/lib/jerarquias";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useAutoSave } from "@/hooks/useAutoSave";
 
 // Datos mock del colaborador
@@ -83,6 +86,9 @@ const EvaluacionColaborador = () => {
   const [autoevaluacion, setAutoevaluacion] = useState<any>(null);
   const [jefeAlreadyEvaluated, setJefeAlreadyEvaluated] = useState(false);
   const [evaluacionTab, setEvaluacionTab] = useState<"auto" | "desempeno" | "potencial">("desempeno");
+  const [perteneceACuadrilla, setPerteneceACuadrilla] = useState(false);
+  const [gruposColaborador, setGruposColaborador] = useState<any[]>([]);
+  const [generarFeedbackGrupal, setGenerarFeedbackGrupal] = useState(false);
   
   // Estados para evaluación de desempeño del jefe
   const [desempenoResponses, setDesempenoResponses] = useState<Record<string, number>>({});
@@ -194,6 +200,17 @@ const EvaluacionColaborador = () => {
           if (userInstrument) {
             setInstrument(userInstrument);
           }
+        }
+
+        // Verificar si pertenece a una cuadrilla
+        const enCuadrilla = await perteneceACuadrilla(colaboradorFormatted.dpi);
+        setPerteneceACuadrilla(enCuadrilla);
+
+        if (enCuadrilla) {
+          const grupos = await getGruposDelColaborador(colaboradorFormatted.dpi);
+          setGruposColaborador(grupos);
+          // Activar feedback grupal por defecto si pertenece a cuadrilla
+          setGenerarFeedbackGrupal(true);
         }
 
         // Cargar autoevaluación del colaborador solo si el jefe ya completó su evaluación
@@ -878,20 +895,50 @@ const EvaluacionColaborador = () => {
 
       {/* Submit confirmation dialog */}
       <AlertDialog open={showSubmitDialog} onOpenChange={setShowSubmitDialog}>
-        <AlertDialogContent>
+        <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>
             <AlertDialogTitle>¿Está seguro de enviar su evaluación?</AlertDialogTitle>
-            <AlertDialogDescription className="space-y-2">
+            <AlertDialogDescription className="space-y-3">
               <p>
                 Una vez enviada, no podrá modificarla a menos que RR.HH. reabra su
                 evaluación.
               </p>
-              <p className="font-semibold text-foreground">
-                Desempeño: {desempenoAnsweredItems}/{desempenoTotalItems} ítems completados
-              </p>
-              <p className="font-semibold text-foreground">
-                Potencial: {potencialAnsweredItems}/{potencialTotalItems} ítems completados
-              </p>
+              <div className="space-y-1">
+                <p className="font-semibold text-foreground">
+                  Desempeño: {desempenoAnsweredItems}/{desempenoTotalItems} ítems completados
+                </p>
+                <p className="font-semibold text-foreground">
+                  Potencial: {potencialAnsweredItems}/{potencialTotalItems} ítems completados
+                </p>
+              </div>
+              {perteneceACuadrilla && gruposColaborador.length > 0 && (
+                <div className="mt-4 p-3 bg-info/10 border border-info/20 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <Users2 className="h-4 w-4 text-info mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-info mb-1">
+                        Opción de Feedback Grupal
+                      </p>
+                      <p className="text-xs text-muted-foreground mb-2">
+                        Este colaborador pertenece a {gruposColaborador.length} cuadrilla{gruposColaborador.length > 1 ? 's' : ''}: {gruposColaborador.map((g: any) => g.nombre).join(', ')}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id="feedback-grupal"
+                          checked={generarFeedbackGrupal}
+                          onCheckedChange={(checked) => setGenerarFeedbackGrupal(checked === true)}
+                        />
+                        <Label htmlFor="feedback-grupal" className="text-sm cursor-pointer">
+                          Generar feedback grupal adicional (para toda la cuadrilla)
+                        </Label>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        El feedback individual siempre se generará. El feedback grupal será adicional si marca esta opción.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
