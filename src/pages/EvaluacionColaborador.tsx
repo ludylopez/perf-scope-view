@@ -59,7 +59,7 @@ import { generateDevelopmentPlan } from "@/lib/developmentPlan";
 import { getInstrumentForUser } from "@/lib/instruments";
 import { getActivePeriod } from "@/lib/supabase";
 import { supabase } from "@/integrations/supabase/client";
-import { perteneceACuadrilla, getGruposDelColaborador } from "@/lib/jerarquias";
+import { perteneceACuadrilla as verificarCuadrilla, getGruposDelColaborador } from "@/lib/jerarquias";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAutoSave } from "@/hooks/useAutoSave";
 
@@ -203,7 +203,7 @@ const EvaluacionColaborador = () => {
         }
 
         // Verificar si pertenece a una cuadrilla
-        const enCuadrilla = await perteneceACuadrilla(colaboradorFormatted.dpi);
+        const enCuadrilla = await verificarCuadrilla(colaboradorFormatted.dpi);
         setPerteneceACuadrilla(enCuadrilla);
 
         if (enCuadrilla) {

@@ -64,7 +64,8 @@ const DashboardRRHH = () => {
       return;
     }
     loadStats();
-  }, [user, navigate, periodoId, selectedArea]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, navigate]);
 
   const loadStats = async () => {
     try {
