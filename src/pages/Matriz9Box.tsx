@@ -13,6 +13,7 @@ import { calculateCompleteFinalScore, getNineBoxDescription } from "@/lib/finalS
 import { getInstrumentForUser } from "@/lib/instruments";
 import { scoreToPercentage } from "@/lib/calculations";
 import { getFinalResultFromSupabase } from "@/lib/finalResultSupabase";
+import { hasJefeEvaluation, getJefeEvaluationDraft, getSubmittedEvaluation } from "@/lib/storage";
 
 interface TeamMember9Box {
   dpi: string;
@@ -100,7 +101,9 @@ const Matriz9Box = () => {
 
       // Para cada colaborador, calcular su posición 9-box
       for (const assignment of assignments || []) {
-        const colaborador = assignment.users;
+        const colaborador = Array.isArray(assignment.users) ? assignment.users[0] : assignment.users;
+        if (!colaborador) continue;
+        
         const colaboradorDpi = colaborador.dpi;
 
         // Verificar si el jefe completó la evaluación
@@ -129,7 +132,7 @@ const Matriz9Box = () => {
           if (!instrument) continue;
 
           // Calcular resultado final
-          resultadoFinal = calculateCompleteFinalScore(
+          resultadoFinal = await calculateCompleteFinalScore(
             autoevaluacion,
             evaluacionJefe,
             instrument.dimensionesDesempeno,

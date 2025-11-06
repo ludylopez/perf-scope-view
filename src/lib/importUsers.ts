@@ -80,9 +80,9 @@ export const convertirFechaNacimiento = (fecha: string | number | Date): string 
           if (parts[2].length === 4) {
             // YYYY-MM-DD o DD/MM/YYYY
             if (parts[0].length === 4) {
-              date = new Date(parts[0], parseInt(parts[1]) - 1, parseInt(parts[2]));
+              date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
             } else {
-              date = new Date(parts[2], parseInt(parts[1]) - 1, parseInt(parts[0]));
+              date = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
             }
           }
         }
@@ -122,9 +122,9 @@ export const convertirFechaIngreso = (fecha: string | number | Date): string | n
         if (parts.length === 3) {
           if (parts[2].length === 4) {
             if (parts[0].length === 4) {
-              date = new Date(parts[0], parseInt(parts[1]) - 1, parseInt(parts[2]));
+              date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
             } else {
-              date = new Date(parts[2], parseInt(parts[1]) - 1, parseInt(parts[0]));
+              date = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
             }
           }
         }

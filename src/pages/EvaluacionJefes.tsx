@@ -49,15 +49,17 @@ const EvaluacionJefes = () => {
       setLoading(true);
 
       // Obtener período activo
+      let periodData = null;
       const activePeriod = await getActivePeriod();
       if (activePeriod) {
         setPeriodoId(activePeriod.id);
       } else {
-        const { data: periodData } = await supabase
+        const { data } = await supabase
           .from("evaluation_periods")
           .select("id")
           .eq("nombre", "2025-1")
           .single();
+        periodData = data;
         if (periodData) {
           setPeriodoId(periodData.id);
         }

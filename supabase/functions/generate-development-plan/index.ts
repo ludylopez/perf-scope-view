@@ -1,5 +1,4 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "jsr:@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // Inicializar cliente de Supabase
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
@@ -32,7 +31,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { resultado_final_id }: GenerateDevelopmentPlanRequest = await req.json();
+    const { resultado_final_id, generar_feedback_grupal }: GenerateDevelopmentPlanRequest = await req.json();
 
     if (!resultado_final_id) {
       return new Response(

@@ -161,7 +161,10 @@ export const getFinalResultsByJefe = async (
     // Para cada colaborador, obtener su resultado final
     const results = [];
     for (const assignment of assignments) {
-      const colaborador = assignment.users;
+      // users es un objeto, no un array
+      const colaborador = Array.isArray(assignment.users) ? assignment.users[0] : assignment.users;
+      if (!colaborador) continue;
+      
       const resultado = await getFinalResultFromSupabase(colaborador.dpi, periodoId);
 
       if (resultado) {

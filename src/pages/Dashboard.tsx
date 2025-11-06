@@ -398,12 +398,13 @@ const Dashboard = () => {
                       <p className="text-sm text-muted-foreground">Completadas</p>
                     </div>
                   </div>
-                
-                <Button className="w-full" size="lg" onClick={() => navigate("/evaluacion-equipo")}>
-                  Evaluar Mi Equipo
-                </Button>
+                  
+                  <Button className="w-full" size="lg" onClick={() => navigate("/evaluacion-equipo")}>
+                    Evaluar Mi Equipo
+                  </Button>
               </CardContent>
             </Card>
+            )}
 
             {/* Dashboard Consolidado (si tiene jefes subordinados O colaboradores) */}
             {(jerarquiaInfo?.tieneJefesSubordinados || jerarquiaInfo?.tieneColaboradores) && (
