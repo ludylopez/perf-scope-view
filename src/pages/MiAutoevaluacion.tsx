@@ -25,7 +25,7 @@ import {
   calculateDimensionPercentage,
   calculateDimensionAverage
 } from "@/lib/calculations";
-import { ArrowLeft, CheckCircle2, FileDown, Sparkles, TrendingUp, Target, Award, AlertCircle, Lightbulb } from "lucide-react";
+import { ArrowLeft, CheckCircle2, FileDown, Sparkles, TrendingUp, Target, Award, AlertCircle, Lightbulb, Shield, Brain, Heart, Users, HandHeart, ChevronDown, ChevronUp } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import {
@@ -38,6 +38,77 @@ import {
   Tooltip
 } from "recharts";
 
+// Helper para obtener el ícono de cada dimensión
+const getDimensionIcon = (dimensionId: string) => {
+  const icons: Record<string, any> = {
+    dim1: Target,
+    dim2: Shield,
+    dim3: Brain,
+    dim4: Heart,
+    dim5: Users,
+    dim6: HandHeart,
+  };
+  return icons[dimensionId] || Target;
+};
+
+// Helper para obtener el color de cada dimensión
+const getDimensionColor = (dimensionId: string) => {
+  const colors: Record<string, string> = {
+    dim1: "text-blue-500 bg-blue-500/10",
+    dim2: "text-purple-500 bg-purple-500/10",
+    dim3: "text-orange-500 bg-orange-500/10",
+    dim4: "text-pink-500 bg-pink-500/10",
+    dim5: "text-indigo-500 bg-indigo-500/10",
+    dim6: "text-teal-500 bg-teal-500/10",
+  };
+  return colors[dimensionId] || "text-primary bg-primary/10";
+};
+
+// Helper para interpretar el puntaje
+const getScoreInterpretation = (percentage: number) => {
+  if (percentage >= 90) return { label: "Excelente", color: "text-green-600 bg-green-50 border-green-200" };
+  if (percentage >= 75) return { label: "Bueno", color: "text-blue-600 bg-blue-50 border-blue-200" };
+  if (percentage >= 60) return { label: "Regular", color: "text-yellow-600 bg-yellow-50 border-yellow-200" };
+  return { label: "Necesita mejorar", color: "text-orange-600 bg-orange-50 border-orange-200" };
+};
+
+// Helper para obtener ejemplos de cada dimensión
+const getDimensionExamples = (dimensionId: string) => {
+  const examples: Record<string, string[]> = {
+    dim1: [
+      "Cumplir con las metas del Plan Operativo Anual",
+      "Ejecutar el presupuesto en tiempo y forma",
+      "Implementar acuerdos del Concejo Municipal"
+    ],
+    dim2: [
+      "Mantener transparencia en el manejo de recursos",
+      "Cumplir con leyes y normativas vigentes",
+      "Presentar informes completos y puntuales"
+    ],
+    dim3: [
+      "Dominar la gestión pública municipal",
+      "Aplicar herramientas de planificación estratégica",
+      "Tomar decisiones fundamentadas"
+    ],
+    dim4: [
+      "Actuar con integridad y transparencia",
+      "Orientarse a resultados y mejora continua",
+      "Mantener compromiso con las responsabilidades"
+    ],
+    dim5: [
+      "Dirigir efectivamente al equipo directivo",
+      "Coordinar entre dependencias municipales",
+      "Comunicarse clara y oportunamente"
+    ],
+    dim6: [
+      "Priorizar el interés ciudadano",
+      "Atender demandas de la población",
+      "Mantener buena imagen institucional"
+    ]
+  };
+  return examples[dimensionId] || [];
+};
+
 const MiAutoevaluacion = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -45,6 +116,14 @@ const MiAutoevaluacion = () => {
 
   const [evaluation, setEvaluation] = useState<any>(null);
   const [currentDimension, setCurrentDimension] = useState(0);
+  const [expandedDimensions, setExpandedDimensions] = useState<Record<number, boolean>>({});
+
+  const toggleDimension = (idx: number) => {
+    setExpandedDimensions(prev => ({
+      ...prev,
+      [idx]: !prev[idx]
+    }));
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -90,7 +169,8 @@ const MiAutoevaluacion = () => {
     nombreCompleto: dim.nombre,
     numero: idx + 1,
     porcentaje: calculateDimensionPercentage(evaluation.responses, dim),
-    puntaje: calculateDimensionAverage(evaluation.responses, dim)
+    puntaje: calculateDimensionAverage(evaluation.responses, dim),
+    dimensionData: dim // Incluir toda la dimensión
   }));
 
   // Identificar fortalezas (top 3) y áreas de mejora (bottom 3)
@@ -140,6 +220,40 @@ const MiAutoevaluacion = () => {
             evaluación cierre.
           </AlertDescription>
         </Alert>
+
+        {/* Resumen ejecutivo simple */}
+        <Card className="mb-6 border-2 border-primary/20 bg-gradient-to-r from-primary/5 to-transparent">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-4">
+              <div className={`flex-shrink-0 p-3 rounded-full ${getScoreInterpretation(performancePercentage).color}`}>
+                <TrendingUp className="h-6 w-6" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-bold mb-2">
+                  Tu desempeño es {getScoreInterpretation(performancePercentage).label}
+                </h3>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Con un puntaje global de <strong>{performancePercentage}%</strong>,
+                  {performancePercentage >= 75 ? " estás cumpliendo satisfactoriamente con las expectativas del cargo." : " hay áreas importantes que requieren atención y mejora."}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {fortalezas.length > 0 && (
+                    <div className="text-xs">
+                      <span className="text-muted-foreground">Destacas en: </span>
+                      <span className="font-semibold text-success">{fortalezas[0].nombreCompleto}</span>
+                    </div>
+                  )}
+                  {areasDeOportunidad.length > 0 && (
+                    <div className="text-xs">
+                      <span className="text-muted-foreground">• Puedes mejorar en: </span>
+                      <span className="font-semibold text-warning">{areasDeOportunidad[0].nombreCompleto}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="grid gap-6 mb-6 md:grid-cols-2">
           <Card>
@@ -204,9 +318,9 @@ const MiAutoevaluacion = () => {
 
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle>Perfil de Desempeño por Dimensión</CardTitle>
+            <CardTitle>Resultados por Áreas Evaluadas</CardTitle>
             <CardDescription>
-              Visualización de sus resultados en cada dimensión evaluada
+              Cada área representa aspectos clave de tu trabajo. Haz clic en cada tarjeta para ver más detalles.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -252,19 +366,99 @@ const MiAutoevaluacion = () => {
                 </RadarChart>
               </ResponsiveContainer>
             </div>
-            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-3">
-              {radarData.map((data, idx) => (
-                <div key={idx} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border border-border">
-                  <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 text-primary font-bold text-sm">
-                    {data.numero}
+            <div className="mt-6 grid grid-cols-1 gap-4">
+              {radarData.map((data, idx) => {
+                const Icon = getDimensionIcon(data.dimensionData.id);
+                const colorClasses = getDimensionColor(data.dimensionData.id);
+                const interpretation = getScoreInterpretation(data.porcentaje);
+                const isExpanded = expandedDimensions[idx];
+                const examples = getDimensionExamples(data.dimensionData.id);
+
+                return (
+                  <div
+                    key={idx}
+                    className="border border-border rounded-lg overflow-hidden hover:shadow-md transition-all"
+                  >
+                    {/* Header de la tarjeta - clickeable */}
+                    <div
+                      className="flex items-center gap-4 p-4 cursor-pointer hover:bg-muted/30 transition-colors"
+                      onClick={() => toggleDimension(idx)}
+                    >
+                      {/* Ícono de la dimensión */}
+                      <div className={`flex-shrink-0 p-3 rounded-full ${colorClasses}`}>
+                        <Icon className="h-6 w-6" />
+                      </div>
+
+                      {/* Contenido principal */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="text-xs font-medium text-muted-foreground">Área {data.numero}</p>
+                          <Badge className={`text-xs px-2 py-0 ${interpretation.color}`}>
+                            {interpretation.label}
+                          </Badge>
+                        </div>
+                        <p className="text-sm font-semibold text-foreground mb-1">
+                          {data.nombreCompleto}
+                        </p>
+                        <p className="text-xs text-muted-foreground line-clamp-1">
+                          {data.dimensionData.descripcion}
+                        </p>
+                      </div>
+
+                      {/* Puntaje y chevron */}
+                      <div className="flex items-center gap-3">
+                        <div className="text-right">
+                          <p className="text-2xl font-bold text-primary">{data.porcentaje}%</p>
+                          <p className="text-xs text-muted-foreground">{data.puntaje.toFixed(1)}/5.0</p>
+                        </div>
+                        {isExpanded ? (
+                          <ChevronUp className="h-5 w-5 text-muted-foreground" />
+                        ) : (
+                          <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Contenido expandible */}
+                    {isExpanded && (
+                      <div className="px-4 pb-4 pt-2 bg-muted/20 border-t border-border">
+                        <div className="space-y-3">
+                          {/* Descripción completa */}
+                          <div>
+                            <p className="text-xs font-semibold text-foreground mb-1">¿Qué se evalúa?</p>
+                            <p className="text-xs text-muted-foreground">
+                              {data.dimensionData.descripcion}
+                            </p>
+                          </div>
+
+                          {/* Ejemplos concretos */}
+                          {examples.length > 0 && (
+                            <div>
+                              <p className="text-xs font-semibold text-foreground mb-2">Ejemplos de lo que incluye:</p>
+                              <ul className="space-y-1">
+                                {examples.map((example, exIdx) => (
+                                  <li key={exIdx} className="flex items-start gap-2 text-xs text-muted-foreground">
+                                    <CheckCircle2 className="h-3 w-3 text-primary mt-0.5 flex-shrink-0" />
+                                    <span>{example}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
+                          {/* Peso de la dimensión */}
+                          <div className="pt-2 border-t border-border/50">
+                            <p className="text-xs text-muted-foreground">
+                              <span className="font-medium">Peso en evaluación: </span>
+                              {Math.round(data.dimensionData.peso * 100)}% del total
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-muted-foreground mb-0.5">Dimensión {data.numero}</p>
-                    <p className="text-sm font-semibold truncate">{data.nombreCompleto}</p>
-                    <p className="text-lg font-bold text-primary mt-1">{data.porcentaje}%</p>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </CardContent>
         </Card>
