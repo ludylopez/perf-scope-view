@@ -173,9 +173,14 @@ export const ImportUsersDialog = ({ open, onOpenChange, onImportComplete }: Impo
           const nivelCode = extraerCodigoNivel(rawNivel);
           const cargo = String(row[cargoCol] || '').trim();
           const area = String(row[areaCol] || '').trim();
+          const fechaNac = row[fechaNacCol];
 
           if (!dpi || !nombreCompleto || !cargo || !area) {
-            errors.push(`Fila ${index + 2}: Faltan datos requeridos`);
+            errors.push(`Fila ${index + 2}: Faltan datos requeridos (DPI, nombre, cargo, área)`);
+            return;
+          }
+          if (!fechaNac) {
+            errors.push(`Fila ${index + 2}: Falta fecha de nacimiento (requerida para contraseña)`);
             return;
           }
           if (!nivelCode || !isNivelValido(nivelCode)) {

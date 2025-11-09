@@ -278,8 +278,8 @@ export const parsearArchivoUsuarios = async (file: File): Promise<{ usuarios: Im
         const headerLower = h.toLowerCase();
         if (headerLower.includes('dpi')) columnMap.dpi = i;
         if (headerLower.includes('nombre') && !headerLower.includes('completo')) columnMap.nombre = i;
-        if (headerLower.includes('fecha') && headerLower.includes('nacimiento')) columnMap.fechaNacimiento = i;
-        if (headerLower.includes('fecha') && (headerLower.includes('inicio') || headerLower.includes('laboral'))) columnMap.fechaIngreso = i;
+        if (headerLower.includes('fecha') && (headerLower.includes('nacimiento') || headerLower.includes('nac'))) columnMap.fechaNacimiento = i;
+        if (headerLower.includes('fecha') && (headerLower.includes('inicio') || headerLower.includes('laboral') || headerLower.includes('ingreso'))) columnMap.fechaIngreso = i;
         if (headerLower.includes('nivel') || headerLower.includes('puesto')) columnMap.nivel = i;
         if (headerLower.includes('puesto') && !headerLower.includes('nivel')) columnMap.cargo = i;
         if (headerLower.includes('departamento') || headerLower.includes('dependencia')) columnMap.area = i;
@@ -329,7 +329,7 @@ export const parsearArchivoUsuarios = async (file: File): Promise<{ usuarios: Im
           const genero = generoRaw ? normalizarGenero(generoRaw) : undefined;
           
           if (!fechaNacFormato) {
-            errores.push(`Línea ${i + 1}: No se pudo convertir fecha de nacimiento: ${fechaNac}`);
+            errores.push(`Línea ${i + 1}: Fecha de nacimiento inválida o faltante (requerida para contraseña): "${fechaNac}"`);
             continue;
           }
           
@@ -370,8 +370,8 @@ export const parsearArchivoUsuarios = async (file: File): Promise<{ usuarios: Im
       headerLower.forEach((h: string, i: number) => {
         if (h.includes('dpi')) columnMap.dpi = i;
         if (h.includes('nombre') && !h.includes('completo')) columnMap.nombre = i;
-        if (h.includes('fecha') && h.includes('nacimiento')) columnMap.fechaNacimiento = i;
-        if (h.includes('fecha') && (h.includes('inicio') || h.includes('laboral'))) columnMap.fechaIngreso = i;
+        if (h.includes('fecha') && (h.includes('nacimiento') || h.includes('nac'))) columnMap.fechaNacimiento = i;
+        if (h.includes('fecha') && (h.includes('inicio') || h.includes('laboral') || h.includes('ingreso'))) columnMap.fechaIngreso = i;
         if (h.includes('nivel') || (h.includes('puesto') && h.includes('nivel'))) columnMap.nivel = i;
         if (h.includes('puesto') && !h.includes('nivel')) columnMap.cargo = i;
         if (h.includes('departamento') || h.includes('dependencia')) columnMap.area = i;
@@ -418,7 +418,7 @@ export const parsearArchivoUsuarios = async (file: File): Promise<{ usuarios: Im
           const genero = generoRaw ? normalizarGenero(generoRaw) : undefined;
           
           if (!fechaNacFormato) {
-            errores.push(`Fila ${i + 1}: No se pudo convertir fecha de nacimiento`);
+            errores.push(`Fila ${i + 1}: Fecha de nacimiento inválida o faltante (requerida para contraseña): "${fechaNac}"`);
             continue;
           }
           
