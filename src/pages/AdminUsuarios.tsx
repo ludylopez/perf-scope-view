@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { 
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -25,11 +25,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Plus, Edit, X, UserPlus, Users, Search, ChevronLeft, ChevronRight, Upload, FileSpreadsheet } from "lucide-react";
+import { ArrowLeft, Plus, Edit, X, UserPlus, Users, Search, ChevronLeft, ChevronRight, Upload, FileSpreadsheet, Layers } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@/types/auth";
 import { parsearArchivoUsuarios, importarUsuarios, ImportedUser } from "@/lib/importUsers";
+import { JobLevel } from "@/types/jobLevel";
+import { getActiveJobLevels } from "@/lib/jobLevels";
 
 const PAGE_SIZE = 50; // OPTIMIZACIÓN: Paginación para manejar 400 usuarios
 
@@ -37,6 +39,7 @@ const AdminUsuarios = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [usuarios, setUsuarios] = useState<User[]>([]);
+  const [jobLevels, setJobLevels] = useState<JobLevel[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -71,8 +74,19 @@ const AdminUsuarios = () => {
       navigate("/dashboard");
       return;
     }
+    loadJobLevels();
     loadUsuarios();
   }, [user, navigate]);
+
+  const loadJobLevels = async () => {
+    try {
+      const levels = await getActiveJobLevels();
+      setJobLevels(levels);
+    } catch (error) {
+      console.error("Error loading job levels:", error);
+      toast.error("Error al cargar niveles de puesto");
+    }
+  };
 
   const loadUsuarios = async (page: number = 0) => {
     try {
@@ -341,6 +355,10 @@ const AdminUsuarios = () => {
               className="pl-10"
             />
           </div>
+          <Button variant="outline" onClick={() => navigate("/admin/niveles")}>
+            <Layers className="mr-2 h-4 w-4" />
+            Niveles de Puesto
+          </Button>
           <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
             <DialogTrigger asChild>
               <Button>
@@ -446,25 +464,25 @@ const AdminUsuarios = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Nivel *</Label>
+                    <Label>Nivel de Puesto *</Label>
                     <Select
                       value={newUser.nivel}
                       onValueChange={(value) => setNewUser({ ...newUser, nivel: value })}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar nivel" />
+                        <SelectValue placeholder="Seleccionar nivel de puesto" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="A1">A1</SelectItem>
-                        <SelectItem value="A2">A2</SelectItem>
-                        <SelectItem value="S1">S1</SelectItem>
-                        <SelectItem value="S2">S2</SelectItem>
-                        <SelectItem value="E1">E1</SelectItem>
-                        <SelectItem value="E2">E2</SelectItem>
-                        <SelectItem value="O1">O1</SelectItem>
-                        <SelectItem value="O2">O2</SelectItem>
+                        {jobLevels.map((level) => (
+                          <SelectItem key={level.code} value={level.code}>
+                            {level.code} - {level.name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
+                    <p className="text-xs text-muted-foreground">
+                      El tipo de puesto se asignará automáticamente según el nivel
+                    </p>
                   </div>
                   <div className="space-y-2">
                     <Label>Cargo *</Label>
@@ -805,7 +823,7 @@ const AdminUsuarios = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Nivel</Label>
+                    <Label>Nivel de Puesto</Label>
                     <Select
                       value={editingUser.nivel}
                       onValueChange={(value) => setEditingUser({ ...editingUser, nivel: value })}
@@ -814,16 +832,16 @@ const AdminUsuarios = () => {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="A1">A1</SelectItem>
-                        <SelectItem value="A2">A2</SelectItem>
-                        <SelectItem value="S1">S1</SelectItem>
-                        <SelectItem value="S2">S2</SelectItem>
-                        <SelectItem value="E1">E1</SelectItem>
-                        <SelectItem value="E2">E2</SelectItem>
-                        <SelectItem value="O1">O1</SelectItem>
-                        <SelectItem value="O2">O2</SelectItem>
+                        {jobLevels.map((level) => (
+                          <SelectItem key={level.code} value={level.code}>
+                            {level.code} - {level.name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
+                    <p className="text-xs text-muted-foreground">
+                      El tipo de puesto se actualizará automáticamente
+                    </p>
                   </div>
                   <div className="space-y-2">
                     <Label>Cargo</Label>

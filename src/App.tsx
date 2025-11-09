@@ -15,6 +15,7 @@ import AdminAsignaciones from "./pages/AdminAsignaciones";
 import AdminGrupos from "./pages/AdminGrupos";
 import AdminPeriodos from "./pages/AdminPeriodos";
 import AdminUsuarios from "./pages/AdminUsuarios";
+import AdminNiveles from "./pages/AdminNiveles";
 import DashboardRRHH from "./pages/DashboardRRHH";
 import VistaPlanDesarrollo from "./pages/VistaPlanDesarrollo";
 import VistaResultadosFinales from "./pages/VistaResultadosFinales";
@@ -135,6 +136,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <AdminUsuarios />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/niveles"
+              element={
+                <ProtectedRoute>
+                  <AdminNiveles />
                 </ProtectedRoute>
               }
             />

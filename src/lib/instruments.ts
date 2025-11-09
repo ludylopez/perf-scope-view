@@ -74,18 +74,27 @@ export const registerInstrument = (instrument: Instrument, config?: InstrumentCa
 
 /**
  * Obtiene el ID del instrumento recomendado para un nivel
+ * Cada nivel de puesto tiene su propio instrumento diseñado a medida
  */
 export const getRecommendedInstrumentId = (nivel: string): string => {
-  // Mapeo de niveles a instrumentos (se puede extender)
+  // Mapeo de niveles a instrumentos (1:1)
   const nivelToInstrument: Record<string, string> = {
-    "A1": "A1",
-    "A2": "A2",
-    "S1": "S1",
-    "S2": "S2",
-    "E1": "E1",
-    "E2": "E2",
-    // Agregar más mapeos según sea necesario
+    "A1": "A1",   // ALCALDE MUNICIPAL
+    "A2": "A2",   // ASESORÍA PROFESIONAL
+    "S2": "S2",   // SECRETARIO
+    "D1": "D1",   // GERENTE - DIRECCIONES I
+    "D2": "D2",   // DIRECCIONES II
+    "E1": "E1",   // ENCARGADOS Y JEFES DE UNIDADES I
+    "E2": "E2",   // ENCARGADOS Y JEFES DE UNIDADES II
+    "A3": "A3",   // ADMINISTRATIVOS I
+    "A4": "A4",   // ADMINISTRATIVOS II
+    "OTE": "OTE", // OPERATIVOS - TÉCNICO ESPECIALIZADO
+    "O1": "O1",   // OPERATIVOS I
+    "O2": "O2",   // OPERATIVOS II
+    "OS": "OS",   // OTROS SERVICIOS
   };
-  
+
+  // Si el nivel existe, retornar el instrumento correspondiente
+  // Si no existe, usar A1 como fallback
   return nivelToInstrument[nivel] || "A1";
 };

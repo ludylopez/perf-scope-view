@@ -37,12 +37,21 @@ export const normalizarGenero = (genero: string): 'masculino' | 'femenino' | 'ot
   
   return null;
 };
+
+/**
+ * Infiere el tipo de puesto desde el código de nivel
+ * NOTA: Esta función se mantiene por compatibilidad pero ya no es necesaria
+ * ya que el trigger SQL sync_tipo_puesto_from_job_level lo hace automáticamente
+ * @deprecated Usar job_levels.category en su lugar
+ */
 export const inferTipoPuesto = (nivel: string): 'administrativo' | 'operativo' | null => {
   const nivelUpper = nivel.toUpperCase().trim();
-  if (['A1', 'A2', 'S1', 'S2'].includes(nivelUpper)) {
+  // Niveles administrativos
+  if (['A1', 'A2', 'A3', 'A4', 'S2', 'D1', 'D2', 'E1', 'E2'].includes(nivelUpper)) {
     return 'administrativo';
   }
-  if (['E1', 'E2', 'O1', 'O2'].includes(nivelUpper)) {
+  // Niveles operativos
+  if (['OTE', 'O1', 'O2', 'OS'].includes(nivelUpper)) {
     return 'operativo';
   }
   return null;
@@ -248,6 +257,8 @@ export const parsearArchivoUsuarios = async (file: File): Promise<{ usuarios: Im
           const { nombre, apellidos } = separarNombre(nombreCompleto);
           const fechaNacFormato = convertirFechaNacimiento(fechaNac);
           const fechaIngFormato = convertirFechaIngreso(fechaIng);
+          // NOTA: tipo_puesto se sincronizará automáticamente desde job_levels via trigger SQL
+          // Se mantiene inferTipoPuesto como fallback para compatibilidad
           const tipoPuesto = inferTipoPuesto(nivel);
           const genero = generoRaw ? normalizarGenero(generoRaw) : undefined;
           
@@ -335,6 +346,8 @@ export const parsearArchivoUsuarios = async (file: File): Promise<{ usuarios: Im
           const { nombre, apellidos } = separarNombre(nombreCompleto);
           const fechaNacFormato = convertirFechaNacimiento(fechaNac);
           const fechaIngFormato = convertirFechaIngreso(fechaIng);
+          // NOTA: tipo_puesto se sincronizará automáticamente desde job_levels via trigger SQL
+          // Se mantiene inferTipoPuesto como fallback para compatibilidad
           const tipoPuesto = inferTipoPuesto(nivel);
           const genero = generoRaw ? normalizarGenero(generoRaw) : undefined;
           
