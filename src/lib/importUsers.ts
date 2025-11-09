@@ -340,7 +340,7 @@ export const parsearArchivoUsuarios = async (file: File): Promise<{ usuarios: Im
         const partsTrimmed = parts.map(p => p.trim());
         
         try {
-          const dpi = partsTrimmed[columnMap.dpi]?.toString().trim();
+          const dpi = partsTrimmed[columnMap.dpi]?.toString().trim().replace(/\s+/g, '');
           const nombreCompleto = partsTrimmed[columnMap.nombre]?.trim() || '';
           const fechaNac = partsTrimmed[columnMap.fechaNacimiento]?.trim() || '';
           const fechaIng = partsTrimmed[columnMap.fechaIngreso]?.trim() || '';
@@ -433,7 +433,7 @@ export const parsearArchivoUsuarios = async (file: File): Promise<{ usuarios: Im
         if (!row || row.length === 0) continue;
         
         try {
-          const dpi = String(row[columnMap.dpi] || '').trim();
+          const dpi = String(row[columnMap.dpi] || '').trim().replace(/\s+/g, '');
           const nombreCompleto = String(row[columnMap.nombre] || '').trim();
           const fechaNac = row[columnMap.fechaNacimiento];
           const fechaIng = row[columnMap.fechaIngreso];
