@@ -117,10 +117,17 @@ export const ImportUsersDialog = ({ open, onOpenChange, onImportComplete }: Impo
   };
 
   const handleMappingChange = (field: string, excelColumn: string) => {
-    setColumnMappings(prev => ({
-      ...prev,
-      [field]: excelColumn
-    }));
+    setColumnMappings(prev => {
+      // Si selecciona "_none_", eliminar el mapping
+      if (excelColumn === "_none_") {
+        const { [field]: _, ...rest } = prev;
+        return rest;
+      }
+      return {
+        ...prev,
+        [field]: excelColumn
+      };
+    });
   };
 
   const validateMappings = (): boolean => {
@@ -322,14 +329,14 @@ export const ImportUsersDialog = ({ open, onOpenChange, onImportComplete }: Impo
               {fieldConfig.label} {fieldConfig.required && <span className="text-red-500">*</span>}
             </Label>
             <Select
-              value={columnMappings[fieldKey] || ''}
+              value={columnMappings[fieldKey] || "_none_"}
               onValueChange={(value) => handleMappingChange(fieldKey, value)}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Seleccionar columna" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">-- No mapear --</SelectItem>
+                <SelectItem value="_none_">-- No mapear --</SelectItem>
                 {excelHeaders.map(header => (
                   <SelectItem key={header} value={header}>
                     {header}
