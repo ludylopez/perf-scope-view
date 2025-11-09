@@ -61,13 +61,17 @@ export const inferTipoPuesto = (nivel: string): 'administrativo' | 'operativo' |
  * Extrae el código de nivel válido a partir de una cadena libre
  * Ejemplos válidos: OTE, OS, O1, O2, A1-A4, S2, D1-D2, E1-E2
  */
+export const VALID_JOB_LEVELS = new Set([
+  'OTE','OS','O1','O2','A1','A2','A3','A4','S2','D1','D2','E1','E2'
+]);
+
 export const extraerCodigoNivel = (valor: string): string => {
   const v = (valor || '').toUpperCase().trim();
   const match = v.match(/\b(OTE|OS|O[12]|A[1-4]|S2|D[12]|E[12])\b/);
-  if (match) return match[1];
-  // fallback: quitar espacios y símbolos, y cortar a 10 máx
-  return v.replace(/[^A-Z0-9]/g, '').slice(0, 10);
+  return match ? match[1] : '';
 };
+
+export const isNivelValido = (code: string): boolean => VALID_JOB_LEVELS.has(code);
 
 /**
  * Convierte fecha de varios formatos a DDMMAAAA para fecha_nacimiento
@@ -281,9 +285,9 @@ export const parsearArchivoUsuarios = async (file: File): Promise<{ usuarios: Im
             errores.push(`Línea ${i + 1}: Nombre faltante`);
             continue;
           }
-          
-          if (!fechaNac) {
-            errores.push(`Línea ${i + 1}: Fecha de nacimiento faltante`);
+
+          if (!nivel || !isNivelValido(nivel)) {
+            errores.push(`Línea ${i + 1}: Nivel de puesto inválido: "${partsTrimmed[columnMap.nivel] || ''}"`);
             continue;
           }
           
@@ -365,14 +369,14 @@ export const parsearArchivoUsuarios = async (file: File): Promise<{ usuarios: Im
             errores.push(`Fila ${i + 1}: DPI inválido o faltante`);
             continue;
           }
-          
-          if (!nombreCompleto) {
-            errores.push(`Fila ${i + 1}: Nombre faltante`);
+
+          if (!isNivelValido(nivel)) {
+            errores.push(`Fila ${i + 1}: Nivel de puesto inválido: "${row[columnMap.nivel] || ''}"`);
             continue;
           }
           
-          if (!fechaNac) {
-            errores.push(`Fila ${i + 1}: Fecha de nacimiento faltante`);
+          if (!nombreCompleto) {
+            errores.push(`Fila ${i + 1}: Nombre faltante`);
             continue;
           }
           
