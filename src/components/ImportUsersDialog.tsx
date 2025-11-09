@@ -193,21 +193,26 @@ export const ImportUsersDialog = ({ open, onOpenChange, onImportComplete }: Impo
           const nombre = partes[0] || '';
           const apellidos = partes.slice(1).join(' ') || '';
 
-          // Procesar fechas (simplificado para preview)
-          const fechaNacimiento = row[fechaNacCol] || '';
-          const fechaIngreso = fechaIngCol >= 0 ? row[fechaIngCol] : '';
-          const generoRaw = generoCol >= 0 ? String(row[generoCol] || '') : '';
-          const generoNormalizado = generoRaw ? normalizarGenero(generoRaw) : undefined;
+// Procesar fechas para preview usando utilidades
+const fechaNacRaw = row[fechaNacCol];
+const fechaNacimientoConv = convertirFechaNacimiento(fechaNacRaw as any);
+if (!fechaNacimientoConv) {
+  errors.push(`Fila ${index + 2}: Fecha de nacimiento inválida (use formato como 2/10/1986)`);
+  return;
+}
+const fechaIngresoConv = fechaIngCol >= 0 ? (convertirFechaIngreso(row[fechaIngCol] as any) || '') : '';
+const generoRaw = generoCol >= 0 ? String(row[generoCol] || '') : '';
+const generoNormalizado = generoRaw ? normalizarGenero(generoRaw) : undefined;
 
-          previewUsers.push({
-            dpi,
-            nombre,
-            apellidos,
-            fechaNacimiento: String(fechaNacimiento),
-            fechaIngreso: String(fechaIngreso),
-            nivel: nivelCode,
-            cargo,
-            area,
+previewUsers.push({
+  dpi,
+  nombre,
+  apellidos,
+  fechaNacimiento: String(fechaNacimientoConv),
+  fechaIngreso: String(fechaIngresoConv),
+  nivel: nivelCode,
+  cargo,
+  area,
             genero: generoNormalizado || undefined,
           });
         } catch (error: any) {
