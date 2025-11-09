@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Upload, FileSpreadsheet, CheckCircle, AlertCircle, Info } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from 'xlsx';
-import { parsearArchivoUsuarios, importarUsuarios, ImportedUser, normalizarGenero, extraerCodigoNivel, isNivelValido } from "@/lib/importUsers";
+import { parsearArchivoUsuarios, importarUsuarios, ImportedUser, normalizarGenero, extraerCodigoNivel, isNivelValido, convertirFechaNacimiento, convertirFechaIngreso } from "@/lib/importUsers";
 
 type ImportStep = 'upload' | 'mapping' | 'preview' | 'importing' | 'results';
 
@@ -227,16 +227,95 @@ export const ImportUsersDialog = ({ open, onOpenChange, onImportComplete }: Impo
   const handleImport = async () => {
     if (!file) return;
 
+    // Validar mapeo antes de importar todo el archivo
+    if (!validateMappings()) {
+      toast.error('Por favor mapea todos los campos requeridos');
+      return;
+    }
+
     setStep('importing');
     setImportProgress(0);
 
     try {
-      // Parsear el archivo completo
-      const { usuarios, errores } = await parsearArchivoUsuarios(file);
+      const usuarios: ImportedUser[] = [];
+      const errores: Array<{ usuario: ImportedUser; error: string }> = [];
+
+      // Construir índices según mapeo del usuario
+      const dpiCol = excelHeaders.indexOf(columnMappings.dpi || '');
+      const nombreCol = excelHeaders.indexOf(columnMappings.nombre || '');
+      const fechaNacCol = excelHeaders.indexOf(columnMappings.fechaNacimiento || '');
+      const fechaIngCol = columnMappings.fechaIngreso ? excelHeaders.indexOf(columnMappings.fechaIngreso) : -1;
+      const nivelCol = excelHeaders.indexOf(columnMappings.nivel || '');
+      const cargoCol = excelHeaders.indexOf(columnMappings.cargo || '');
+      const areaCol = excelHeaders.indexOf(columnMappings.area || '');
+      const generoCol = columnMappings.genero ? excelHeaders.indexOf(columnMappings.genero) : -1;
+
+      // Procesar todas las filas
+      excelData.forEach((row, index) => {
+        try {
+          const dpi = String(row[dpiCol] || '').trim().replace(/\D+/g, '');
+          const nombreCompleto = String(row[nombreCol] || '').trim();
+          const rawNivel = String(row[nivelCol] || '').trim();
+          const nivelCode = extraerCodigoNivel(rawNivel);
+          const cargo = String(row[cargoCol] || '').trim();
+          const area = String(row[areaCol] || '').trim();
+          const fechaNacRaw = row[fechaNacCol];
+          const fechaIngRaw = fechaIngCol >= 0 ? row[fechaIngCol] : null;
+
+          if (!dpi || !nombreCompleto || !cargo || !area) {
+            throw new Error('Faltan datos requeridos (DPI, nombre, cargo, área)');
+          }
+          if (!nivelCode || !isNivelValido(nivelCode)) {
+            throw new Error(`Nivel de puesto inválido: "${rawNivel}"`);
+          }
+
+          // Separar nombre y apellidos
+          const partes = nombreCompleto.split(/\s+/);
+          const nombre = partes[0] || '';
+          const apellidos = partes.slice(1).join(' ') || '';
+
+          // Convertir fechas usando utilidades oficiales
+          const fechaNacimiento = convertirFechaNacimiento(fechaNacRaw as any);
+          if (!fechaNacimiento) {
+            throw new Error(`Fecha de nacimiento inválida o faltante (requerida para contraseña): "${fechaNacRaw ?? ''}"`);
+          }
+          const fechaIngreso = fechaIngRaw ? (convertirFechaIngreso(fechaIngRaw as any) || '') : '';
+
+          const generoRaw = generoCol >= 0 ? String(row[generoCol] || '') : '';
+          const generoNormalizado = generoRaw ? normalizarGenero(generoRaw) : undefined;
+
+          usuarios.push({
+            dpi,
+            nombre,
+            apellidos,
+            fechaNacimiento,
+            fechaIngreso,
+            nivel: nivelCode,
+            cargo,
+            area,
+            genero: generoNormalizado || undefined,
+          });
+        } catch (err: any) {
+          // Registrar error por fila (index+2 porque 1 es header)
+          errores.push({
+            usuario: {
+              dpi: String(row[dpiCol] || ''),
+              nombre: '',
+              apellidos: '',
+              fechaNacimiento: '',
+              fechaIngreso: '',
+              nivel: '',
+              cargo: '',
+              area: '',
+            },
+            error: `Fila ${index + 2}: ${err.message || 'Error al procesar'}`,
+          });
+        }
+      });
 
       if (usuarios.length === 0) {
         toast.error('No se pudieron procesar usuarios del archivo');
-        setValidationErrors(errores);
+        setValidationErrors(errores.map(e => e.error));
         setStep('preview');
         return;
       }
@@ -244,25 +323,17 @@ export const ImportUsersDialog = ({ open, onOpenChange, onImportComplete }: Impo
       // Importar en lotes con progreso
       const BATCH_SIZE = 50;
       let totalImportados = 0;
-      const allErrors: Array<{ usuario: ImportedUser; error: string }> = [];
+      const allErrors: Array<{ usuario: ImportedUser; error: string }> = [...errores];
 
       for (let i = 0; i < usuarios.length; i += BATCH_SIZE) {
         const batch = usuarios.slice(i, i + BATCH_SIZE);
-
         const { exitosos, errores: batchErrors } = await importarUsuarios(batch);
-
         totalImportados += exitosos;
         allErrors.push(...batchErrors);
-
-        // Actualizar progreso
-        const progress = Math.round(((i + batch.length) / usuarios.length) * 100);
-        setImportProgress(progress);
+        setImportProgress(Math.round(((i + batch.length) / usuarios.length) * 100));
       }
 
-      setImportResults({
-        exitosos: totalImportados,
-        errores: allErrors
-      });
+      setImportResults({ exitosos: totalImportados, errores: allErrors });
       setStep('results');
 
       if (allErrors.length === 0) {
