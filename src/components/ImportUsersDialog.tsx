@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Upload, FileSpreadsheet, CheckCircle, AlertCircle, Info } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from 'xlsx';
-import { parsearArchivoUsuarios, importarUsuarios, ImportedUser, normalizarGenero } from "@/lib/importUsers";
+import { parsearArchivoUsuarios, importarUsuarios, ImportedUser, normalizarGenero, extraerCodigoNivel, isNivelValido } from "@/lib/importUsers";
 
 type ImportStep = 'upload' | 'mapping' | 'preview' | 'importing' | 'results';
 
@@ -169,12 +169,17 @@ export const ImportUsersDialog = ({ open, onOpenChange, onImportComplete }: Impo
 
           const dpi = String(row[dpiCol] || '').trim().replace(/\D+/g, ''); // Solo dígitos
           const nombreCompleto = String(row[nombreCol] || '').trim();
-          const nivel = String(row[nivelCol] || '').trim().toUpperCase();
+          const rawNivel = String(row[nivelCol] || '').trim();
+          const nivelCode = extraerCodigoNivel(rawNivel);
           const cargo = String(row[cargoCol] || '').trim();
           const area = String(row[areaCol] || '').trim();
 
-          if (!dpi || !nombreCompleto || !nivel || !cargo || !area) {
+          if (!dpi || !nombreCompleto || !cargo || !area) {
             errors.push(`Fila ${index + 2}: Faltan datos requeridos`);
+            return;
+          }
+          if (!nivelCode || !isNivelValido(nivelCode)) {
+            errors.push(`Fila ${index + 2}: Nivel de puesto inválido: "${rawNivel}"`);
             return;
           }
 
@@ -195,7 +200,7 @@ export const ImportUsersDialog = ({ open, onOpenChange, onImportComplete }: Impo
             apellidos,
             fechaNacimiento: String(fechaNacimiento),
             fechaIngreso: String(fechaIngreso),
-            nivel,
+            nivel: nivelCode,
             cargo,
             area,
             genero: generoNormalizado || undefined,

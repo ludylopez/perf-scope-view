@@ -59,16 +59,45 @@ export const inferTipoPuesto = (nivel: string): 'administrativo' | 'operativo' |
 
 /**
  * Extrae el código de nivel válido a partir de una cadena libre
- * Ejemplos válidos: OTE, OS, O1, O2, A1-A4, S2, D1-D2, E1-E2
+ * Acepta tanto códigos (O2) como nombres ("OPERATIVOS II") del catálogo
  */
 export const VALID_JOB_LEVELS = new Set([
   'OTE','OS','O1','O2','A1','A2','A3','A4','S2','D1','D2','E1','E2'
 ]);
 
+const normalize = (s: string) =>
+  (s || '')
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .replace(/[^A-Z0-9 ]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const NAME_TO_CODE = new Map<string, string>([
+  ['ALCALDE MUNICIPAL', 'A1'],
+  ['ASESORIA PROFESIONAL', 'A2'],
+  ['ADMINISTRATIVOS I', 'A3'],
+  ['ADMINISTRATIVOS II', 'A4'],
+  ['SECRETARIO', 'S2'],
+  ['GERENTE DIRECCIONES I', 'D1'],
+  ['DIRECCIONES I', 'D1'],
+  ['DIRECCIONES II', 'D2'],
+  ['ENCARGADOS Y JEFES DE UNIDADES I', 'E1'],
+  ['ENCARGADOS Y JEFES DE UNIDADES II', 'E2'],
+  ['OPERATIVOS TECNICO ESPECIALIZADO', 'OTE'],
+  ['OPERATIVOS - TECNICO ESPECIALIZADO', 'OTE'],
+  ['OPERATIVOS I', 'O1'],
+  ['OPERATIVOS II', 'O2'],
+  ['OTROS SERVICIOS', 'OS'],
+].map(([k, v]) => [normalize(k), v]));
+
 export const extraerCodigoNivel = (valor: string): string => {
   const v = (valor || '').toUpperCase().trim();
   const match = v.match(/\b(OTE|OS|O[12]|A[1-4]|S2|D[12]|E[12])\b/);
-  return match ? match[1] : '';
+  if (match) return match[1];
+  const byName = NAME_TO_CODE.get(normalize(valor));
+  return byName || '';
 };
 
 export const isNivelValido = (code: string): boolean => VALID_JOB_LEVELS.has(code);
