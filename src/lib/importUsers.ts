@@ -58,163 +58,74 @@ export const inferTipoPuesto = (nivel: string): 'administrativo' | 'operativo' |
 };
 
 /**
- * Extrae el código de nivel válido a partir de una cadena libre
- * Acepta tanto códigos (O2) como nombres ("OPERATIVOS II") del catálogo
- */
-export const VALID_JOB_LEVELS = new Set([
-  'OTE','OS','O1','O2','A1','A2','A3','A4','S2','D1','D2','E1','E2'
-]);
-
-const normalize = (s: string) =>
-  (s || '')
-    .toUpperCase()
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
-    .replace(/[^A-Z0-9 ]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-const NAME_TO_CODE = new Map<string, string>([
-  ['ALCALDE MUNICIPAL', 'A1'],
-  ['ASESORIA PROFESIONAL', 'A2'],
-  ['ADMINISTRATIVOS I', 'A3'],
-  ['ADMINISTRATIVOS II', 'A4'],
-  ['SECRETARIO', 'S2'],
-  ['GERENTE DIRECCIONES I', 'D1'],
-  ['DIRECCIONES I', 'D1'],
-  ['DIRECCIONES II', 'D2'],
-  ['ENCARGADOS Y JEFES DE UNIDADES I', 'E1'],
-  ['ENCARGADOS Y JEFES DE UNIDADES II', 'E2'],
-  ['OPERATIVOS TECNICO ESPECIALIZADO', 'OTE'],
-  ['OPERATIVOS - TECNICO ESPECIALIZADO', 'OTE'],
-  ['OPERATIVOS I', 'O1'],
-  ['OPERATIVOS II', 'O2'],
-  ['OTROS SERVICIOS', 'OS'],
-].map(([k, v]) => [normalize(k), v]));
-
-export const extraerCodigoNivel = (valor: string): string => {
-  const v = (valor || '').toUpperCase().trim();
-  const match = v.match(/\b(OTE|OS|O[12]|A[1-4]|S2|D[12]|E[12])\b/);
-  if (match) return match[1];
-  const byName = NAME_TO_CODE.get(normalize(valor));
-  return byName || '';
-};
-
-export const isNivelValido = (code: string): boolean => VALID_JOB_LEVELS.has(code);
-
-/**
  * Convierte fecha de varios formatos a DDMMAAAA para fecha_nacimiento
  */
 export const convertirFechaNacimiento = (fecha: string | number | Date): string => {
   try {
-    // 1) Excel serial date
-    if (typeof fecha === 'number' && !Number.isNaN(fecha)) {
-      const excelDate = XLSX.SSF.parse_date_code(fecha);
-      const d = new Date(excelDate.y, excelDate.m - 1, excelDate.d);
-      const dd = String(d.getDate()).padStart(2, '0');
-      const mm = String(d.getMonth() + 1).padStart(2, '0');
-      const yyyy = String(d.getFullYear());
-      return `${dd}${mm}${yyyy}`;
-    }
+    let date: Date;
 
-    // 2) String parsing robusto (acepta 2/10/1986, 02-10-1986, 1986/10/02, 2.10.86, etc.)
-    if (typeof fecha === 'string') {
-      const raw = fecha.trim();
-      if (!raw) return '';
+    if (typeof fecha === 'number') {
+      // Excel serial date
+      date = XLSX.SSF.parse_date_code(fecha);
+    } else if (typeof fecha === 'string') {
+      const fechaStr = fecha.trim();
 
-      // Ya viene como DDMMAAAA (solo dígitos y longitud 8)
-      const onlyDigits = raw.replace(/\D+/g, '');
-      if (/^\d{8}$/.test(onlyDigits)) {
-        return onlyDigits; // Asumimos DDMMAAAA
+      // Si ya está en formato DDMMAAAA
+      if (/^\d{8}$/.test(fechaStr)) {
+        return fechaStr;
       }
 
-      // Extraer tokens numéricos y reconstruir
-      const tokens = raw.match(/\d+/g) || [];
-      if (tokens.length >= 3) {
-        let day: number;
-        let month: number;
-        let year: number;
+      // Intentar parsear manualmente con split
+      const parts = fechaStr.split(/[\/\-]/);
+      if (parts.length === 3) {
+        const [part1, part2, part3] = parts;
 
-        // Heurística: si el primer token tiene 4 dígitos, es YYYY-MM-DD
-        if (tokens[0].length === 4) {
-          year = parseInt(tokens[0], 10);
-          month = parseInt(tokens[1], 10);
-          day = parseInt(tokens[2], 10);
-        }
-        // Si el tercer token tiene 4 dígitos, es DD/MM/YYYY o M/D/YYYY
-        else if (tokens[2].length === 4) {
-          day = parseInt(tokens[0], 10);
-          month = parseInt(tokens[1], 10);
-          year = parseInt(tokens[2], 10);
+        // Detectar formato basándose en la longitud de las partes
+        if (part3.length === 4) {
+          // Formato DD/MM/YYYY o D/M/YYYY
+          const day = parseInt(part1);
+          const month = parseInt(part2);
+          const year = parseInt(part3);
+
+          if (day >= 1 && day <= 31 && month >= 1 && month <= 12 && year >= 1900) {
+            date = new Date(year, month - 1, day);
+          } else {
+            throw new Error('Fecha fuera de rango');
+          }
+        } else if (part1.length === 4) {
+          // Formato YYYY-MM-DD o YYYY/MM/DD
+          const year = parseInt(part1);
+          const month = parseInt(part2);
+          const day = parseInt(part3);
+
+          if (day >= 1 && day <= 31 && month >= 1 && month <= 12 && year >= 1900) {
+            date = new Date(year, month - 1, day);
+          } else {
+            throw new Error('Fecha fuera de rango');
+          }
         } else {
-          // Año de 2 dígitos: inferir siglo (<= 49 => 2000+, >49 => 1900+)
-          const yy = parseInt(tokens[2], 10);
-          year = yy + (yy <= 49 ? 2000 : 1900);
-          day = parseInt(tokens[0], 10);
-          month = parseInt(tokens[1], 10);
+          // Intentar con new Date() como fallback
+          date = new Date(fechaStr);
         }
-
-        const d = new Date(year, month - 1, day);
-        if (!isNaN(d.getTime())) {
-          const dd = String(d.getDate()).padStart(2, '0');
-          const mm = String(d.getMonth() + 1).padStart(2, '0');
-          const yyyy = String(d.getFullYear());
-          return `${dd}${mm}${yyyy}`;
-        }
+      } else {
+        // Intentar con new Date() como fallback
+        date = new Date(fechaStr);
       }
-
-      // Formatos comunes explícitos como fallback
-      // DD/MM/YYYY
-      if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(raw)) {
-        const [d, m, y] = raw.split('/').map(v => parseInt(v, 10));
-        const date = new Date(y, m - 1, d);
-        const dd = String(date.getDate()).padStart(2, '0');
-        const mm = String(date.getMonth() + 1).padStart(2, '0');
-        const yyyy = String(date.getFullYear());
-        return `${dd}${mm}${yyyy}`;
-      }
-      // YYYY-MM-DD
-      if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(raw)) {
-        const [y, m, d] = raw.split('-').map(v => parseInt(v, 10));
-        const date = new Date(y, m - 1, d);
-        const dd = String(date.getDate()).padStart(2, '0');
-        const mm = String(date.getMonth() + 1).padStart(2, '0');
-        const yyyy = String(date.getFullYear());
-        return `${dd}${mm}${yyyy}`;
-      }
-      // DD-MM-YYYY
-      if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(raw)) {
-        const [d, m, y] = raw.split('-').map(v => parseInt(v, 10));
-        const date = new Date(y, m - 1, d);
-        const dd = String(date.getDate()).padStart(2, '0');
-        const mm = String(date.getMonth() + 1).padStart(2, '0');
-        const yyyy = String(date.getFullYear());
-        return `${dd}${mm}${yyyy}`;
-      }
-
-      // Fallback: confiar en Date
-      const fallback = new Date(raw);
-      if (!isNaN(fallback.getTime())) {
-        const dd = String(fallback.getDate()).padStart(2, '0');
-        const mm = String(fallback.getMonth() + 1).padStart(2, '0');
-        const yyyy = String(fallback.getFullYear());
-        return `${dd}${mm}${yyyy}`;
-      }
-
-      return '';
+    } else {
+      date = fecha;
     }
 
-    // 3) Fecha ya como Date
-    if (fecha instanceof Date) {
-      const dd = String(fecha.getDate()).padStart(2, '0');
-      const mm = String(fecha.getMonth() + 1).padStart(2, '0');
-      const yyyy = String(fecha.getFullYear());
-      return `${dd}${mm}${yyyy}`;
+    if (isNaN(date.getTime())) {
+      throw new Error('Fecha inválida');
     }
 
-    return '';
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = String(date.getFullYear());
+
+    return `${day}${month}${year}`;
   } catch (error) {
-    console.error('Error convirtiendo fecha nacimiento:', fecha, error);
+    console.error('Error convirtiendo fecha:', fecha, error);
     return '';
   }
 };
@@ -225,53 +136,65 @@ export const convertirFechaNacimiento = (fecha: string | number | Date): string 
 export const convertirFechaIngreso = (fecha: string | number | Date): string | null => {
   try {
     if (!fecha) return null;
-    
+
     let date: Date;
-    
+
     if (typeof fecha === 'number') {
-      const excelDate = XLSX.SSF.parse_date_code(fecha);
-      date = new Date(excelDate.y, excelDate.m - 1, excelDate.d);
+      date = XLSX.SSF.parse_date_code(fecha);
     } else if (typeof fecha === 'string') {
       const fechaStr = fecha.trim();
-      let parsed = false;
-      
-      // DD/MM/YYYY
-      if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(fechaStr)) {
-        const parts = fechaStr.split('/');
-        date = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
-        parsed = true;
-      }
-      // YYYY-MM-DD
-      else if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(fechaStr)) {
-        const parts = fechaStr.split('-');
-        date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-        parsed = true;
-      }
-      // DD-MM-YYYY
-      else if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(fechaStr)) {
-        const parts = fechaStr.split('-');
-        date = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
-        parsed = true;
-      }
-      
-      if (!parsed) {
+
+      // Intentar parsear manualmente con split
+      const parts = fechaStr.split(/[\/\-]/);
+      if (parts.length === 3) {
+        const [part1, part2, part3] = parts;
+
+        // Detectar formato basándose en la longitud de las partes
+        if (part3.length === 4) {
+          // Formato DD/MM/YYYY o D/M/YYYY
+          const day = parseInt(part1);
+          const month = parseInt(part2);
+          const year = parseInt(part3);
+
+          if (day >= 1 && day <= 31 && month >= 1 && month <= 12 && year >= 1900) {
+            date = new Date(year, month - 1, day);
+          } else {
+            throw new Error('Fecha fuera de rango');
+          }
+        } else if (part1.length === 4) {
+          // Formato YYYY-MM-DD o YYYY/MM/DD
+          const year = parseInt(part1);
+          const month = parseInt(part2);
+          const day = parseInt(part3);
+
+          if (day >= 1 && day <= 31 && month >= 1 && month <= 12 && year >= 1900) {
+            date = new Date(year, month - 1, day);
+          } else {
+            throw new Error('Fecha fuera de rango');
+          }
+        } else {
+          // Intentar con new Date() como fallback
+          date = new Date(fechaStr);
+        }
+      } else {
+        // Intentar con new Date() como fallback
         date = new Date(fechaStr);
       }
     } else {
       date = fecha;
     }
-    
+
     if (isNaN(date.getTime())) {
       return null;
     }
-    
+
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
-    
+
     return `${year}-${month}-${day}`;
   } catch (error) {
-    console.error('Error convirtiendo fecha ingreso:', fecha, error);
+    console.error('Error convirtiendo fecha de ingreso:', fecha, error);
     return null;
   }
 };
@@ -332,8 +255,8 @@ export const parsearArchivoUsuarios = async (file: File): Promise<{ usuarios: Im
         const headerLower = h.toLowerCase();
         if (headerLower.includes('dpi')) columnMap.dpi = i;
         if (headerLower.includes('nombre') && !headerLower.includes('completo')) columnMap.nombre = i;
-        if (headerLower.includes('fecha') && (headerLower.includes('nacimiento') || headerLower.includes('nac'))) columnMap.fechaNacimiento = i;
-        if (headerLower.includes('fecha') && (headerLower.includes('inicio') || headerLower.includes('laboral') || headerLower.includes('ingreso'))) columnMap.fechaIngreso = i;
+        if (headerLower.includes('fecha') && headerLower.includes('nacimiento')) columnMap.fechaNacimiento = i;
+        if (headerLower.includes('fecha') && (headerLower.includes('inicio') || headerLower.includes('laboral'))) columnMap.fechaIngreso = i;
         if (headerLower.includes('nivel') || headerLower.includes('puesto')) columnMap.nivel = i;
         if (headerLower.includes('puesto') && !headerLower.includes('nivel')) columnMap.cargo = i;
         if (headerLower.includes('departamento') || headerLower.includes('dependencia')) columnMap.area = i;
@@ -350,11 +273,11 @@ export const parsearArchivoUsuarios = async (file: File): Promise<{ usuarios: Im
         const partsTrimmed = parts.map(p => p.trim());
         
         try {
-          const dpi = partsTrimmed[columnMap.dpi]?.toString().trim().replace(/\D+/g, ''); // Solo dígitos
+          const dpi = partsTrimmed[columnMap.dpi]?.toString().trim();
           const nombreCompleto = partsTrimmed[columnMap.nombre]?.trim() || '';
           const fechaNac = partsTrimmed[columnMap.fechaNacimiento]?.trim() || '';
           const fechaIng = partsTrimmed[columnMap.fechaIngreso]?.trim() || '';
-          const nivel = extraerCodigoNivel(partsTrimmed[columnMap.nivel]?.trim() || '');
+          const nivel = partsTrimmed[columnMap.nivel]?.trim().toUpperCase() || '';
           const cargo = partsTrimmed[columnMap.cargo]?.trim() || '';
           const area = partsTrimmed[columnMap.area]?.trim() || partsTrimmed[columnMap.direccion]?.trim() || '';
           const generoRaw = partsTrimmed[columnMap.genero]?.trim() || '';
@@ -368,9 +291,9 @@ export const parsearArchivoUsuarios = async (file: File): Promise<{ usuarios: Im
             errores.push(`Línea ${i + 1}: Nombre faltante`);
             continue;
           }
-
-          if (!nivel || !isNivelValido(nivel)) {
-            errores.push(`Línea ${i + 1}: Nivel de puesto inválido: "${partsTrimmed[columnMap.nivel] || ''}"`);
+          
+          if (!fechaNac) {
+            errores.push(`Línea ${i + 1}: Fecha de nacimiento faltante`);
             continue;
           }
           
@@ -383,7 +306,7 @@ export const parsearArchivoUsuarios = async (file: File): Promise<{ usuarios: Im
           const genero = generoRaw ? normalizarGenero(generoRaw) : undefined;
           
           if (!fechaNacFormato) {
-            errores.push(`Línea ${i + 1}: Fecha de nacimiento inválida o faltante (requerida para contraseña): "${fechaNac}"`);
+            errores.push(`Línea ${i + 1}: No se pudo convertir fecha de nacimiento: ${fechaNac}`);
             continue;
           }
           
@@ -424,8 +347,8 @@ export const parsearArchivoUsuarios = async (file: File): Promise<{ usuarios: Im
       headerLower.forEach((h: string, i: number) => {
         if (h.includes('dpi')) columnMap.dpi = i;
         if (h.includes('nombre') && !h.includes('completo')) columnMap.nombre = i;
-        if (h.includes('fecha') && (h.includes('nacimiento') || h.includes('nac'))) columnMap.fechaNacimiento = i;
-        if (h.includes('fecha') && (h.includes('inicio') || h.includes('laboral') || h.includes('ingreso'))) columnMap.fechaIngreso = i;
+        if (h.includes('fecha') && h.includes('nacimiento')) columnMap.fechaNacimiento = i;
+        if (h.includes('fecha') && (h.includes('inicio') || h.includes('laboral'))) columnMap.fechaIngreso = i;
         if (h.includes('nivel') || (h.includes('puesto') && h.includes('nivel'))) columnMap.nivel = i;
         if (h.includes('puesto') && !h.includes('nivel')) columnMap.cargo = i;
         if (h.includes('departamento') || h.includes('dependencia')) columnMap.area = i;
@@ -439,11 +362,11 @@ export const parsearArchivoUsuarios = async (file: File): Promise<{ usuarios: Im
         if (!row || row.length === 0) continue;
         
         try {
-          const dpi = String(row[columnMap.dpi] || '').trim().replace(/\D+/g, ''); // Solo dígitos
+          const dpi = String(row[columnMap.dpi] || '').trim();
           const nombreCompleto = String(row[columnMap.nombre] || '').trim();
           const fechaNac = row[columnMap.fechaNacimiento];
           const fechaIng = row[columnMap.fechaIngreso];
-          const nivel = extraerCodigoNivel(String(row[columnMap.nivel] || '').trim());
+          const nivel = String(row[columnMap.nivel] || '').trim().toUpperCase();
           const cargo = String(row[columnMap.cargo] || '').trim();
           const area = String(row[columnMap.area] || row[columnMap.direccion] || '').trim();
           const generoRaw = String(row[columnMap.genero] || '').trim();
@@ -452,14 +375,14 @@ export const parsearArchivoUsuarios = async (file: File): Promise<{ usuarios: Im
             errores.push(`Fila ${i + 1}: DPI inválido o faltante`);
             continue;
           }
-
-          if (!isNivelValido(nivel)) {
-            errores.push(`Fila ${i + 1}: Nivel de puesto inválido: "${row[columnMap.nivel] || ''}"`);
-            continue;
-          }
           
           if (!nombreCompleto) {
             errores.push(`Fila ${i + 1}: Nombre faltante`);
+            continue;
+          }
+          
+          if (!fechaNac) {
+            errores.push(`Fila ${i + 1}: Fecha de nacimiento faltante`);
             continue;
           }
           
@@ -472,7 +395,7 @@ export const parsearArchivoUsuarios = async (file: File): Promise<{ usuarios: Im
           const genero = generoRaw ? normalizarGenero(generoRaw) : undefined;
           
           if (!fechaNacFormato) {
-            errores.push(`Fila ${i + 1}: Fecha de nacimiento inválida o faltante (requerida para contraseña): "${fechaNac}"`);
+            errores.push(`Fila ${i + 1}: No se pudo convertir fecha de nacimiento`);
             continue;
           }
           

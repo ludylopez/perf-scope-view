@@ -10,7 +10,16 @@ import { Badge } from "@/components/ui/badge";
 import { Upload, FileSpreadsheet, CheckCircle, AlertCircle, Info } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from 'xlsx';
-import { parsearArchivoUsuarios, importarUsuarios, ImportedUser, normalizarGenero, extraerCodigoNivel, isNivelValido, convertirFechaNacimiento, convertirFechaIngreso } from "@/lib/importUsers";
+import {
+  parsearArchivoUsuarios,
+  importarUsuarios,
+  ImportedUser,
+  convertirFechaNacimiento,
+  convertirFechaIngreso,
+  separarNombre,
+  normalizarGenero,
+  inferTipoPuesto
+} from "@/lib/importUsers";
 
 type ImportStep = 'upload' | 'mapping' | 'preview' | 'importing' | 'results';
 
@@ -117,17 +126,10 @@ export const ImportUsersDialog = ({ open, onOpenChange, onImportComplete }: Impo
   };
 
   const handleMappingChange = (field: string, excelColumn: string) => {
-    setColumnMappings(prev => {
-      // Si selecciona "_none_", eliminar el mapping
-      if (excelColumn === "_none_") {
-        const { [field]: _, ...rest } = prev;
-        return rest;
-      }
-      return {
-        ...prev,
-        [field]: excelColumn
-      };
-    });
+    setColumnMappings(prev => ({
+      ...prev,
+      [field]: excelColumn
+    }));
   };
 
   const validateMappings = (): boolean => {
@@ -167,53 +169,50 @@ export const ImportUsersDialog = ({ open, onOpenChange, onImportComplete }: Impo
           const areaCol = excelHeaders.indexOf(columnMappings.area || '');
           const generoCol = columnMappings.genero ? excelHeaders.indexOf(columnMappings.genero) : -1;
 
-          const dpi = String(row[dpiCol] || '').trim().replace(/\D+/g, ''); // Solo dígitos
+          const dpi = String(row[dpiCol] || '').trim().replace(/\s+/g, '');
           const nombreCompleto = String(row[nombreCol] || '').trim();
-          const rawNivel = String(row[nivelCol] || '').trim();
-          const nivelCode = extraerCodigoNivel(rawNivel);
+          const nivel = String(row[nivelCol] || '').trim().toUpperCase();
           const cargo = String(row[cargoCol] || '').trim();
           const area = String(row[areaCol] || '').trim();
           const fechaNac = row[fechaNacCol];
+          const fechaIng = fechaIngCol >= 0 ? row[fechaIngCol] : '';
+          const generoRaw = generoCol >= 0 ? row[generoCol] : '';
 
-          if (!dpi || !nombreCompleto || !cargo || !area) {
-            errors.push(`Fila ${index + 2}: Faltan datos requeridos (DPI, nombre, cargo, área)`);
+          if (!dpi || !nombreCompleto || !nivel || !cargo || !area) {
+            errors.push(`Fila ${index + 2}: Faltan datos requeridos`);
             return;
           }
+
           if (!fechaNac) {
-            errors.push(`Fila ${index + 2}: Falta fecha de nacimiento (requerida para contraseña)`);
-            return;
-          }
-          if (!nivelCode || !isNivelValido(nivelCode)) {
-            errors.push(`Fila ${index + 2}: Nivel de puesto inválido: "${rawNivel}"`);
+            errors.push(`Fila ${index + 2}: Fecha de nacimiento faltante`);
             return;
           }
 
-          // Separar nombre y apellidos
-          const partes = nombreCompleto.split(/\s+/);
-          const nombre = partes[0] || '';
-          const apellidos = partes.slice(1).join(' ') || '';
+          // Separar nombre y apellidos usando la función existente
+          const { nombre, apellidos } = separarNombre(nombreCompleto);
 
-// Procesar fechas para preview usando utilidades
-const fechaNacRaw = row[fechaNacCol];
-const fechaNacimientoConv = convertirFechaNacimiento(fechaNacRaw as any);
-if (!fechaNacimientoConv) {
-  errors.push(`Fila ${index + 2}: Fecha de nacimiento inválida (use formato como 2/10/1986)`);
-  return;
-}
-const fechaIngresoConv = fechaIngCol >= 0 ? (convertirFechaIngreso(row[fechaIngCol] as any) || '') : '';
-const generoRaw = generoCol >= 0 ? String(row[generoCol] || '') : '';
-const generoNormalizado = generoRaw ? normalizarGenero(generoRaw) : undefined;
+          // Convertir fechas usando las funciones existentes
+          const fechaNacFormato = convertirFechaNacimiento(fechaNac);
+          const fechaIngFormato = convertirFechaIngreso(fechaIng);
+          const tipoPuesto = inferTipoPuesto(nivel);
+          const genero = generoRaw ? normalizarGenero(String(generoRaw)) : undefined;
 
-previewUsers.push({
-  dpi,
-  nombre,
-  apellidos,
-  fechaNacimiento: String(fechaNacimientoConv),
-  fechaIngreso: String(fechaIngresoConv),
-  nivel: nivelCode,
-  cargo,
-  area,
-            genero: generoNormalizado || undefined,
+          if (!fechaNacFormato) {
+            errors.push(`Fila ${index + 2}: No se pudo convertir fecha de nacimiento: ${fechaNac}`);
+            return;
+          }
+
+          previewUsers.push({
+            dpi,
+            nombre,
+            apellidos,
+            fechaNacimiento: fechaNacFormato,
+            fechaIngreso: fechaIngFormato || '',
+            nivel,
+            cargo,
+            area,
+            tipoPuesto: tipoPuesto || undefined,
+            genero: genero || undefined,
           });
         } catch (error: any) {
           errors.push(`Fila ${index + 2}: ${error.message}`);
@@ -232,95 +231,16 @@ previewUsers.push({
   const handleImport = async () => {
     if (!file) return;
 
-    // Validar mapeo antes de importar todo el archivo
-    if (!validateMappings()) {
-      toast.error('Por favor mapea todos los campos requeridos');
-      return;
-    }
-
     setStep('importing');
     setImportProgress(0);
 
     try {
-      const usuarios: ImportedUser[] = [];
-      const errores: Array<{ usuario: ImportedUser; error: string }> = [];
-
-      // Construir índices según mapeo del usuario
-      const dpiCol = excelHeaders.indexOf(columnMappings.dpi || '');
-      const nombreCol = excelHeaders.indexOf(columnMappings.nombre || '');
-      const fechaNacCol = excelHeaders.indexOf(columnMappings.fechaNacimiento || '');
-      const fechaIngCol = columnMappings.fechaIngreso ? excelHeaders.indexOf(columnMappings.fechaIngreso) : -1;
-      const nivelCol = excelHeaders.indexOf(columnMappings.nivel || '');
-      const cargoCol = excelHeaders.indexOf(columnMappings.cargo || '');
-      const areaCol = excelHeaders.indexOf(columnMappings.area || '');
-      const generoCol = columnMappings.genero ? excelHeaders.indexOf(columnMappings.genero) : -1;
-
-      // Procesar todas las filas
-      excelData.forEach((row, index) => {
-        try {
-          const dpi = String(row[dpiCol] || '').trim().replace(/\D+/g, '');
-          const nombreCompleto = String(row[nombreCol] || '').trim();
-          const rawNivel = String(row[nivelCol] || '').trim();
-          const nivelCode = extraerCodigoNivel(rawNivel);
-          const cargo = String(row[cargoCol] || '').trim();
-          const area = String(row[areaCol] || '').trim();
-          const fechaNacRaw = row[fechaNacCol];
-          const fechaIngRaw = fechaIngCol >= 0 ? row[fechaIngCol] : null;
-
-          if (!dpi || !nombreCompleto || !cargo || !area) {
-            throw new Error('Faltan datos requeridos (DPI, nombre, cargo, área)');
-          }
-          if (!nivelCode || !isNivelValido(nivelCode)) {
-            throw new Error(`Nivel de puesto inválido: "${rawNivel}"`);
-          }
-
-          // Separar nombre y apellidos
-          const partes = nombreCompleto.split(/\s+/);
-          const nombre = partes[0] || '';
-          const apellidos = partes.slice(1).join(' ') || '';
-
-          // Convertir fechas usando utilidades oficiales
-          const fechaNacimiento = convertirFechaNacimiento(fechaNacRaw as any);
-          if (!fechaNacimiento) {
-            throw new Error(`Fecha de nacimiento inválida o faltante (requerida para contraseña): "${fechaNacRaw ?? ''}"`);
-          }
-          const fechaIngreso = fechaIngRaw ? (convertirFechaIngreso(fechaIngRaw as any) || '') : '';
-
-          const generoRaw = generoCol >= 0 ? String(row[generoCol] || '') : '';
-          const generoNormalizado = generoRaw ? normalizarGenero(generoRaw) : undefined;
-
-          usuarios.push({
-            dpi,
-            nombre,
-            apellidos,
-            fechaNacimiento,
-            fechaIngreso,
-            nivel: nivelCode,
-            cargo,
-            area,
-            genero: generoNormalizado || undefined,
-          });
-        } catch (err: any) {
-          // Registrar error por fila (index+2 porque 1 es header)
-          errores.push({
-            usuario: {
-              dpi: String(row[dpiCol] || ''),
-              nombre: '',
-              apellidos: '',
-              fechaNacimiento: '',
-              fechaIngreso: '',
-              nivel: '',
-              cargo: '',
-              area: '',
-            },
-            error: `Fila ${index + 2}: ${err.message || 'Error al procesar'}`,
-          });
-        }
-      });
+      // Parsear el archivo completo
+      const { usuarios, errores } = await parsearArchivoUsuarios(file);
 
       if (usuarios.length === 0) {
         toast.error('No se pudieron procesar usuarios del archivo');
-        setValidationErrors(errores.map(e => e.error));
+        setValidationErrors(errores);
         setStep('preview');
         return;
       }
@@ -328,17 +248,25 @@ previewUsers.push({
       // Importar en lotes con progreso
       const BATCH_SIZE = 50;
       let totalImportados = 0;
-      const allErrors: Array<{ usuario: ImportedUser; error: string }> = [...errores];
+      const allErrors: Array<{ usuario: ImportedUser; error: string }> = [];
 
       for (let i = 0; i < usuarios.length; i += BATCH_SIZE) {
         const batch = usuarios.slice(i, i + BATCH_SIZE);
+
         const { exitosos, errores: batchErrors } = await importarUsuarios(batch);
+
         totalImportados += exitosos;
         allErrors.push(...batchErrors);
-        setImportProgress(Math.round(((i + batch.length) / usuarios.length) * 100));
+
+        // Actualizar progreso
+        const progress = Math.round(((i + batch.length) / usuarios.length) * 100);
+        setImportProgress(progress);
       }
 
-      setImportResults({ exitosos: totalImportados, errores: allErrors });
+      setImportResults({
+        exitosos: totalImportados,
+        errores: allErrors
+      });
       setStep('results');
 
       if (allErrors.length === 0) {
@@ -415,14 +343,14 @@ previewUsers.push({
               {fieldConfig.label} {fieldConfig.required && <span className="text-red-500">*</span>}
             </Label>
             <Select
-              value={columnMappings[fieldKey] || "_none_"}
+              value={columnMappings[fieldKey] || ''}
               onValueChange={(value) => handleMappingChange(fieldKey, value)}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Seleccionar columna" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="_none_">-- No mapear --</SelectItem>
+                <SelectItem value="">-- No mapear --</SelectItem>
                 {excelHeaders.map(header => (
                   <SelectItem key={header} value={header}>
                     {header}
