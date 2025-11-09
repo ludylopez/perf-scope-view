@@ -66,35 +66,40 @@ export const convertirFechaNacimiento = (fecha: string | number | Date): string 
     
     if (typeof fecha === 'number') {
       // Excel serial date
-      date = XLSX.SSF.parse_date_code(fecha);
+      const excelDate = XLSX.SSF.parse_date_code(fecha);
+      date = new Date(excelDate.y, excelDate.m - 1, excelDate.d);
     } else if (typeof fecha === 'string') {
-      // Intentar parsear diferentes formatos
-      const formats = [
-        /^\d{8}$/, // DDMMAAAA
-        /^\d{2}\/\d{2}\/\d{4}$/, // DD/MM/YYYY
-        /^\d{4}-\d{2}-\d{2}$/, // YYYY-MM-DD
-        /^\d{2}-\d{2}-\d{4}$/, // DD-MM-YYYY
-      ];
+      const fechaStr = fecha.trim();
       
-      if (formats[0].test(fecha)) {
-        // Ya está en formato DDMMAAAA
-        return fecha;
+      // Ya está en formato DDMMAAAA
+      if (/^\d{8}$/.test(fechaStr)) {
+        return fechaStr;
       }
       
-      date = new Date(fecha);
-      if (isNaN(date.getTime())) {
-        // Intentar parsear manualmente
-        const parts = fecha.split(/[\/\-]/);
-        if (parts.length === 3) {
-          if (parts[2].length === 4) {
-            // YYYY-MM-DD o DD/MM/YYYY
-            if (parts[0].length === 4) {
-              date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-            } else {
-              date = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
-            }
-          }
-        }
+      // Intentar parsear diferentes formatos
+      let parsed = false;
+      
+      // DD/MM/YYYY
+      if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(fechaStr)) {
+        const parts = fechaStr.split('/');
+        date = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+        parsed = true;
+      }
+      // YYYY-MM-DD
+      else if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(fechaStr)) {
+        const parts = fechaStr.split('-');
+        date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+        parsed = true;
+      }
+      // DD-MM-YYYY
+      else if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(fechaStr)) {
+        const parts = fechaStr.split('-');
+        date = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+        parsed = true;
+      }
+      
+      if (!parsed) {
+        date = new Date(fechaStr);
       }
     } else {
       date = fecha;
@@ -109,7 +114,8 @@ export const convertirFechaNacimiento = (fecha: string | number | Date): string 
     const year = String(date.getFullYear());
     
     return `${day}${month}${year}`;
-  } catch {
+  } catch (error) {
+    console.error('Error convirtiendo fecha nacimiento:', fecha, error);
     return '';
   }
 };
@@ -119,24 +125,38 @@ export const convertirFechaNacimiento = (fecha: string | number | Date): string 
  */
 export const convertirFechaIngreso = (fecha: string | number | Date): string | null => {
   try {
+    if (!fecha) return null;
+    
     let date: Date;
     
     if (typeof fecha === 'number') {
-      date = XLSX.SSF.parse_date_code(fecha);
+      const excelDate = XLSX.SSF.parse_date_code(fecha);
+      date = new Date(excelDate.y, excelDate.m - 1, excelDate.d);
     } else if (typeof fecha === 'string') {
-      // Intentar parsear diferentes formatos
-      date = new Date(fecha);
-      if (isNaN(date.getTime())) {
-        const parts = fecha.split(/[\/\-]/);
-        if (parts.length === 3) {
-          if (parts[2].length === 4) {
-            if (parts[0].length === 4) {
-              date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-            } else {
-              date = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
-            }
-          }
-        }
+      const fechaStr = fecha.trim();
+      let parsed = false;
+      
+      // DD/MM/YYYY
+      if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(fechaStr)) {
+        const parts = fechaStr.split('/');
+        date = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+        parsed = true;
+      }
+      // YYYY-MM-DD
+      else if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(fechaStr)) {
+        const parts = fechaStr.split('-');
+        date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+        parsed = true;
+      }
+      // DD-MM-YYYY
+      else if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(fechaStr)) {
+        const parts = fechaStr.split('-');
+        date = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+        parsed = true;
+      }
+      
+      if (!parsed) {
+        date = new Date(fechaStr);
       }
     } else {
       date = fecha;
@@ -151,7 +171,8 @@ export const convertirFechaIngreso = (fecha: string | number | Date): string | n
     const day = String(date.getDate()).padStart(2, '0');
     
     return `${year}-${month}-${day}`;
-  } catch {
+  } catch (error) {
+    console.error('Error convirtiendo fecha ingreso:', fecha, error);
     return null;
   }
 };

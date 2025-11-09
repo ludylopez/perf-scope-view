@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Upload, FileSpreadsheet, CheckCircle, AlertCircle, Info } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from 'xlsx';
-import { parsearArchivoUsuarios, importarUsuarios, ImportedUser } from "@/lib/importUsers";
+import { parsearArchivoUsuarios, importarUsuarios, ImportedUser, normalizarGenero } from "@/lib/importUsers";
 
 type ImportStep = 'upload' | 'mapping' | 'preview' | 'importing' | 'results';
 
@@ -179,7 +179,8 @@ export const ImportUsersDialog = ({ open, onOpenChange, onImportComplete }: Impo
           // Procesar fechas (simplificado para preview)
           const fechaNacimiento = row[fechaNacCol] || '';
           const fechaIngreso = fechaIngCol >= 0 ? row[fechaIngCol] : '';
-          const genero = generoCol >= 0 ? row[generoCol] : '';
+          const generoRaw = generoCol >= 0 ? String(row[generoCol] || '') : '';
+          const generoNormalizado = generoRaw ? normalizarGenero(generoRaw) : undefined;
 
           previewUsers.push({
             dpi,
@@ -190,7 +191,7 @@ export const ImportUsersDialog = ({ open, onOpenChange, onImportComplete }: Impo
             nivel,
             cargo,
             area,
-            genero: genero ? String(genero) : undefined,
+            genero: generoNormalizado || undefined,
           });
         } catch (error: any) {
           errors.push(`Fila ${index + 2}: ${error.message}`);
