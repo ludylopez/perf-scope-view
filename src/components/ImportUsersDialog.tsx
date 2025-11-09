@@ -192,15 +192,25 @@ export const ImportUsersDialog = ({ open, onOpenChange, onImportComplete }: Impo
           const { nombre, apellidos } = separarNombre(nombreCompleto);
 
           // Convertir fechas usando las funciones existentes
-          const fechaNacFormato = convertirFechaNacimiento(fechaNac);
+          let fechaNacFormato: string;
+          try {
+            console.log(`Fila ${index + 2} - Convirtiendo fecha:`, {
+              valorOriginal: fechaNac,
+              tipo: typeof fechaNac,
+              nombre: nombreCompleto,
+              dpi
+            });
+            fechaNacFormato = convertirFechaNacimiento(fechaNac);
+            console.log(`Fila ${index + 2} - Fecha convertida:`, fechaNacFormato);
+          } catch (error: any) {
+            console.error(`Fila ${index + 2} - Error convirtiendo fecha:`, error);
+            errors.push(`Fila ${index + 2}: ${error.message}`);
+            return;
+          }
+
           const fechaIngFormato = convertirFechaIngreso(fechaIng);
           const tipoPuesto = inferTipoPuesto(nivel);
           const genero = generoRaw ? normalizarGenero(String(generoRaw)) : undefined;
-
-          if (!fechaNacFormato) {
-            errors.push(`Fila ${index + 2}: No se pudo convertir fecha de nacimiento: ${fechaNac}`);
-            return;
-          }
 
           previewUsers.push({
             dpi,
@@ -420,6 +430,7 @@ export const ImportUsersDialog = ({ open, onOpenChange, onImportComplete }: Impo
               <TableHead>DPI</TableHead>
               <TableHead>Nombre</TableHead>
               <TableHead>Apellidos</TableHead>
+              <TableHead>Fecha Nac.</TableHead>
               <TableHead>Nivel</TableHead>
               <TableHead>Cargo</TableHead>
               <TableHead>Área</TableHead>
@@ -432,6 +443,7 @@ export const ImportUsersDialog = ({ open, onOpenChange, onImportComplete }: Impo
                 <TableCell className="font-mono text-sm">{user.dpi}</TableCell>
                 <TableCell>{user.nombre}</TableCell>
                 <TableCell>{user.apellidos}</TableCell>
+                <TableCell className="font-mono text-sm">{user.fechaNacimiento}</TableCell>
                 <TableCell>
                   <Badge>{user.nivel}</Badge>
                 </TableCell>
