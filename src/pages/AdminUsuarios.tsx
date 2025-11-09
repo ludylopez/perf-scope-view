@@ -29,9 +29,9 @@ import { ArrowLeft, Plus, Edit, X, UserPlus, Users, Search, ChevronLeft, Chevron
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@/types/auth";
-import { parsearArchivoUsuarios, importarUsuarios, ImportedUser } from "@/lib/importUsers";
 import { JobLevel } from "@/types/jobLevel";
 import { getActiveJobLevels } from "@/lib/jobLevels";
+import { ImportUsersDialog } from "@/components/ImportUsersDialog";
 
 const PAGE_SIZE = 50; // OPTIMIZACIÓN: Paginación para manejar 400 usuarios
 
@@ -44,9 +44,6 @@ const AdminUsuarios = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
-  const [importFile, setImportFile] = useState<File | null>(null);
-  const [importing, setImporting] = useState(false);
-  const [importResults, setImportResults] = useState<{ exitosos: number; errores: Array<{ usuario: ImportedUser; error: string }> } | null>(null);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [currentPage, setCurrentPage] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
@@ -254,52 +251,9 @@ const AdminUsuarios = () => {
     }
   };
 
-  const handleImportFile = async () => {
-    if (!importFile) {
-      toast.error("Debe seleccionar un archivo");
-      return;
-    }
-
-    setImporting(true);
-    setImportResults(null);
-
-    try {
-      // Parsear archivo
-      const { usuarios, errores } = await parsearArchivoUsuarios(importFile);
-
-      if (errores.length > 0) {
-        console.warn("Errores al parsear:", errores);
-      }
-
-      if (usuarios.length === 0) {
-        toast.error("No se encontraron usuarios válidos en el archivo");
-        setImporting(false);
-        return;
-      }
-
-      // Importar usuarios
-      const resultados = await importarUsuarios(usuarios);
-
-      setImportResults(resultados);
-
-      if (resultados.exitosos > 0) {
-        toast.success(`${resultados.exitosos} usuarios importados exitosamente`);
-        loadUsuarios(currentPage);
-      }
-
-      if (resultados.errores.length > 0) {
-        toast.warning(`${resultados.errores.length} usuarios tuvieron errores`);
-      }
-
-      if (errores.length > 0 && resultados.exitosos === 0) {
-        toast.error(`Errores al procesar archivo: ${errores.slice(0, 3).join(', ')}`);
-      }
-    } catch (error: any) {
-      console.error("Error importing:", error);
-      toast.error(error.message || "Error al importar archivo");
-    } finally {
-      setImporting(false);
-    }
+  const handleImportComplete = () => {
+    // Recargar usuarios después de importación exitosa
+    loadUsuarios(currentPage);
   };
 
   // OPTIMIZACIÓN: Memoizar el filtrado para evitar recalcular en cada render
@@ -556,76 +510,16 @@ const AdminUsuarios = () => {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-          <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
-            <DialogTrigger asChild>
-              <Button variant="outline">
-                <Upload className="mr-2 h-4 w-4" />
-                Importar Usuarios
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Importar Usuarios desde Archivo</DialogTitle>
-                <DialogDescription>
-                  Importe usuarios desde un archivo CSV o Excel. El archivo debe contener las columnas: DPI, NOMBRE, FECHA DE NACIMIENTO, FECHA DE INICIO LABORAL, Nivel de puesto, PUESTO, DEPARTAMENTO O DEPENDENCIA
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Archivo (CSV o Excel)</Label>
-                  <Input
-                    type="file"
-                    accept=".csv,.xlsx,.xls"
-                    onChange={(e) => setImportFile(e.target.files?.[0] || null)}
-                    disabled={importing}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Formatos soportados: CSV, Excel (.xlsx, .xls)
-                  </p>
-                </div>
-                {importResults && (
-                  <div className="space-y-2">
-                    <div className="p-4 bg-success/10 border border-success rounded-lg">
-                      <p className="text-sm font-medium text-success">
-                        ✓ {importResults.exitosos} usuarios importados exitosamente
-                      </p>
-                    </div>
-                    {importResults.errores.length > 0 && (
-                      <div className="p-4 bg-destructive/10 border border-destructive rounded-lg">
-                        <p className="text-sm font-medium text-destructive mb-2">
-                          ✗ {importResults.errores.length} usuarios con errores:
-                        </p>
-                        <div className="max-h-40 overflow-y-auto space-y-1">
-                          {importResults.errores.slice(0, 10).map((error, idx) => (
-                            <p key={idx} className="text-xs text-muted-foreground">
-                              {error.usuario.dpi} - {error.usuario.nombre} {error.usuario.apellidos}: {error.error}
-                            </p>
-                          ))}
-                          {importResults.errores.length > 10 && (
-                            <p className="text-xs text-muted-foreground">
-                              ... y {importResults.errores.length - 10} errores más
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => {
-                  setShowImportDialog(false);
-                  setImportFile(null);
-                  setImportResults(null);
-                }}>
-                  Cerrar
-                </Button>
-                <Button onClick={handleImportFile} disabled={!importFile || importing}>
-                  {importing ? "Importando..." : "Importar"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          <Button variant="outline" onClick={() => setShowImportDialog(true)}>
+            <Upload className="mr-2 h-4 w-4" />
+            Importar Usuarios
+          </Button>
+
+          <ImportUsersDialog
+            open={showImportDialog}
+            onOpenChange={setShowImportDialog}
+            onImportComplete={handleImportComplete}
+          />
         </div>
 
         {/* Lista de Usuarios */}
