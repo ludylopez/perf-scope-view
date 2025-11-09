@@ -353,14 +353,14 @@ export const ImportUsersDialog = ({ open, onOpenChange, onImportComplete }: Impo
               {fieldConfig.label} {fieldConfig.required && <span className="text-red-500">*</span>}
             </Label>
             <Select
-              value={columnMappings[fieldKey] || ''}
-              onValueChange={(value) => handleMappingChange(fieldKey, value)}
+              value={columnMappings[fieldKey] || '__none__'}
+              onValueChange={(value) => handleMappingChange(fieldKey, value === '__none__' ? '' : value)}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Seleccionar columna" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">-- No mapear --</SelectItem>
+                <SelectItem value="__none__">-- No mapear --</SelectItem>
                 {excelHeaders.map(header => (
                   <SelectItem key={header} value={header}>
                     {header}
