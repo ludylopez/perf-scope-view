@@ -59,74 +59,135 @@ export const inferTipoPuesto = (nivel: string): 'administrativo' | 'operativo' |
 
 /**
  * Convierte fecha de varios formatos a DDMMAAAA para fecha_nacimiento
+ * @throws Error si la fecha no puede ser convertida o es inválida
  */
 export const convertirFechaNacimiento = (fecha: string | number | Date): string => {
+  if (fecha === null || fecha === undefined || fecha === '') {
+    throw new Error('Fecha vacía o nula');
+  }
+
   try {
-    let date: Date;
+    let date: Date | null = null;
 
     if (typeof fecha === 'number') {
       // Excel serial date
-      date = XLSX.SSF.parse_date_code(fecha);
+      const parsedDate = XLSX.SSF.parse_date_code(fecha);
+      if (!parsedDate) {
+        throw new Error(`No se pudo parsear fecha Excel: ${fecha}`);
+      }
+      date = new Date(parsedDate.y, parsedDate.m - 1, parsedDate.d);
     } else if (typeof fecha === 'string') {
       const fechaStr = fecha.trim();
 
-      // Si ya está en formato DDMMAAAA
+      if (!fechaStr) {
+        throw new Error('Fecha vacía después de trim');
+      }
+
+      // Si ya está en formato DDMMAAAA, validar y retornar
       if (/^\d{8}$/.test(fechaStr)) {
-        return fechaStr;
+        const day = parseInt(fechaStr.substring(0, 2));
+        const month = parseInt(fechaStr.substring(2, 4));
+        const year = parseInt(fechaStr.substring(4, 8));
+
+        // Validar que sea una fecha válida
+        if (day >= 1 && day <= 31 && month >= 1 && month <= 12 && year >= 1900 && year <= 2100) {
+          return fechaStr;
+        } else {
+          throw new Error(`Fecha DDMMAAAA inválida: ${fechaStr} (día: ${day}, mes: ${month}, año: ${year})`);
+        }
       }
 
       // Intentar parsear manualmente con split
-      const parts = fechaStr.split(/[\/\-]/);
+      const parts = fechaStr.split(/[\/\-\.\s]+/);
+
       if (parts.length === 3) {
         const [part1, part2, part3] = parts;
 
+        // Limpiar partes (remover espacios)
+        const p1 = part1.trim();
+        const p2 = part2.trim();
+        const p3 = part3.trim();
+
+        let day: number;
+        let month: number;
+        let year: number;
+
         // Detectar formato basándose en la longitud de las partes
-        if (part3.length === 4) {
+        if (p3.length === 4) {
           // Formato DD/MM/YYYY o D/M/YYYY
-          const day = parseInt(part1);
-          const month = parseInt(part2);
-          const year = parseInt(part3);
-
-          if (day >= 1 && day <= 31 && month >= 1 && month <= 12 && year >= 1900) {
-            date = new Date(year, month - 1, day);
-          } else {
-            throw new Error('Fecha fuera de rango');
-          }
-        } else if (part1.length === 4) {
+          day = parseInt(p1, 10);
+          month = parseInt(p2, 10);
+          year = parseInt(p3, 10);
+        } else if (p1.length === 4) {
           // Formato YYYY-MM-DD o YYYY/MM/DD
-          const year = parseInt(part1);
-          const month = parseInt(part2);
-          const day = parseInt(part3);
-
-          if (day >= 1 && day <= 31 && month >= 1 && month <= 12 && year >= 1900) {
-            date = new Date(year, month - 1, day);
-          } else {
-            throw new Error('Fecha fuera de rango');
-          }
+          year = parseInt(p1, 10);
+          month = parseInt(p2, 10);
+          day = parseInt(p3, 10);
         } else {
-          // Intentar con new Date() como fallback
-          date = new Date(fechaStr);
+          throw new Error(`Formato de fecha no reconocido: ${fechaStr}`);
+        }
+
+        // Validar rangos
+        if (isNaN(day) || isNaN(month) || isNaN(year)) {
+          throw new Error(`Componentes de fecha no numéricos: día=${p1}, mes=${p2}, año=${p3}`);
+        }
+
+        if (day < 1 || day > 31) {
+          throw new Error(`Día fuera de rango (1-31): ${day}`);
+        }
+
+        if (month < 1 || month > 12) {
+          throw new Error(`Mes fuera de rango (1-12): ${month}`);
+        }
+
+        if (year < 1900 || year > 2100) {
+          throw new Error(`Año fuera de rango (1900-2100): ${year}`);
+        }
+
+        // Crear fecha y validar que sea válida (ej: 31/02 no es válido)
+        date = new Date(year, month - 1, day);
+
+        // Verificar que la fecha creada corresponde a los valores ingresados
+        // (new Date puede ajustar fechas inválidas, ej: 31/02 → 03/03)
+        if (date.getDate() !== day || date.getMonth() !== month - 1 || date.getFullYear() !== year) {
+          throw new Error(`Fecha inválida: ${day}/${month}/${year} (el día ${day} no existe en el mes ${month})`);
         }
       } else {
-        // Intentar con new Date() como fallback
-        date = new Date(fechaStr);
+        throw new Error(`Formato de fecha no soportado (se esperaban 3 partes separadas por / - o .): ${fechaStr}`);
       }
-    } else {
+    } else if (fecha instanceof Date) {
       date = fecha;
+    } else {
+      throw new Error(`Tipo de fecha no soportado: ${typeof fecha}`);
     }
 
+    // Validar que date esté asignado
+    if (!date) {
+      throw new Error('No se pudo crear objeto Date');
+    }
+
+    // Validar que la fecha sea válida
     if (isNaN(date.getTime())) {
-      throw new Error('Fecha inválida');
+      throw new Error('Fecha inválida (NaN)');
     }
 
+    // Formatear a DDMMAAAA
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const year = String(date.getFullYear());
 
-    return `${day}${month}${year}`;
-  } catch (error) {
-    console.error('Error convirtiendo fecha:', fecha, error);
-    return '';
+    const resultado = `${day}${month}${year}`;
+
+    // Validación final: debe ser exactamente 8 dígitos
+    if (!/^\d{8}$/.test(resultado)) {
+      throw new Error(`Resultado no tiene 8 dígitos: ${resultado}`);
+    }
+
+    return resultado;
+  } catch (error: any) {
+    const errorMsg = `Error convirtiendo fecha "${fecha}": ${error.message || error}`;
+    console.error(errorMsg);
+    throw new Error(errorMsg);
   }
 };
 
@@ -298,17 +359,21 @@ export const parsearArchivoUsuarios = async (file: File): Promise<{ usuarios: Im
           }
           
           const { nombre, apellidos } = separarNombre(nombreCompleto);
-          const fechaNacFormato = convertirFechaNacimiento(fechaNac);
+
+          // Convertir fechas - estas funciones ahora lanzan excepciones en lugar de retornar vacío
+          let fechaNacFormato: string;
+          try {
+            fechaNacFormato = convertirFechaNacimiento(fechaNac);
+          } catch (error: any) {
+            errores.push(`Línea ${i + 1}: ${error.message}`);
+            continue;
+          }
+
           const fechaIngFormato = convertirFechaIngreso(fechaIng);
           // NOTA: tipo_puesto se sincronizará automáticamente desde job_levels via trigger SQL
           // Se mantiene inferTipoPuesto como fallback para compatibilidad
           const tipoPuesto = inferTipoPuesto(nivel);
           const genero = generoRaw ? normalizarGenero(generoRaw) : undefined;
-          
-          if (!fechaNacFormato) {
-            errores.push(`Línea ${i + 1}: No se pudo convertir fecha de nacimiento: ${fechaNac}`);
-            continue;
-          }
           
           usuarios.push({
             dpi,
@@ -387,17 +452,21 @@ export const parsearArchivoUsuarios = async (file: File): Promise<{ usuarios: Im
           }
           
           const { nombre, apellidos } = separarNombre(nombreCompleto);
-          const fechaNacFormato = convertirFechaNacimiento(fechaNac);
+
+          // Convertir fechas - estas funciones ahora lanzan excepciones en lugar de retornar vacío
+          let fechaNacFormato: string;
+          try {
+            fechaNacFormato = convertirFechaNacimiento(fechaNac);
+          } catch (error: any) {
+            errores.push(`Fila ${i + 1}: ${error.message}`);
+            continue;
+          }
+
           const fechaIngFormato = convertirFechaIngreso(fechaIng);
           // NOTA: tipo_puesto se sincronizará automáticamente desde job_levels via trigger SQL
           // Se mantiene inferTipoPuesto como fallback para compatibilidad
           const tipoPuesto = inferTipoPuesto(nivel);
           const genero = generoRaw ? normalizarGenero(generoRaw) : undefined;
-          
-          if (!fechaNacFormato) {
-            errores.push(`Fila ${i + 1}: No se pudo convertir fecha de nacimiento`);
-            continue;
-          }
           
           usuarios.push({
             dpi,
