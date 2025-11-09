@@ -201,7 +201,13 @@ export const convertirFechaIngreso = (fecha: string | number | Date): string | n
     let date: Date;
 
     if (typeof fecha === 'number') {
-      date = XLSX.SSF.parse_date_code(fecha);
+      // Excel serial date - parse_date_code retorna {y, m, d}, no un Date
+      const parsedDate = XLSX.SSF.parse_date_code(fecha);
+      if (!parsedDate) {
+        console.error('Error convirtiendo fecha de ingreso:', fecha);
+        return null;
+      }
+      date = new Date(parsedDate.y, parsedDate.m - 1, parsedDate.d);
     } else if (typeof fecha === 'string') {
       const fechaStr = fecha.trim();
 
