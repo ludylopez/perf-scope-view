@@ -63,53 +63,69 @@ export const inferTipoPuesto = (nivel: string): 'administrativo' | 'operativo' |
 export const convertirFechaNacimiento = (fecha: string | number | Date): string => {
   try {
     let date: Date;
-    
+
     if (typeof fecha === 'number') {
       // Excel serial date
       date = XLSX.SSF.parse_date_code(fecha);
     } else if (typeof fecha === 'string') {
-      // Intentar parsear diferentes formatos
-      const formats = [
-        /^\d{8}$/, // DDMMAAAA
-        /^\d{2}\/\d{2}\/\d{4}$/, // DD/MM/YYYY
-        /^\d{4}-\d{2}-\d{2}$/, // YYYY-MM-DD
-        /^\d{2}-\d{2}-\d{4}$/, // DD-MM-YYYY
-      ];
-      
-      if (formats[0].test(fecha)) {
-        // Ya está en formato DDMMAAAA
-        return fecha;
+      const fechaStr = fecha.trim();
+
+      // Si ya está en formato DDMMAAAA
+      if (/^\d{8}$/.test(fechaStr)) {
+        return fechaStr;
       }
-      
-      date = new Date(fecha);
-      if (isNaN(date.getTime())) {
-        // Intentar parsear manualmente
-        const parts = fecha.split(/[\/\-]/);
-        if (parts.length === 3) {
-          if (parts[2].length === 4) {
-            // YYYY-MM-DD o DD/MM/YYYY
-            if (parts[0].length === 4) {
-              date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-            } else {
-              date = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
-            }
+
+      // Intentar parsear manualmente con split
+      const parts = fechaStr.split(/[\/\-]/);
+      if (parts.length === 3) {
+        const [part1, part2, part3] = parts;
+
+        // Detectar formato basándose en la longitud de las partes
+        if (part3.length === 4) {
+          // Formato DD/MM/YYYY o D/M/YYYY
+          const day = parseInt(part1);
+          const month = parseInt(part2);
+          const year = parseInt(part3);
+
+          if (day >= 1 && day <= 31 && month >= 1 && month <= 12 && year >= 1900) {
+            date = new Date(year, month - 1, day);
+          } else {
+            throw new Error('Fecha fuera de rango');
           }
+        } else if (part1.length === 4) {
+          // Formato YYYY-MM-DD o YYYY/MM/DD
+          const year = parseInt(part1);
+          const month = parseInt(part2);
+          const day = parseInt(part3);
+
+          if (day >= 1 && day <= 31 && month >= 1 && month <= 12 && year >= 1900) {
+            date = new Date(year, month - 1, day);
+          } else {
+            throw new Error('Fecha fuera de rango');
+          }
+        } else {
+          // Intentar con new Date() como fallback
+          date = new Date(fechaStr);
         }
+      } else {
+        // Intentar con new Date() como fallback
+        date = new Date(fechaStr);
       }
     } else {
       date = fecha;
     }
-    
+
     if (isNaN(date.getTime())) {
       throw new Error('Fecha inválida');
     }
-    
+
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const year = String(date.getFullYear());
-    
+
     return `${day}${month}${year}`;
-  } catch {
+  } catch (error) {
+    console.error('Error convirtiendo fecha:', fecha, error);
     return '';
   }
 };
@@ -119,39 +135,66 @@ export const convertirFechaNacimiento = (fecha: string | number | Date): string 
  */
 export const convertirFechaIngreso = (fecha: string | number | Date): string | null => {
   try {
+    if (!fecha) return null;
+
     let date: Date;
-    
+
     if (typeof fecha === 'number') {
       date = XLSX.SSF.parse_date_code(fecha);
     } else if (typeof fecha === 'string') {
-      // Intentar parsear diferentes formatos
-      date = new Date(fecha);
-      if (isNaN(date.getTime())) {
-        const parts = fecha.split(/[\/\-]/);
-        if (parts.length === 3) {
-          if (parts[2].length === 4) {
-            if (parts[0].length === 4) {
-              date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-            } else {
-              date = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
-            }
+      const fechaStr = fecha.trim();
+
+      // Intentar parsear manualmente con split
+      const parts = fechaStr.split(/[\/\-]/);
+      if (parts.length === 3) {
+        const [part1, part2, part3] = parts;
+
+        // Detectar formato basándose en la longitud de las partes
+        if (part3.length === 4) {
+          // Formato DD/MM/YYYY o D/M/YYYY
+          const day = parseInt(part1);
+          const month = parseInt(part2);
+          const year = parseInt(part3);
+
+          if (day >= 1 && day <= 31 && month >= 1 && month <= 12 && year >= 1900) {
+            date = new Date(year, month - 1, day);
+          } else {
+            throw new Error('Fecha fuera de rango');
           }
+        } else if (part1.length === 4) {
+          // Formato YYYY-MM-DD o YYYY/MM/DD
+          const year = parseInt(part1);
+          const month = parseInt(part2);
+          const day = parseInt(part3);
+
+          if (day >= 1 && day <= 31 && month >= 1 && month <= 12 && year >= 1900) {
+            date = new Date(year, month - 1, day);
+          } else {
+            throw new Error('Fecha fuera de rango');
+          }
+        } else {
+          // Intentar con new Date() como fallback
+          date = new Date(fechaStr);
         }
+      } else {
+        // Intentar con new Date() como fallback
+        date = new Date(fechaStr);
       }
     } else {
       date = fecha;
     }
-    
+
     if (isNaN(date.getTime())) {
       return null;
     }
-    
+
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
-    
+
     return `${year}-${month}-${day}`;
-  } catch {
+  } catch (error) {
+    console.error('Error convirtiendo fecha de ingreso:', fecha, error);
     return null;
   }
 };

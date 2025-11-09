@@ -10,7 +10,16 @@ import { Badge } from "@/components/ui/badge";
 import { Upload, FileSpreadsheet, CheckCircle, AlertCircle, Info } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from 'xlsx';
-import { parsearArchivoUsuarios, importarUsuarios, ImportedUser } from "@/lib/importUsers";
+import {
+  parsearArchivoUsuarios,
+  importarUsuarios,
+  ImportedUser,
+  convertirFechaNacimiento,
+  convertirFechaIngreso,
+  separarNombre,
+  normalizarGenero,
+  inferTipoPuesto
+} from "@/lib/importUsers";
 
 type ImportStep = 'upload' | 'mapping' | 'preview' | 'importing' | 'results';
 
@@ -160,37 +169,50 @@ export const ImportUsersDialog = ({ open, onOpenChange, onImportComplete }: Impo
           const areaCol = excelHeaders.indexOf(columnMappings.area || '');
           const generoCol = columnMappings.genero ? excelHeaders.indexOf(columnMappings.genero) : -1;
 
-          const dpi = String(row[dpiCol] || '').trim().replace(/\s+/g, ' ');
+          const dpi = String(row[dpiCol] || '').trim().replace(/\s+/g, '');
           const nombreCompleto = String(row[nombreCol] || '').trim();
           const nivel = String(row[nivelCol] || '').trim().toUpperCase();
           const cargo = String(row[cargoCol] || '').trim();
           const area = String(row[areaCol] || '').trim();
+          const fechaNac = row[fechaNacCol];
+          const fechaIng = fechaIngCol >= 0 ? row[fechaIngCol] : '';
+          const generoRaw = generoCol >= 0 ? row[generoCol] : '';
 
           if (!dpi || !nombreCompleto || !nivel || !cargo || !area) {
             errors.push(`Fila ${index + 2}: Faltan datos requeridos`);
             return;
           }
 
-          // Separar nombre y apellidos
-          const partes = nombreCompleto.split(/\s+/);
-          const nombre = partes[0] || '';
-          const apellidos = partes.slice(1).join(' ') || '';
+          if (!fechaNac) {
+            errors.push(`Fila ${index + 2}: Fecha de nacimiento faltante`);
+            return;
+          }
 
-          // Procesar fechas (simplificado para preview)
-          const fechaNacimiento = row[fechaNacCol] || '';
-          const fechaIngreso = fechaIngCol >= 0 ? row[fechaIngCol] : '';
-          const genero = generoCol >= 0 ? row[generoCol] : '';
+          // Separar nombre y apellidos usando la función existente
+          const { nombre, apellidos } = separarNombre(nombreCompleto);
+
+          // Convertir fechas usando las funciones existentes
+          const fechaNacFormato = convertirFechaNacimiento(fechaNac);
+          const fechaIngFormato = convertirFechaIngreso(fechaIng);
+          const tipoPuesto = inferTipoPuesto(nivel);
+          const genero = generoRaw ? normalizarGenero(String(generoRaw)) : undefined;
+
+          if (!fechaNacFormato) {
+            errors.push(`Fila ${index + 2}: No se pudo convertir fecha de nacimiento: ${fechaNac}`);
+            return;
+          }
 
           previewUsers.push({
             dpi,
             nombre,
             apellidos,
-            fechaNacimiento: String(fechaNacimiento),
-            fechaIngreso: String(fechaIngreso),
+            fechaNacimiento: fechaNacFormato,
+            fechaIngreso: fechaIngFormato || '',
             nivel,
             cargo,
             area,
-            genero: genero ? String(genero) : undefined,
+            tipoPuesto: tipoPuesto || undefined,
+            genero: genero || undefined,
           });
         } catch (error: any) {
           errors.push(`Fila ${index + 2}: ${error.message}`);
