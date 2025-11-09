@@ -107,58 +107,112 @@ export const isNivelValido = (code: string): boolean => VALID_JOB_LEVELS.has(cod
  */
 export const convertirFechaNacimiento = (fecha: string | number | Date): string => {
   try {
-    let date: Date;
-    
-    if (typeof fecha === 'number') {
-      // Excel serial date
+    // 1) Excel serial date
+    if (typeof fecha === 'number' && !Number.isNaN(fecha)) {
       const excelDate = XLSX.SSF.parse_date_code(fecha);
-      date = new Date(excelDate.y, excelDate.m - 1, excelDate.d);
-    } else if (typeof fecha === 'string') {
-      const fechaStr = fecha.trim();
-      
-      // Ya está en formato DDMMAAAA
-      if (/^\d{8}$/.test(fechaStr)) {
-        return fechaStr;
+      const d = new Date(excelDate.y, excelDate.m - 1, excelDate.d);
+      const dd = String(d.getDate()).padStart(2, '0');
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const yyyy = String(d.getFullYear());
+      return `${dd}${mm}${yyyy}`;
+    }
+
+    // 2) String parsing robusto (acepta 2/10/1986, 02-10-1986, 1986/10/02, 2.10.86, etc.)
+    if (typeof fecha === 'string') {
+      const raw = fecha.trim();
+      if (!raw) return '';
+
+      // Ya viene como DDMMAAAA (solo dígitos y longitud 8)
+      const onlyDigits = raw.replace(/\D+/g, '');
+      if (/^\d{8}$/.test(onlyDigits)) {
+        return onlyDigits; // Asumimos DDMMAAAA
       }
-      
-      // Intentar parsear diferentes formatos
-      let parsed = false;
-      
+
+      // Extraer tokens numéricos y reconstruir
+      const tokens = raw.match(/\d+/g) || [];
+      if (tokens.length >= 3) {
+        let day: number;
+        let month: number;
+        let year: number;
+
+        // Heurística: si el primer token tiene 4 dígitos, es YYYY-MM-DD
+        if (tokens[0].length === 4) {
+          year = parseInt(tokens[0], 10);
+          month = parseInt(tokens[1], 10);
+          day = parseInt(tokens[2], 10);
+        }
+        // Si el tercer token tiene 4 dígitos, es DD/MM/YYYY o M/D/YYYY
+        else if (tokens[2].length === 4) {
+          day = parseInt(tokens[0], 10);
+          month = parseInt(tokens[1], 10);
+          year = parseInt(tokens[2], 10);
+        } else {
+          // Año de 2 dígitos: inferir siglo (<= 49 => 2000+, >49 => 1900+)
+          const yy = parseInt(tokens[2], 10);
+          year = yy + (yy <= 49 ? 2000 : 1900);
+          day = parseInt(tokens[0], 10);
+          month = parseInt(tokens[1], 10);
+        }
+
+        const d = new Date(year, month - 1, day);
+        if (!isNaN(d.getTime())) {
+          const dd = String(d.getDate()).padStart(2, '0');
+          const mm = String(d.getMonth() + 1).padStart(2, '0');
+          const yyyy = String(d.getFullYear());
+          return `${dd}${mm}${yyyy}`;
+        }
+      }
+
+      // Formatos comunes explícitos como fallback
       // DD/MM/YYYY
-      if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(fechaStr)) {
-        const parts = fechaStr.split('/');
-        date = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
-        parsed = true;
+      if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(raw)) {
+        const [d, m, y] = raw.split('/').map(v => parseInt(v, 10));
+        const date = new Date(y, m - 1, d);
+        const dd = String(date.getDate()).padStart(2, '0');
+        const mm = String(date.getMonth() + 1).padStart(2, '0');
+        const yyyy = String(date.getFullYear());
+        return `${dd}${mm}${yyyy}`;
       }
       // YYYY-MM-DD
-      else if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(fechaStr)) {
-        const parts = fechaStr.split('-');
-        date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-        parsed = true;
+      if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(raw)) {
+        const [y, m, d] = raw.split('-').map(v => parseInt(v, 10));
+        const date = new Date(y, m - 1, d);
+        const dd = String(date.getDate()).padStart(2, '0');
+        const mm = String(date.getMonth() + 1).padStart(2, '0');
+        const yyyy = String(date.getFullYear());
+        return `${dd}${mm}${yyyy}`;
       }
       // DD-MM-YYYY
-      else if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(fechaStr)) {
-        const parts = fechaStr.split('-');
-        date = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
-        parsed = true;
+      if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(raw)) {
+        const [d, m, y] = raw.split('-').map(v => parseInt(v, 10));
+        const date = new Date(y, m - 1, d);
+        const dd = String(date.getDate()).padStart(2, '0');
+        const mm = String(date.getMonth() + 1).padStart(2, '0');
+        const yyyy = String(date.getFullYear());
+        return `${dd}${mm}${yyyy}`;
       }
-      
-      if (!parsed) {
-        date = new Date(fechaStr);
+
+      // Fallback: confiar en Date
+      const fallback = new Date(raw);
+      if (!isNaN(fallback.getTime())) {
+        const dd = String(fallback.getDate()).padStart(2, '0');
+        const mm = String(fallback.getMonth() + 1).padStart(2, '0');
+        const yyyy = String(fallback.getFullYear());
+        return `${dd}${mm}${yyyy}`;
       }
-    } else {
-      date = fecha;
+
+      return '';
     }
-    
-    if (isNaN(date.getTime())) {
-      throw new Error('Fecha inválida');
+
+    // 3) Fecha ya como Date
+    if (fecha instanceof Date) {
+      const dd = String(fecha.getDate()).padStart(2, '0');
+      const mm = String(fecha.getMonth() + 1).padStart(2, '0');
+      const yyyy = String(fecha.getFullYear());
+      return `${dd}${mm}${yyyy}`;
     }
-    
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = String(date.getFullYear());
-    
-    return `${day}${month}${year}`;
+
+    return '';
   } catch (error) {
     console.error('Error convirtiendo fecha nacimiento:', fecha, error);
     return '';
