@@ -167,7 +167,7 @@ export const ImportUsersDialog = ({ open, onOpenChange, onImportComplete }: Impo
           const areaCol = excelHeaders.indexOf(columnMappings.area || '');
           const generoCol = columnMappings.genero ? excelHeaders.indexOf(columnMappings.genero) : -1;
 
-          const dpi = String(row[dpiCol] || '').trim().replace(/\s+/g, ''); // Eliminar todos los espacios
+          const dpi = String(row[dpiCol] || '').trim().replace(/\D+/g, ''); // Solo dígitos
           const nombreCompleto = String(row[nombreCol] || '').trim();
           const nivel = String(row[nivelCol] || '').trim().toUpperCase();
           const cargo = String(row[cargoCol] || '').trim();

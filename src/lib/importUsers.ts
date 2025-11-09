@@ -58,6 +58,18 @@ export const inferTipoPuesto = (nivel: string): 'administrativo' | 'operativo' |
 };
 
 /**
+ * Extrae el código de nivel válido a partir de una cadena libre
+ * Ejemplos válidos: OTE, OS, O1, O2, A1-A4, S2, D1-D2, E1-E2
+ */
+export const extraerCodigoNivel = (valor: string): string => {
+  const v = (valor || '').toUpperCase().trim();
+  const match = v.match(/\b(OTE|OS|O[12]|A[1-4]|S2|D[12]|E[12])\b/);
+  if (match) return match[1];
+  // fallback: quitar espacios y símbolos, y cortar a 10 máx
+  return v.replace(/[^A-Z0-9]/g, '').slice(0, 10);
+};
+
+/**
  * Convierte fecha de varios formatos a DDMMAAAA para fecha_nacimiento
  */
 export const convertirFechaNacimiento = (fecha: string | number | Date): string => {
@@ -251,11 +263,11 @@ export const parsearArchivoUsuarios = async (file: File): Promise<{ usuarios: Im
         const partsTrimmed = parts.map(p => p.trim());
         
         try {
-          const dpi = partsTrimmed[columnMap.dpi]?.toString().trim().replace(/\s+/g, ''); // Eliminar todos los espacios
+          const dpi = partsTrimmed[columnMap.dpi]?.toString().trim().replace(/\D+/g, ''); // Solo dígitos
           const nombreCompleto = partsTrimmed[columnMap.nombre]?.trim() || '';
           const fechaNac = partsTrimmed[columnMap.fechaNacimiento]?.trim() || '';
           const fechaIng = partsTrimmed[columnMap.fechaIngreso]?.trim() || '';
-          const nivel = partsTrimmed[columnMap.nivel]?.trim().toUpperCase() || '';
+          const nivel = extraerCodigoNivel(partsTrimmed[columnMap.nivel]?.trim() || '');
           const cargo = partsTrimmed[columnMap.cargo]?.trim() || '';
           const area = partsTrimmed[columnMap.area]?.trim() || partsTrimmed[columnMap.direccion]?.trim() || '';
           const generoRaw = partsTrimmed[columnMap.genero]?.trim() || '';
@@ -340,11 +352,11 @@ export const parsearArchivoUsuarios = async (file: File): Promise<{ usuarios: Im
         if (!row || row.length === 0) continue;
         
         try {
-          const dpi = String(row[columnMap.dpi] || '').trim().replace(/\s+/g, ''); // Eliminar todos los espacios
+          const dpi = String(row[columnMap.dpi] || '').trim().replace(/\D+/g, ''); // Solo dígitos
           const nombreCompleto = String(row[columnMap.nombre] || '').trim();
           const fechaNac = row[columnMap.fechaNacimiento];
           const fechaIng = row[columnMap.fechaIngreso];
-          const nivel = String(row[columnMap.nivel] || '').trim().toUpperCase();
+          const nivel = extraerCodigoNivel(String(row[columnMap.nivel] || '').trim());
           const cargo = String(row[columnMap.cargo] || '').trim();
           const area = String(row[columnMap.area] || row[columnMap.direccion] || '').trim();
           const generoRaw = String(row[columnMap.genero] || '').trim();
