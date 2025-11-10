@@ -44,7 +44,11 @@ El sistema detecta automáticamente las columnas y las mapea a los campos del si
 | Fecha de Nacimiento | "FECHA DE NACIMIENTO", "NACIMIENTO" | ✅ Sí |
 | Nivel de Puesto | "NIVEL DE PUESTO", "CODIGO NIVEL" | ✅ Sí |
 | Puesto/Cargo | "PUESTO", "CARGO" | ✅ Sí |
-| Área/Departamento | "DEPARTAMENTO O DEPENDENCIA", "AREA", "DIRECCION O UNIDAD" | ✅ Sí |
+| Dirección o Unidad | "DIRECCION O UNIDAD", "DIRECCION", "UNIDAD" | ⭕ Opcional |
+| Departamento o Dependencia | "DEPARTAMENTO O DEPENDENCIA", "DEPARTAMENTO" | ⭕ Opcional |
+| Área (genérico) | "AREA", "ÁREA" | ⭕ Opcional |
+| Renglón | "RENGLON", "RENGLÓN" | ⭕ Opcional |
+| Profesión | "PROFESION", "PROFESIÓN", "OCUPACION" | ⭕ Opcional |
 | Fecha de Ingreso | "FECHA DE INICIO LABORAL", "FECHA INGRESO" | ⭕ Opcional |
 | Sexo/Género | "SEXO", "GENERO" | ⭕ Opcional |
 

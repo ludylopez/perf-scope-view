@@ -60,6 +60,10 @@ const AdminUsuarios = () => {
     nivel: "",
     cargo: "",
     area: "",
+    direccionUnidad: "",
+    departamentoDependencia: "",
+    renglon: "",
+    profesion: "",
     jefeInmediato: "",
     rol: "colaborador" as User["rol"],
     estado: "activo" as "activo" | "inactivo",
@@ -122,6 +126,10 @@ const AdminUsuarios = () => {
         nivel: item.nivel,
         cargo: item.cargo,
         area: item.area,
+        direccionUnidad: item.direccion_unidad || "",
+        departamentoDependencia: item.departamento_dependencia || "",
+        renglon: item.renglon || "",
+        profesion: item.profesion || "",
         jefeInmediato: item.jefe_inmediato_id,
         rol: item.rol,
         estado: item.estado,
@@ -172,6 +180,10 @@ const AdminUsuarios = () => {
           nivel: newUser.nivel,
           cargo: newUser.cargo,
           area: newUser.area,
+          direccion_unidad: newUser.direccionUnidad || null,
+          departamento_dependencia: newUser.departamentoDependencia || null,
+          renglon: newUser.renglon || null,
+          profesion: newUser.profesion || null,
           jefe_inmediato_id: newUser.jefeInmediato || null,
           rol: newUser.rol,
           estado: newUser.estado,
@@ -195,6 +207,10 @@ const AdminUsuarios = () => {
         nivel: "",
         cargo: "",
         area: "",
+        direccionUnidad: "",
+        departamentoDependencia: "",
+        renglon: "",
+        profesion: "",
         jefeInmediato: "",
         rol: "colaborador",
         estado: "activo",
@@ -233,6 +249,10 @@ const AdminUsuarios = () => {
           nivel: editingUser.nivel,
           cargo: editingUser.cargo,
           area: editingUser.area,
+          direccion_unidad: editingUser.direccionUnidad || null,
+          departamento_dependencia: editingUser.departamentoDependencia || null,
+          renglon: editingUser.renglon || null,
+          profesion: editingUser.profesion || null,
           jefe_inmediato_id: editingUser.jefeInmediato || null,
           rol: editingUser.rol,
           estado: editingUser.estado,
@@ -450,6 +470,38 @@ const AdminUsuarios = () => {
                     <Input
                       value={newUser.area}
                       onChange={(e) => setNewUser({ ...newUser, area: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Dirección o Unidad</Label>
+                    <Input
+                      value={newUser.direccionUnidad}
+                      onChange={(e) => setNewUser({ ...newUser, direccionUnidad: e.target.value })}
+                      placeholder="Unidad organizacional"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Departamento o Dependencia</Label>
+                    <Input
+                      value={newUser.departamentoDependencia}
+                      onChange={(e) => setNewUser({ ...newUser, departamentoDependencia: e.target.value })}
+                      placeholder="Departamento administrativo"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Renglón</Label>
+                    <Input
+                      value={newUser.renglon}
+                      onChange={(e) => setNewUser({ ...newUser, renglon: e.target.value })}
+                      placeholder="011, 021, 022, etc."
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Profesión</Label>
+                    <Input
+                      value={newUser.profesion}
+                      onChange={(e) => setNewUser({ ...newUser, profesion: e.target.value })}
+                      placeholder="Profesión u oficio"
                     />
                   </div>
                   <div className="space-y-2">
@@ -749,6 +801,38 @@ const AdminUsuarios = () => {
                     <Input
                       value={editingUser.area}
                       onChange={(e) => setEditingUser({ ...editingUser, area: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Dirección o Unidad</Label>
+                    <Input
+                      value={editingUser.direccionUnidad || ""}
+                      onChange={(e) => setEditingUser({ ...editingUser, direccionUnidad: e.target.value })}
+                      placeholder="Unidad organizacional"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Departamento o Dependencia</Label>
+                    <Input
+                      value={editingUser.departamentoDependencia || ""}
+                      onChange={(e) => setEditingUser({ ...editingUser, departamentoDependencia: e.target.value })}
+                      placeholder="Departamento administrativo"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Renglón</Label>
+                    <Input
+                      value={editingUser.renglon || ""}
+                      onChange={(e) => setEditingUser({ ...editingUser, renglon: e.target.value })}
+                      placeholder="011, 021, 022, etc."
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Profesión</Label>
+                    <Input
+                      value={editingUser.profesion || ""}
+                      onChange={(e) => setEditingUser({ ...editingUser, profesion: e.target.value })}
+                      placeholder="Profesión u oficio"
                     />
                   </div>
                   <div className="space-y-2">
