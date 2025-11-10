@@ -42,11 +42,21 @@ const AdminUsuarios = () => {
   const [jobLevels, setJobLevels] = useState<JobLevel[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [currentPage, setCurrentPage] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
+
+  // Estados para filtros
+  const [filtroNivel, setFiltroNivel] = useState<string>("");
+  const [filtroRol, setFiltroRol] = useState<string>("");
+  const [filtroEstado, setFiltroEstado] = useState<string>("");
+  const [filtroTipoPuesto, setFiltroTipoPuesto] = useState<string>("");
+  const [filtroArea, setFiltroArea] = useState<string>("");
+  const [filtroDireccion, setFiltroDireccion] = useState<string>("");
+  const [filtroDepartamento, setFiltroDepartamento] = useState<string>("");
   const [newUser, setNewUser] = useState({
     dpi: "",
     nombre: "",
@@ -70,6 +80,15 @@ const AdminUsuarios = () => {
     instrumentoId: "",
   });
 
+  // Debounce para el término de búsqueda
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 500); // 500ms de delay
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   useEffect(() => {
     if (!user || (user.rol !== "admin_rrhh" && user.rol !== "admin_general")) {
       navigate("/dashboard");
@@ -92,25 +111,63 @@ const AdminUsuarios = () => {
   const loadUsuarios = async (page: number = 0) => {
     try {
       setLoading(true);
-      
-      // OPTIMIZACIÓN: Obtener total de usuarios primero (solo count)
-      const { count, error: countError } = await supabase
-        .from("users")
-        .select("*", { count: "exact", head: true });
 
+      // Construir query base
+      let countQuery = supabase.from("users").select("*", { count: "exact", head: true });
+      let dataQuery = supabase.from("users").select("*");
+
+      // Aplicar búsqueda global (busca en múltiples campos)
+      if (debouncedSearchTerm) {
+        const searchLower = `%${debouncedSearchTerm}%`;
+        countQuery = countQuery.or(`dpi.ilike.${searchLower},nombre.ilike.${searchLower},apellidos.ilike.${searchLower},cargo.ilike.${searchLower},area.ilike.${searchLower}`);
+        dataQuery = dataQuery.or(`dpi.ilike.${searchLower},nombre.ilike.${searchLower},apellidos.ilike.${searchLower},cargo.ilike.${searchLower},area.ilike.${searchLower}`);
+      }
+
+      // Aplicar filtros específicos
+      if (filtroNivel) {
+        countQuery = countQuery.eq("nivel", filtroNivel);
+        dataQuery = dataQuery.eq("nivel", filtroNivel);
+      }
+      if (filtroRol) {
+        countQuery = countQuery.eq("rol", filtroRol);
+        dataQuery = dataQuery.eq("rol", filtroRol);
+      }
+      if (filtroEstado) {
+        countQuery = countQuery.eq("estado", filtroEstado);
+        dataQuery = dataQuery.eq("estado", filtroEstado);
+      }
+      if (filtroTipoPuesto) {
+        countQuery = countQuery.eq("tipo_puesto", filtroTipoPuesto);
+        dataQuery = dataQuery.eq("tipo_puesto", filtroTipoPuesto);
+      }
+      if (filtroArea) {
+        const areaLower = `%${filtroArea}%`;
+        countQuery = countQuery.ilike("area", areaLower);
+        dataQuery = dataQuery.ilike("area", areaLower);
+      }
+      if (filtroDireccion) {
+        const direccionLower = `%${filtroDireccion}%`;
+        countQuery = countQuery.ilike("direccion_unidad", direccionLower);
+        dataQuery = dataQuery.ilike("direccion_unidad", direccionLower);
+      }
+      if (filtroDepartamento) {
+        const deptoLower = `%${filtroDepartamento}%`;
+        countQuery = countQuery.ilike("departamento_dependencia", deptoLower);
+        dataQuery = dataQuery.ilike("departamento_dependencia", deptoLower);
+      }
+
+      // Obtener total con filtros aplicados
+      const { count, error: countError } = await countQuery;
       if (countError) throw countError;
       setTotalCount(count || 0);
 
-      // OPTIMIZACIÓN: Cargar solo la página actual con paginación
+      // Aplicar paginación y ordenamiento
       const from = page * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
+      dataQuery = dataQuery.order("nombre", { ascending: true }).range(from, to);
 
-      const { data, error } = await supabase
-        .from("users")
-        .select("*")
-        .order("nombre", { ascending: true })
-        .range(from, to);
-
+      // Ejecutar query de datos
+      const { data, error } = await dataQuery;
       if (error) throw error;
 
       const formattedData = (data || []).map((item: any) => ({
@@ -146,13 +203,22 @@ const AdminUsuarios = () => {
     }
   };
 
+  // Recargar cuando cambien filtros o búsqueda
+  useEffect(() => {
+    if (!user || (user.rol !== "admin_rrhh" && user.rol !== "admin_general")) {
+      return;
+    }
+    // Resetear a página 1 cuando cambian filtros o búsqueda
+    setCurrentPage(0);
+  }, [debouncedSearchTerm, filtroNivel, filtroRol, filtroEstado, filtroTipoPuesto, filtroArea, filtroDireccion, filtroDepartamento, user]);
+
   useEffect(() => {
     if (!user || (user.rol !== "admin_rrhh" && user.rol !== "admin_general")) {
       navigate("/dashboard");
       return;
     }
     loadUsuarios(currentPage);
-  }, [user, navigate, currentPage]);
+  }, [user, navigate, currentPage, debouncedSearchTerm, filtroNivel, filtroRol, filtroEstado, filtroTipoPuesto, filtroArea, filtroDireccion, filtroDepartamento]);
 
   const handleCreateUser = async () => {
     if (!newUser.dpi || !newUser.nombre || !newUser.apellidos || !newUser.fechaNacimiento || !newUser.nivel || !newUser.cargo || !newUser.area) {
@@ -276,17 +342,35 @@ const AdminUsuarios = () => {
     loadUsuarios(currentPage);
   };
 
-  // OPTIMIZACIÓN: Memoizar el filtrado para evitar recalcular en cada render
-  const filteredUsuarios = useMemo(() => {
-    if (!searchTerm) return usuarios;
-    return usuarios.filter((u) =>
-      `${u.nombre} ${u.apellidos} ${u.dpi} ${u.cargo} ${u.area}`.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [usuarios, searchTerm]);
+  const limpiarFiltros = () => {
+    setSearchTerm("");
+    setDebouncedSearchTerm("");
+    setFiltroNivel("");
+    setFiltroRol("");
+    setFiltroEstado("");
+    setFiltroTipoPuesto("");
+    setFiltroArea("");
+    setFiltroDireccion("");
+    setFiltroDepartamento("");
+  };
+
+  const contarFiltrosActivos = () => {
+    let count = 0;
+    if (debouncedSearchTerm) count++;
+    if (filtroNivel) count++;
+    if (filtroRol) count++;
+    if (filtroEstado) count++;
+    if (filtroTipoPuesto) count++;
+    if (filtroArea) count++;
+    if (filtroDireccion) count++;
+    if (filtroDepartamento) count++;
+    return count;
+  };
 
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
   const hasNextPage = currentPage < totalPages - 1;
   const hasPrevPage = currentPage > 0;
+  const filtrosActivos = contarFiltrosActivos();
 
   if (loading) {
     return (
@@ -319,16 +403,179 @@ const AdminUsuarios = () => {
           </div>
         </div>
 
+        {/* Búsqueda y Filtros */}
+        <Card className="mb-6">
+          <CardContent className="pt-6">
+            <div className="space-y-4">
+              {/* Barra de búsqueda principal */}
+              <div className="flex gap-4">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar por nombre, DPI, cargo o área..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                {filtrosActivos > 0 && (
+                  <Button variant="outline" onClick={limpiarFiltros}>
+                    <X className="mr-2 h-4 w-4" />
+                    Limpiar Filtros ({filtrosActivos})
+                  </Button>
+                )}
+              </div>
+
+              {/* Filtros avanzados */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="space-y-2">
+                  <Label>Nivel de Puesto</Label>
+                  <Select value={filtroNivel} onValueChange={setFiltroNivel}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Todos los niveles" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Todos los niveles</SelectItem>
+                      {jobLevels.map((level) => (
+                        <SelectItem key={level.code} value={level.code}>
+                          {level.code} - {level.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Rol</Label>
+                  <Select value={filtroRol} onValueChange={setFiltroRol}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Todos los roles" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Todos los roles</SelectItem>
+                      <SelectItem value="colaborador">Colaborador</SelectItem>
+                      <SelectItem value="jefe">Jefe</SelectItem>
+                      <SelectItem value="admin_rrhh">Admin RR.HH.</SelectItem>
+                      <SelectItem value="admin_general">Admin General</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Estado</Label>
+                  <Select value={filtroEstado} onValueChange={setFiltroEstado}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Todos los estados" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Todos los estados</SelectItem>
+                      <SelectItem value="activo">Activo</SelectItem>
+                      <SelectItem value="inactivo">Inactivo</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Tipo de Puesto</Label>
+                  <Select value={filtroTipoPuesto} onValueChange={setFiltroTipoPuesto}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Todos los tipos" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Todos los tipos</SelectItem>
+                      <SelectItem value="administrativo">Administrativo</SelectItem>
+                      <SelectItem value="operativo">Operativo</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Área</Label>
+                  <Input
+                    placeholder="Filtrar por área..."
+                    value={filtroArea}
+                    onChange={(e) => setFiltroArea(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Dirección/Unidad</Label>
+                  <Input
+                    placeholder="Filtrar por dirección..."
+                    value={filtroDireccion}
+                    onChange={(e) => setFiltroDireccion(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Departamento</Label>
+                  <Input
+                    placeholder="Filtrar por departamento..."
+                    value={filtroDepartamento}
+                    onChange={(e) => setFiltroDepartamento(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Badges de filtros activos */}
+              {filtrosActivos > 0 && (
+                <div className="flex flex-wrap gap-2 pt-2">
+                  {debouncedSearchTerm && (
+                    <Badge variant="secondary" className="gap-1">
+                      Búsqueda: "{debouncedSearchTerm}"
+                      <X className="h-3 w-3 cursor-pointer" onClick={() => {setSearchTerm(""); setDebouncedSearchTerm("");}} />
+                    </Badge>
+                  )}
+                  {filtroNivel && (
+                    <Badge variant="secondary" className="gap-1">
+                      Nivel: {filtroNivel}
+                      <X className="h-3 w-3 cursor-pointer" onClick={() => setFiltroNivel("")} />
+                    </Badge>
+                  )}
+                  {filtroRol && (
+                    <Badge variant="secondary" className="gap-1">
+                      Rol: {filtroRol}
+                      <X className="h-3 w-3 cursor-pointer" onClick={() => setFiltroRol("")} />
+                    </Badge>
+                  )}
+                  {filtroEstado && (
+                    <Badge variant="secondary" className="gap-1">
+                      Estado: {filtroEstado}
+                      <X className="h-3 w-3 cursor-pointer" onClick={() => setFiltroEstado("")} />
+                    </Badge>
+                  )}
+                  {filtroTipoPuesto && (
+                    <Badge variant="secondary" className="gap-1">
+                      Tipo: {filtroTipoPuesto}
+                      <X className="h-3 w-3 cursor-pointer" onClick={() => setFiltroTipoPuesto("")} />
+                    </Badge>
+                  )}
+                  {filtroArea && (
+                    <Badge variant="secondary" className="gap-1">
+                      Área: {filtroArea}
+                      <X className="h-3 w-3 cursor-pointer" onClick={() => setFiltroArea("")} />
+                    </Badge>
+                  )}
+                  {filtroDireccion && (
+                    <Badge variant="secondary" className="gap-1">
+                      Dirección: {filtroDireccion}
+                      <X className="h-3 w-3 cursor-pointer" onClick={() => setFiltroDireccion("")} />
+                    </Badge>
+                  )}
+                  {filtroDepartamento && (
+                    <Badge variant="secondary" className="gap-1">
+                      Departamento: {filtroDepartamento}
+                      <X className="h-3 w-3 cursor-pointer" onClick={() => setFiltroDepartamento("")} />
+                    </Badge>
+                  )}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Botones de acción */}
         <div className="mb-6 flex gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por nombre, DPI, cargo o área..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
           <Button variant="outline" onClick={() => navigate("/admin/niveles")}>
             <Layers className="mr-2 h-4 w-4" />
             Niveles de Puesto
@@ -579,14 +826,14 @@ const AdminUsuarios = () => {
           <CardHeader>
             <CardTitle>Usuarios Registrados</CardTitle>
             <CardDescription>
-              {searchTerm 
-                ? `Mostrando ${filteredUsuarios.length} resultados filtrados de ${totalCount} usuarios`
-                : `Mostrando página ${currentPage + 1} de ${totalPages} (${filteredUsuarios.length} de ${totalCount} usuarios)`
+              {filtrosActivos > 0
+                ? `Mostrando ${usuarios.length} resultados de ${totalCount} usuarios con filtros aplicados`
+                : `Mostrando página ${currentPage + 1} de ${totalPages} (${usuarios.length} de ${totalCount} usuarios)`
               }
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {!searchTerm && totalPages > 1 && (
+            {filtrosActivos === 0 && totalPages > 1 && (
               <div className="flex items-center justify-between mb-4">
                 <Button
                   variant="outline"
@@ -623,14 +870,14 @@ const AdminUsuarios = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredUsuarios.length === 0 ? (
+                {usuarios.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={8} className="text-center text-muted-foreground">
                       No se encontraron usuarios
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredUsuarios.map((usuario) => (
+                  usuarios.map((usuario) => (
                     <TableRow key={usuario.dpi}>
                       <TableCell className="font-mono text-sm">{usuario.dpi}</TableCell>
                       <TableCell>
