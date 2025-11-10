@@ -507,27 +507,90 @@ export const parsearArchivoUsuarios = async (file: File): Promise<{ usuarios: Im
 export const importarUsuarios = async (usuarios: ImportedUser[]): Promise<{ exitosos: number; errores: Array<{ usuario: ImportedUser; error: string }> }> => {
   const errores: Array<{ usuario: ImportedUser; error: string }> = [];
   let exitosos = 0;
-  
+
+  // Obtener niveles válidos de job_levels una sola vez
+  const { data: jobLevels, error: jobLevelsError } = await supabase
+    .from('job_levels')
+    .select('code')
+    .eq('is_active', true);
+
+  if (jobLevelsError) {
+    console.error('❌ Error al obtener niveles de puesto:', jobLevelsError);
+    errores.push({
+      usuario: usuarios[0],
+      error: 'No se pudieron obtener los niveles de puesto válidos: ' + jobLevelsError.message
+    });
+    return { exitosos: 0, errores };
+  }
+
+  const nivelesValidos = new Set(jobLevels?.map(jl => jl.code) || []);
+  console.log('✅ Niveles válidos:', Array.from(nivelesValidos));
+
   // Procesar en lotes de 50 para evitar sobrecarga
   const BATCH_SIZE = 50;
   for (let i = 0; i < usuarios.length; i += BATCH_SIZE) {
     const batch = usuarios.slice(i, i + BATCH_SIZE);
     
-    const usuariosParaInsertar = batch.map(u => ({
-      dpi: u.dpi,
-      nombre: u.nombre,
-      apellidos: u.apellidos,
-      fecha_nacimiento: u.fechaNacimiento,
-      fecha_ingreso: u.fechaIngreso || null,
-      nivel: u.nivel,
-      cargo: u.cargo,
-      area: u.area,
-      tipo_puesto: u.tipoPuesto || null,
-      genero: u.genero || null,
-      rol: 'colaborador' as const,
-      estado: 'activo' as const,
-      primer_ingreso: true,
-    }));
+    // Filtrar usuarios con nivel inválido
+    const usuariosConNivelInvalido: ImportedUser[] = [];
+    const usuariosValidos: ImportedUser[] = [];
+
+    batch.forEach(u => {
+      if (!nivelesValidos.has(u.nivel)) {
+        console.warn(`⚠️ Nivel inválido: ${u.nivel} para ${u.nombre} ${u.apellidos}`);
+        usuariosConNivelInvalido.push(u);
+      } else {
+        usuariosValidos.push(u);
+      }
+    });
+
+    // Agregar errores para usuarios con nivel inválido
+    usuariosConNivelInvalido.forEach(u => {
+      errores.push({
+        usuario: u,
+        error: `Nivel de puesto inválido: "${u.nivel}". Los niveles válidos son: ${Array.from(nivelesValidos).join(', ')}`
+      });
+    });
+
+    // Si no hay usuarios válidos en este batch, continuar
+    if (usuariosValidos.length === 0) {
+      continue;
+    }
+
+    const usuariosParaInsertar = usuariosValidos.map(u => {
+      const userData = {
+        dpi: u.dpi,
+        nombre: u.nombre,
+        apellidos: u.apellidos,
+        fecha_nacimiento: u.fechaNacimiento,
+        fecha_ingreso: u.fechaIngreso || null,
+        nivel: u.nivel,
+        cargo: u.cargo,
+        area: u.area,
+        tipo_puesto: u.tipoPuesto || null,
+        genero: u.genero || null,
+        rol: 'colaborador' as const,
+        estado: 'activo' as const,
+        primer_ingreso: true,
+      };
+
+      // Log detallado de los primeros 3 registros
+      if (i < 3) {
+        console.log('📋 Usuario a insertar:', {
+          dpi: userData.dpi,
+          nombre: userData.nombre,
+          apellidos: userData.apellidos,
+          fecha_nacimiento: userData.fecha_nacimiento,
+          fecha_nacimiento_tipo: typeof userData.fecha_nacimiento,
+          fecha_nacimiento_length: userData.fecha_nacimiento?.length,
+          fecha_ingreso: userData.fecha_ingreso,
+          nivel: userData.nivel,
+          nivel_valido: nivelesValidos.has(userData.nivel)
+        });
+      }
+
+      return userData;
+    });
     
     try {
       const { error } = await supabase
@@ -538,14 +601,22 @@ export const importarUsuarios = async (usuarios: ImportedUser[]): Promise<{ exit
         });
       
       if (error) {
-        batch.forEach(u => {
+        console.error('❌ Error al insertar batch:', {
+          error: error,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
+        usuariosValidos.forEach(u => {
           errores.push({ usuario: u, error: error.message });
         });
       } else {
-        exitosos += batch.length;
+        exitosos += usuariosValidos.length;
       }
     } catch (error: any) {
-      batch.forEach(u => {
+      console.error('❌ Excepción al insertar batch:', error);
+      usuariosValidos.forEach(u => {
         errores.push({ usuario: u, error: error.message || 'Error desconocido' });
       });
     }
