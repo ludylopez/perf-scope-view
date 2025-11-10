@@ -430,12 +430,11 @@ const AdminUsuarios = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="space-y-2">
                   <Label>Nivel de Puesto</Label>
-                  <Select value={filtroNivel} onValueChange={setFiltroNivel}>
+                  <Select value={filtroNivel || undefined} onValueChange={(value) => setFiltroNivel(value || "")}>
                     <SelectTrigger>
                       <SelectValue placeholder="Todos los niveles" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Todos los niveles</SelectItem>
                       {jobLevels.map((level) => (
                         <SelectItem key={level.code} value={level.code}>
                           {level.code} - {level.name}
@@ -447,12 +446,11 @@ const AdminUsuarios = () => {
 
                 <div className="space-y-2">
                   <Label>Rol</Label>
-                  <Select value={filtroRol} onValueChange={setFiltroRol}>
+                  <Select value={filtroRol || undefined} onValueChange={(value) => setFiltroRol(value || "")}>
                     <SelectTrigger>
                       <SelectValue placeholder="Todos los roles" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Todos los roles</SelectItem>
                       <SelectItem value="colaborador">Colaborador</SelectItem>
                       <SelectItem value="jefe">Jefe</SelectItem>
                       <SelectItem value="admin_rrhh">Admin RR.HH.</SelectItem>
@@ -463,12 +461,11 @@ const AdminUsuarios = () => {
 
                 <div className="space-y-2">
                   <Label>Estado</Label>
-                  <Select value={filtroEstado} onValueChange={setFiltroEstado}>
+                  <Select value={filtroEstado || undefined} onValueChange={(value) => setFiltroEstado(value || "")}>
                     <SelectTrigger>
                       <SelectValue placeholder="Todos los estados" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Todos los estados</SelectItem>
                       <SelectItem value="activo">Activo</SelectItem>
                       <SelectItem value="inactivo">Inactivo</SelectItem>
                     </SelectContent>
@@ -477,12 +474,11 @@ const AdminUsuarios = () => {
 
                 <div className="space-y-2">
                   <Label>Tipo de Puesto</Label>
-                  <Select value={filtroTipoPuesto} onValueChange={setFiltroTipoPuesto}>
+                  <Select value={filtroTipoPuesto || undefined} onValueChange={(value) => setFiltroTipoPuesto(value || "")}>
                     <SelectTrigger>
                       <SelectValue placeholder="Todos los tipos" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Todos los tipos</SelectItem>
                       <SelectItem value="administrativo">Administrativo</SelectItem>
                       <SelectItem value="operativo">Operativo</SelectItem>
                     </SelectContent>
