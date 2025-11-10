@@ -378,11 +378,13 @@ export const ImportUsersDialog = ({ open, onOpenChange, onImportComplete }: Impo
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__none__">-- No mapear --</SelectItem>
-                {excelHeaders.map(header => (
-                  <SelectItem key={header} value={header}>
-                    {header}
-                  </SelectItem>
-                ))}
+                {excelHeaders
+                  .filter(header => header && header.trim() !== '')
+                  .map(header => (
+                    <SelectItem key={header} value={header}>
+                      {header}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </div>
