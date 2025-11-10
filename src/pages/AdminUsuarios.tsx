@@ -35,6 +35,65 @@ import { ImportUsersDialog } from "@/components/ImportUsersDialog";
 
 const PAGE_SIZE = 50; // OPTIMIZACIÓN: Paginación para manejar 400 usuarios
 
+const formatDDMMAAAAToISO = (value: string): string => {
+  if (!value) return "";
+
+  const trimmed = value.trim();
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return trimmed;
+  }
+
+  const digits = value.replace(/\D/g, "");
+  if (digits.length !== 8) return "";
+
+  const day = digits.slice(0, 2);
+  const month = digits.slice(2, 4);
+  const year = digits.slice(4, 8);
+
+  return `${year}-${month}-${day}`;
+};
+
+const ensureFechaNacimientoDDMMAAAA = (value: string): string => {
+  if (!value) {
+    throw new Error("La fecha de nacimiento es requerida");
+  }
+
+  const normalized = normalizeFechaNacimientoDDMMAAAA(value);
+
+  if (!normalized || normalized.length !== 8) {
+    throw new Error(`Formato de fecha de nacimiento inválido: "${value}"`);
+  }
+
+  return normalized;
+};
+
+const normalizeFechaNacimientoDDMMAAAA = (value: string): string => {
+  if (!value) return "";
+
+  const trimmed = value.trim();
+
+  if (/^\d{8}$/.test(trimmed)) {
+    return trimmed;
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    const [year, month, day] = trimmed.split("-");
+    return `${day}${month}${year}`;
+  }
+
+  const digits = trimmed.replace(/\D/g, "");
+  if (digits.length === 7) {
+    return digits.padStart(8, "0");
+  }
+
+  if (digits.length >= 8) {
+    return digits.slice(0, 8);
+  }
+
+  return "";
+};
+
 const AdminUsuarios = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -161,9 +220,13 @@ const AdminUsuarios = () => {
     }
 
     try {
-      // Convertir fecha de nacimiento a formato DDMMAAAA
-      const fechaNac = new Date(newUser.fechaNacimiento);
-      const fechaNacFormato = `${String(fechaNac.getDate()).padStart(2, '0')}${String(fechaNac.getMonth() + 1).padStart(2, '0')}${fechaNac.getFullYear()}`;
+      let fechaNacFormato: string;
+      try {
+        fechaNacFormato = ensureFechaNacimientoDDMMAAAA(newUser.fechaNacimiento);
+      } catch (error: any) {
+        toast.error(error.message || "Fecha de nacimiento inválida");
+        return;
+      }
 
       const { error } = await supabase
         .from("users")
@@ -228,11 +291,12 @@ const AdminUsuarios = () => {
     if (!editingUser) return;
 
     try {
-      // Convertir fecha de nacimiento a formato DDMMAAAA si está en formato date
-      let fechaNacFormato = editingUser.fechaNacimiento;
-      if (fechaNacFormato.includes('-')) {
-        const fechaNac = new Date(fechaNacFormato);
-        fechaNacFormato = `${String(fechaNac.getDate()).padStart(2, '0')}${String(fechaNac.getMonth() + 1).padStart(2, '0')}${fechaNac.getFullYear()}`;
+      let fechaNacFormato: string;
+      try {
+        fechaNacFormato = ensureFechaNacimientoDDMMAAAA(editingUser.fechaNacimiento);
+      } catch (error: any) {
+        toast.error(error.message || "Fecha de nacimiento inválida");
+        return;
       }
 
       const { error } = await supabase
@@ -269,6 +333,10 @@ const AdminUsuarios = () => {
       console.error("Error updating user:", error);
       toast.error(error.message || "Error al actualizar usuario");
     }
+  };
+
+  const handleEditClick = (usuario: any) => {
+    setEditingUser(usuario);
   };
 
   const handleImportComplete = () => {
@@ -659,7 +727,7 @@ const AdminUsuarios = () => {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => setEditingUser(usuario)}
+                          onClick={() => handleEditClick(usuario)}
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
@@ -692,8 +760,13 @@ const AdminUsuarios = () => {
                     <Label>Fecha de Nacimiento</Label>
                     <Input
                       type="date"
-                      value={editingUser.fechaNacimiento}
-                      onChange={(e) => setEditingUser({ ...editingUser, fechaNacimiento: e.target.value })}
+                      value={formatDDMMAAAAToISO(editingUser.fechaNacimiento)}
+                      onChange={(e) =>
+                        setEditingUser({
+                          ...editingUser,
+                          fechaNacimiento: normalizeFechaNacimientoDDMMAAAA(e.target.value),
+                        })
+                      }
                     />
                   </div>
                   <div className="space-y-2">

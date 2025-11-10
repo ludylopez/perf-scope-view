@@ -353,16 +353,21 @@ function validateFechaNacimiento(fechaNac: any, rowIndex: number): FieldValidati
 
   try {
     const fechaConvertida = convertirFechaNacimiento(fechaNac);
+    let normalized = fechaConvertida.replace(/\D/g, '');
+
+    if (normalized.length === 7) {
+      normalized = normalized.padStart(8, '0');
+    }
 
     // Validar que tenga exactamente 8 dígitos
-    if (!/^\d{8}$/.test(fechaConvertida)) {
+    if (!/^\d{8}$/.test(normalized)) {
       return {
         field,
         value: fechaNac,
         expectedType,
         constraints,
         isValid: false,
-        error: `Fila ${rowIndex}: Fecha convertida "${fechaConvertida}" no tiene 8 dígitos`
+        error: `Fila ${rowIndex}: Fecha convertida "${normalized}" no tiene 8 dígitos`
       };
     }
 
@@ -372,7 +377,7 @@ function validateFechaNacimiento(fechaNac: any, rowIndex: number): FieldValidati
       expectedType,
       constraints,
       isValid: true,
-      fixedValue: fechaConvertida
+      fixedValue: normalized
     };
   } catch (error: any) {
     return {

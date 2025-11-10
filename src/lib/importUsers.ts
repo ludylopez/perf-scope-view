@@ -25,6 +25,19 @@ export interface ImportedUser {
 let mapeoLogCount = 0;
 const MAX_MAPEO_LOGS = 10;
 
+const normalizeFechaNacimiento = (value: string): string => {
+  if (!value) {
+    return value;
+  }
+
+  const digitsOnly = value.replace(/\D/g, '');
+  if (digitsOnly.length === 7) {
+    return digitsOnly.padStart(8, '0');
+  }
+
+  return digitsOnly;
+};
+
 /**
  * Mapea el nombre descriptivo de un nivel al código correspondiente
  * Ejemplos: "OPERATIVOS II" -> "O2", "ADMINISTRATIVOS I" -> "A3"
@@ -481,6 +494,8 @@ export const parsearArchivoUsuarios = async (file: File): Promise<{ usuarios: Im
             continue;
           }
 
+          const fechaNacimientoNormalizada = normalizeFechaNacimiento(fechaNacFormato);
+
           const fechaIngFormato = convertirFechaIngreso(fechaIng);
           // NOTA: tipo_puesto se sincronizará automáticamente desde job_levels via trigger SQL
           // Se mantiene inferTipoPuesto como fallback para compatibilidad
@@ -491,7 +506,7 @@ export const parsearArchivoUsuarios = async (file: File): Promise<{ usuarios: Im
             dpi,
             nombre,
             apellidos,
-            fechaNacimiento: fechaNacFormato,
+            fechaNacimiento: fechaNacimientoNormalizada,
             fechaIngreso: fechaIngFormato || '',
             nivel,
             cargo,
@@ -596,6 +611,8 @@ export const parsearArchivoUsuarios = async (file: File): Promise<{ usuarios: Im
             continue;
           }
 
+          const fechaNacimientoNormalizada = normalizeFechaNacimiento(fechaNacFormato);
+
           const fechaIngFormato = convertirFechaIngreso(fechaIng);
           // NOTA: tipo_puesto se sincronizará automáticamente desde job_levels via trigger SQL
           // Se mantiene inferTipoPuesto como fallback para compatibilidad
@@ -606,7 +623,7 @@ export const parsearArchivoUsuarios = async (file: File): Promise<{ usuarios: Im
             dpi,
             nombre,
             apellidos,
-            fechaNacimiento: fechaNacFormato,
+            fechaNacimiento: fechaNacimientoNormalizada,
             fechaIngreso: fechaIngFormato || '',
             nivel,
             cargo,
