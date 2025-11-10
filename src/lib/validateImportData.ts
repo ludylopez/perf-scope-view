@@ -140,7 +140,7 @@ export function validateUserRecord(
   fixedData.rol = 'colaborador';
   fixedData.estado = 'activo';
   fixedData.primer_ingreso = true;
-  fixedData.tipo_puesto = null; // Se asignará automáticamente por trigger
+  // tipo_puesto se asignará automáticamente por el trigger BEFORE INSERT
 
   console.groupEnd();
 
