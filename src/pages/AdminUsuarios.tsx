@@ -473,6 +473,38 @@ const AdminUsuarios = () => {
                     />
                   </div>
                   <div className="space-y-2">
+                    <Label>Dirección o Unidad</Label>
+                    <Input
+                      value={newUser.direccionUnidad}
+                      onChange={(e) => setNewUser({ ...newUser, direccionUnidad: e.target.value })}
+                      placeholder="Unidad organizacional"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Departamento o Dependencia</Label>
+                    <Input
+                      value={newUser.departamentoDependencia}
+                      onChange={(e) => setNewUser({ ...newUser, departamentoDependencia: e.target.value })}
+                      placeholder="Departamento administrativo"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Renglón</Label>
+                    <Input
+                      value={newUser.renglon}
+                      onChange={(e) => setNewUser({ ...newUser, renglon: e.target.value })}
+                      placeholder="011, 021, 022, etc."
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Profesión</Label>
+                    <Input
+                      value={newUser.profesion}
+                      onChange={(e) => setNewUser({ ...newUser, profesion: e.target.value })}
+                      placeholder="Profesión u oficio"
+                    />
+                  </div>
+                  <div className="space-y-2">
                     <Label>Jefe Inmediato (DPI)</Label>
                     <Input
                       value={newUser.jefeInmediato}
@@ -769,6 +801,38 @@ const AdminUsuarios = () => {
                     <Input
                       value={editingUser.area}
                       onChange={(e) => setEditingUser({ ...editingUser, area: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Dirección o Unidad</Label>
+                    <Input
+                      value={editingUser.direccionUnidad || ""}
+                      onChange={(e) => setEditingUser({ ...editingUser, direccionUnidad: e.target.value })}
+                      placeholder="Unidad organizacional"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Departamento o Dependencia</Label>
+                    <Input
+                      value={editingUser.departamentoDependencia || ""}
+                      onChange={(e) => setEditingUser({ ...editingUser, departamentoDependencia: e.target.value })}
+                      placeholder="Departamento administrativo"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Renglón</Label>
+                    <Input
+                      value={editingUser.renglon || ""}
+                      onChange={(e) => setEditingUser({ ...editingUser, renglon: e.target.value })}
+                      placeholder="011, 021, 022, etc."
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Profesión</Label>
+                    <Input
+                      value={editingUser.profesion || ""}
+                      onChange={(e) => setEditingUser({ ...editingUser, profesion: e.target.value })}
+                      placeholder="Profesión u oficio"
                     />
                   </div>
                   <div className="space-y-2">
