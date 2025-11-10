@@ -2,6 +2,7 @@
 import * as XLSX from 'xlsx';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { validateUserRecord } from './validateImportData';
 
 export interface ImportedUser {
   dpi: string;
@@ -591,6 +592,9 @@ export const importarUsuarios = async (usuarios: ImportedUser[]): Promise<{ exit
   const errores: Array<{ usuario: ImportedUser; error: string }> = [];
   let exitosos = 0;
 
+  console.group('📊 INICIANDO IMPORTACIÓN DE USUARIOS');
+  console.log(`Total de usuarios a importar: ${usuarios.length}`);
+
   // Obtener niveles válidos de job_levels una sola vez
   const { data: jobLevels, error: jobLevelsError } = await supabase
     .from('job_levels')
@@ -603,65 +607,84 @@ export const importarUsuarios = async (usuarios: ImportedUser[]): Promise<{ exit
       usuario: usuarios[0],
       error: 'No se pudieron obtener los niveles de puesto válidos: ' + jobLevelsError.message
     });
+    console.groupEnd();
     return { exitosos: 0, errores };
   }
 
   const nivelesValidos = new Set(jobLevels?.map(jl => jl.code) || []);
-  console.log('✅ Niveles válidos:', Array.from(nivelesValidos));
+  console.log('✅ Niveles válidos en job_levels:', Array.from(nivelesValidos).join(', '));
 
-  // Procesar en lotes de 50 para evitar sobrecarga
-  const BATCH_SIZE = 50;
-  for (let i = 0; i < usuarios.length; i += BATCH_SIZE) {
-    const batch = usuarios.slice(i, i + BATCH_SIZE);
-    
-    // Filtrar usuarios con nivel inválido
-    const usuariosConNivelInvalido: ImportedUser[] = [];
-    const usuariosValidos: ImportedUser[] = [];
+  // ============================================================
+  // VALIDACIÓN EXHAUSTIVA DE TODOS LOS REGISTROS
+  // ============================================================
+  console.group('🔍 VALIDANDO TODOS LOS REGISTROS');
+  const usuariosValidados: Array<{ usuario: ImportedUser, datosCorregidos: any }> = [];
 
-    batch.forEach(u => {
-      if (!nivelesValidos.has(u.nivel)) {
-        console.warn(`⚠️ Nivel inválido: ${u.nivel} para ${u.nombre} ${u.apellidos}`);
-        usuariosConNivelInvalido.push(u);
-      } else {
-        usuariosValidos.push(u);
-      }
-    });
-
-    // Agregar errores para usuarios con nivel inválido
-    usuariosConNivelInvalido.forEach(u => {
-      errores.push({
-        usuario: u,
-        error: `Nivel de puesto inválido: "${u.nivel}". Los niveles válidos son: ${Array.from(nivelesValidos).join(', ')}`
-      });
-    });
-
-    // Si no hay usuarios válidos en este batch, continuar
-    if (usuariosValidos.length === 0) {
-      continue;
-    }
-
-    const usuariosParaInsertar = usuariosValidos.map(u => {
-      const userData = {
+  usuarios.forEach((u, index) => {
+    // Validar cada registro completo
+    const validationResult = validateUserRecord(
+      {
         dpi: u.dpi,
-        nombre: u.nombre,
-        apellidos: u.apellidos,
-        fecha_nacimiento: u.fechaNacimiento,
-        fecha_ingreso: u.fechaIngreso || null,
+        nombreCompleto: `${u.nombre} ${u.apellidos}`,
+        fechaNacimiento: u.fechaNacimiento,
+        fechaIngreso: u.fechaIngreso,
         nivel: u.nivel,
         cargo: u.cargo,
         area: u.area,
-        tipo_puesto: u.tipoPuesto || null,
-        genero: u.genero || null,
-        rol: 'colaborador' as const,
-        estado: 'activo' as const,
-        primer_ingreso: true,
-      };
+        genero: u.genero
+      },
+      index + 2, // +2 porque Excel empieza en 1 y la primera es header
+      nivelesValidos
+    );
 
-      // Log detallado de los primeros 5 registros
-      const indexInBatch = usuariosValidos.indexOf(u);
-      if (i === 0 && indexInBatch < 5) {
-        console.log(`📋 Usuario #${indexInBatch + 1} a insertar:`, {
+    if (!validationResult.isValid) {
+      // Agregar todos los errores encontrados
+      validationResult.errors.forEach(error => {
+        errores.push({ usuario: u, error });
+      });
+    } else {
+      // Agregar warnings si los hay
+      validationResult.warnings.forEach(warning => {
+        console.warn(warning);
+      });
+
+      // Usuario válido con datos corregidos
+      usuariosValidados.push({
+        usuario: u,
+        datosCorregidos: validationResult.fixedData
+      });
+    }
+  });
+
+  console.groupEnd();
+  console.log(`✅ Usuarios válidos: ${usuariosValidados.length}`);
+  console.log(`❌ Usuarios con errores: ${errores.length}`);
+
+  if (usuariosValidados.length === 0) {
+    console.error('❌ No hay usuarios válidos para importar');
+    console.groupEnd();
+    return { exitosos: 0, errores };
+  }
+
+  // ============================================================
+  // INSERCIÓN EN LOTES
+  // ============================================================
+  console.group('📤 INSERTANDO EN SUPABASE');
+  const BATCH_SIZE = 50;
+  for (let i = 0; i < usuariosValidados.length; i += BATCH_SIZE) {
+    const batch = usuariosValidados.slice(i, i + BATCH_SIZE);
+
+    console.log(`\n📦 Procesando lote ${Math.floor(i / BATCH_SIZE) + 1} (${batch.length} usuarios)`);
+
+    // Usar los datos YA VALIDADOS Y CORREGIDOS
+    const usuariosParaInsertar = batch.map(({ usuario, datosCorregidos }, indexInBatch) => {
+      const userData = datosCorregidos;
+
+      // Log detallado de los primeros 3 registros del primer lote
+      if (i === 0 && indexInBatch < 3) {
+        console.log(`\n📋 Usuario #${indexInBatch + 1} a insertar:`, {
           dpi: userData.dpi,
+          dpi_length: userData.dpi?.length,
           nombre: userData.nombre,
           apellidos: userData.apellidos,
           fecha_nacimiento: userData.fecha_nacimiento,
@@ -669,9 +692,11 @@ export const importarUsuarios = async (usuarios: ImportedUser[]): Promise<{ exit
           fecha_nacimiento_length: userData.fecha_nacimiento?.length,
           fecha_ingreso: userData.fecha_ingreso,
           nivel: userData.nivel,
-          nivel_valido: nivelesValidos.has(userData.nivel),
           cargo: userData.cargo,
-          area: userData.area
+          area: userData.area,
+          genero: userData.genero,
+          rol: userData.rol,
+          estado: userData.estado
         });
       }
 
@@ -694,20 +719,27 @@ export const importarUsuarios = async (usuarios: ImportedUser[]): Promise<{ exit
           hint: error.hint,
           code: error.code
         });
-        usuariosValidos.forEach(u => {
-          errores.push({ usuario: u, error: error.message });
+        batch.forEach(({ usuario }) => {
+          errores.push({ usuario, error: error.message });
         });
       } else {
-        exitosos += usuariosValidos.length;
+        exitosos += batch.length;
+        console.log(`✅ Lote insertado exitosamente (${batch.length} usuarios)`);
       }
     } catch (error: any) {
       console.error('❌ Excepción al insertar batch:', error);
-      usuariosValidos.forEach(u => {
-        errores.push({ usuario: u, error: error.message || 'Error desconocido' });
+      batch.forEach(({ usuario }) => {
+        errores.push({ usuario, error: error.message || 'Error desconocido' });
       });
     }
   }
-  
+
+  console.groupEnd(); // Fin de inserción
+  console.groupEnd(); // Fin de importación
+  console.log('\n📊 RESUMEN FINAL:');
+  console.log(`  ✅ Usuarios importados: ${exitosos}`);
+  console.log(`  ❌ Usuarios con errores: ${errores.length}`);
+
   return { exitosos, errores };
 };
 
