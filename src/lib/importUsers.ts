@@ -16,6 +16,87 @@ export interface ImportedUser {
   genero?: 'masculino' | 'femenino' | 'otro' | 'prefiero_no_decir';
 }
 
+// Contador para limitar los logs de mapeo
+let mapeoLogCount = 0;
+const MAX_MAPEO_LOGS = 10;
+
+/**
+ * Mapea el nombre descriptivo de un nivel al código correspondiente
+ * Ejemplos: "OPERATIVOS II" -> "O2", "ADMINISTRATIVOS I" -> "A3"
+ */
+export const mapearNivelAcodigo = (nivelInput: string): string => {
+  const nivelUpper = nivelInput.trim().toUpperCase();
+
+  // Si ya es un código válido (2-3 caracteres), retornarlo
+  if (/^[A-Z]{1,3}\d?$/.test(nivelUpper) && nivelUpper.length <= 3) {
+    return nivelUpper;
+  }
+
+  const shouldLog = mapeoLogCount < MAX_MAPEO_LOGS;
+  if (shouldLog) {
+    console.log(`🔄 Mapeando nivel: "${nivelInput}" → "${nivelUpper}"`);
+    mapeoLogCount++;
+  }
+
+  // Mapeo de nombres descriptivos a códigos
+  const nombreACodigo: Record<string, string> = {
+    'ALCALDE MUNICIPAL': 'A1',
+    'ALCALDE': 'A1',
+    'ASESORIA PROFESIONAL': 'A2',
+    'ASESORÍA PROFESIONAL': 'A2',
+    'ASESORIA': 'A2',
+    'SECRETARIO': 'S2',
+    'GERENTE - DIRECCIONES I': 'D1',
+    'GERENTE': 'D1',
+    'DIRECCIONES I': 'D1',
+    'DIRECCION I': 'D1',
+    'DIRECCIONES II': 'D2',
+    'DIRECCION II': 'D2',
+    'ENCARGADOS Y JEFES DE UNIDADES I': 'E1',
+    'ENCARGADOS I': 'E1',
+    'JEFES I': 'E1',
+    'ENCARGADOS Y JEFES DE UNIDADES II': 'E2',
+    'ENCARGADOS II': 'E2',
+    'JEFES II': 'E2',
+    'ADMINISTRATIVOS I': 'A3',
+    'ADMINISTRATIVO I': 'A3',
+    'ADMIN I': 'A3',
+    'ADMINISTRATIVOS II': 'A4',
+    'ADMINISTRATIVO II': 'A4',
+    'ADMIN II': 'A4',
+    'OPERATIVOS - TECNICO ESPECIALIZADO': 'OTE',
+    'OPERATIVOS - TÉCNICO ESPECIALIZADO': 'OTE',
+    'OPERATIVO TECNICO ESPECIALIZADO': 'OTE',
+    'TECNICO ESPECIALIZADO': 'OTE',
+    'TÉCNICO ESPECIALIZADO': 'OTE',
+    'OPERATIVOS I': 'O1',
+    'OPERATIVO I': 'O1',
+    'OPERATIVOS II': 'O2',
+    'OPERATIVO II': 'O2',
+    'OTROS SERVICIOS': 'OS',
+    'OTRO SERVICIO': 'OS',
+  };
+
+  // Buscar en el mapeo
+  const codigo = nombreACodigo[nivelUpper];
+  if (codigo) {
+    if (shouldLog) console.log(`  ✅ Convertido a: ${codigo}`);
+    return codigo;
+  }
+
+  // Si no se encuentra, intentar extraer el código de patrones comunes
+  // Ejemplo: "A3 - ADMINISTRATIVOS I" -> "A3"
+  const match = nivelUpper.match(/^([A-Z]{1,3}\d?)[\s\-]/);
+  if (match) {
+    if (shouldLog) console.log(`  ✅ Extraído código: ${match[1]}`);
+    return match[1];
+  }
+
+  // Retornar el valor original si no se pudo mapear
+  if (shouldLog) console.warn(`  ⚠️ No se pudo mapear, usando valor original: ${nivelUpper}`);
+  return nivelUpper;
+};
+
 /**
  * Normaliza el género desde diferentes formatos posibles en el CSV
  */
@@ -344,7 +425,8 @@ export const parsearArchivoUsuarios = async (file: File): Promise<{ usuarios: Im
           const nombreCompleto = partsTrimmed[columnMap.nombre]?.trim() || '';
           const fechaNac = partsTrimmed[columnMap.fechaNacimiento]?.trim() || '';
           const fechaIng = partsTrimmed[columnMap.fechaIngreso]?.trim() || '';
-          const nivel = partsTrimmed[columnMap.nivel]?.trim().toUpperCase() || '';
+          const nivelRaw = partsTrimmed[columnMap.nivel]?.trim() || '';
+          const nivel = mapearNivelAcodigo(nivelRaw);
           const cargo = partsTrimmed[columnMap.cargo]?.trim() || '';
           const area = partsTrimmed[columnMap.area]?.trim() || partsTrimmed[columnMap.direccion]?.trim() || '';
           const generoRaw = partsTrimmed[columnMap.genero]?.trim() || '';
@@ -437,7 +519,8 @@ export const parsearArchivoUsuarios = async (file: File): Promise<{ usuarios: Im
           const nombreCompleto = String(row[columnMap.nombre] || '').trim();
           const fechaNac = row[columnMap.fechaNacimiento];
           const fechaIng = row[columnMap.fechaIngreso];
-          const nivel = String(row[columnMap.nivel] || '').trim().toUpperCase();
+          const nivelRaw = String(row[columnMap.nivel] || '').trim();
+          const nivel = mapearNivelAcodigo(nivelRaw);
           const cargo = String(row[columnMap.cargo] || '').trim();
           const area = String(row[columnMap.area] || row[columnMap.direccion] || '').trim();
           const generoRaw = String(row[columnMap.genero] || '').trim();
@@ -574,9 +657,10 @@ export const importarUsuarios = async (usuarios: ImportedUser[]): Promise<{ exit
         primer_ingreso: true,
       };
 
-      // Log detallado de los primeros 3 registros
-      if (i < 3) {
-        console.log('📋 Usuario a insertar:', {
+      // Log detallado de los primeros 5 registros
+      const indexInBatch = usuariosValidos.indexOf(u);
+      if (i === 0 && indexInBatch < 5) {
+        console.log(`📋 Usuario #${indexInBatch + 1} a insertar:`, {
           dpi: userData.dpi,
           nombre: userData.nombre,
           apellidos: userData.apellidos,
@@ -585,7 +669,9 @@ export const importarUsuarios = async (usuarios: ImportedUser[]): Promise<{ exit
           fecha_nacimiento_length: userData.fecha_nacimiento?.length,
           fecha_ingreso: userData.fecha_ingreso,
           nivel: userData.nivel,
-          nivel_valido: nivelesValidos.has(userData.nivel)
+          nivel_valido: nivelesValidos.has(userData.nivel),
+          cargo: userData.cargo,
+          area: userData.area
         });
       }
 
