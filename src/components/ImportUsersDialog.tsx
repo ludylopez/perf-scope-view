@@ -43,10 +43,12 @@ const FIELD_MAPPINGS = {
   fechaIngreso: { label: 'Fecha de Ingreso', required: false, examples: ['FECHA DE INICIO LABORAL', 'FECHA INGRESO', 'INICIO'] },
   nivel: { label: 'Nivel de Puesto (Código o Nombre)', required: true, examples: ['NIVEL DE PUESTO', 'NIVEL', 'CODIGO NIVEL', 'CODIGO', 'CATEGORY'] },
   cargo: { label: 'Puesto/Cargo', required: true, examples: ['PUESTO', 'CARGO', 'POSICION'] },
-  area: { label: 'Área/Departamento', required: true, examples: ['DEPARTAMENTO O DEPENDENCIA', 'DIRECCION O UNIDAD', 'DEPARTAMENTO', 'AREA', 'DEPENDENCIA', 'DIRECCION'] },
-  genero: { label: 'Género/Sexo', required: false, examples: ['SEXO', 'GENERO', 'GÉNERO'] },
+  direccionUnidad: { label: 'Dirección o Unidad', required: false, examples: ['DIRECCION O UNIDAD', 'DIRECCION', 'UNIDAD'] },
+  departamentoDependencia: { label: 'Departamento o Dependencia', required: false, examples: ['DEPARTAMENTO O DEPENDENCIA', 'DEPARTAMENTO', 'DEPENDENCIA'] },
+  area: { label: 'Área (genérico)', required: false, examples: ['AREA', 'ÁREA'] },
   renglon: { label: 'Renglón', required: false, examples: ['RENGLON', 'RENGLÓN'] },
   profesion: { label: 'Profesión', required: false, examples: ['PROFESION', 'PROFESIÓN', 'OCUPACION'] },
+  genero: { label: 'Género/Sexo', required: false, examples: ['SEXO', 'GENERO', 'GÉNERO'] },
 };
 
 export const ImportUsersDialog = ({ open, onOpenChange, onImportComplete }: ImportUsersDialogProps) => {

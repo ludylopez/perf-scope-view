@@ -13,6 +13,10 @@ export interface ImportedUser {
   nivel: string;
   cargo: string;
   area: string;
+  direccionUnidad?: string;
+  departamentoDependencia?: string;
+  renglon?: string;
+  profesion?: string;
   tipoPuesto?: 'administrativo' | 'operativo';
   genero?: 'masculino' | 'femenino' | 'otro' | 'prefiero_no_decir';
 }
@@ -473,6 +477,10 @@ export const parsearArchivoUsuarios = async (file: File): Promise<{ usuarios: Im
             nivel,
             cargo,
             area,
+            direccionUnidad: direccionUnidad || undefined,
+            departamentoDependencia: departamentoDependencia || undefined,
+            renglon: renglon || undefined,
+            profesion: profesion || undefined,
             tipoPuesto: tipoPuesto || undefined,
             genero: genero || undefined,
           });
@@ -504,9 +512,17 @@ export const parsearArchivoUsuarios = async (file: File): Promise<{ usuarios: Im
         if (h.includes('fecha') && h.includes('nacimiento')) columnMap.fechaNacimiento = i;
         if (h.includes('fecha') && (h.includes('inicio') || h.includes('laboral'))) columnMap.fechaIngreso = i;
         if (h.includes('nivel') || (h.includes('puesto') && h.includes('nivel'))) columnMap.nivel = i;
-        if (h.includes('puesto') && !h.includes('nivel')) columnMap.cargo = i;
-        if (h.includes('departamento') || h.includes('dependencia')) columnMap.area = i;
-        if (h.includes('direccion') || h.includes('unidad')) columnMap.direccion = i;
+        if (h.includes('puesto') && !h.includes('nivel') && !h.includes('tipo')) columnMap.cargo = i;
+
+        // Nuevos campos específicos
+        if (h.includes('direccion') && h.includes('unidad')) columnMap.direccionUnidad = i;
+        if (h.includes('departamento') && h.includes('dependencia')) columnMap.departamentoDependencia = i;
+        if (h.includes('renglon') || h.includes('renglón')) columnMap.renglon = i;
+        if (h.includes('profesion') || h.includes('profesión') || h.includes('ocupacion')) columnMap.profesion = i;
+
+        // Area genérico (fallback)
+        if (h.includes('area') || h.includes('área')) columnMap.area = i;
+
         if (h.includes('sexo') || h.includes('género') || h.includes('genero')) columnMap.genero = i;
       });
       
@@ -523,7 +539,11 @@ export const parsearArchivoUsuarios = async (file: File): Promise<{ usuarios: Im
           const nivelRaw = String(row[columnMap.nivel] || '').trim();
           const nivel = mapearNivelAcodigo(nivelRaw);
           const cargo = String(row[columnMap.cargo] || '').trim();
-          const area = String(row[columnMap.area] || row[columnMap.direccion] || '').trim();
+          const area = String(row[columnMap.area] || '').trim();
+          const direccionUnidad = String(row[columnMap.direccionUnidad] || '').trim();
+          const departamentoDependencia = String(row[columnMap.departamentoDependencia] || '').trim();
+          const renglon = String(row[columnMap.renglon] || '').trim();
+          const profesion = String(row[columnMap.profesion] || '').trim();
           const generoRaw = String(row[columnMap.genero] || '').trim();
           
           if (!dpi || dpi.length < 10) {
@@ -567,6 +587,10 @@ export const parsearArchivoUsuarios = async (file: File): Promise<{ usuarios: Im
             nivel,
             cargo,
             area,
+            direccionUnidad: direccionUnidad || undefined,
+            departamentoDependencia: departamentoDependencia || undefined,
+            renglon: renglon || undefined,
+            profesion: profesion || undefined,
             tipoPuesto: tipoPuesto || undefined,
             genero: genero || undefined,
           });
@@ -631,6 +655,10 @@ export const importarUsuarios = async (usuarios: ImportedUser[]): Promise<{ exit
         nivel: u.nivel,
         cargo: u.cargo,
         area: u.area,
+        direccionUnidad: u.direccionUnidad,
+        departamentoDependencia: u.departamentoDependencia,
+        renglon: u.renglon,
+        profesion: u.profesion,
         genero: u.genero
       },
       index + 2, // +2 porque Excel empieza en 1 y la primera es header

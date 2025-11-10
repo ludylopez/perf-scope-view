@@ -135,6 +135,62 @@ export function validateUserRecord(
   logFieldValidation('GENERO', generoValidation);
 
   // ============================================================
+  // 9. DIRECCION O UNIDAD (VARCHAR(255), OPCIONAL)
+  // ============================================================
+  if (row.direccionUnidad) {
+    const direccionValidation = validateTextField(row.direccionUnidad, 'direccion_unidad', 255, false, rowIndex);
+    if (!direccionValidation.isValid) {
+      errors.push(direccionValidation.error!);
+    } else {
+      fixedData.direccion_unidad = direccionValidation.fixedValue;
+      if (direccionValidation.warning) warnings.push(direccionValidation.warning);
+    }
+    logFieldValidation('DIRECCION_UNIDAD', direccionValidation);
+  }
+
+  // ============================================================
+  // 10. DEPARTAMENTO O DEPENDENCIA (VARCHAR(255), OPCIONAL)
+  // ============================================================
+  if (row.departamentoDependencia) {
+    const departamentoValidation = validateTextField(row.departamentoDependencia, 'departamento_dependencia', 255, false, rowIndex);
+    if (!departamentoValidation.isValid) {
+      errors.push(departamentoValidation.error!);
+    } else {
+      fixedData.departamento_dependencia = departamentoValidation.fixedValue;
+      if (departamentoValidation.warning) warnings.push(departamentoValidation.warning);
+    }
+    logFieldValidation('DEPARTAMENTO_DEPENDENCIA', departamentoValidation);
+  }
+
+  // ============================================================
+  // 11. RENGLON (VARCHAR(50), OPCIONAL)
+  // ============================================================
+  if (row.renglon) {
+    const renglonValidation = validateTextField(row.renglon, 'renglon', 50, false, rowIndex);
+    if (!renglonValidation.isValid) {
+      errors.push(renglonValidation.error!);
+    } else {
+      fixedData.renglon = renglonValidation.fixedValue;
+      if (renglonValidation.warning) warnings.push(renglonValidation.warning);
+    }
+    logFieldValidation('RENGLON', renglonValidation);
+  }
+
+  // ============================================================
+  // 12. PROFESION (VARCHAR(255), OPCIONAL)
+  // ============================================================
+  if (row.profesion) {
+    const profesionValidation = validateTextField(row.profesion, 'profesion', 255, false, rowIndex);
+    if (!profesionValidation.isValid) {
+      errors.push(profesionValidation.error!);
+    } else {
+      fixedData.profesion = profesionValidation.fixedValue;
+      if (profesionValidation.warning) warnings.push(profesionValidation.warning);
+    }
+    logFieldValidation('PROFESION', profesionValidation);
+  }
+
+  // ============================================================
   // CAMPOS CON VALORES POR DEFECTO
   // ============================================================
   fixedData.rol = 'colaborador';

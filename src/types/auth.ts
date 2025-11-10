@@ -10,6 +10,10 @@ export interface User {
   nivel: string;
   cargo: string;
   area: string;
+  direccionUnidad?: string;
+  departamentoDependencia?: string;
+  renglon?: string;
+  profesion?: string;
   jefeInmediato?: string;
   rol: UserRole;
   estado: "activo" | "inactivo";
