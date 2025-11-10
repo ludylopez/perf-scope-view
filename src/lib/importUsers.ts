@@ -690,13 +690,12 @@ export const importarUsuarios = async (usuarios: ImportedUser[]): Promise<{ exit
         .select();
 
       if (error) {
-        console.error(`❌ Error al insertar usuario ${i + 1} (DPI: ${userData.dpi}):`, {
-          error: error,
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code
-        });
+        console.error(`❌ Error al insertar usuario ${i + 1} (DPI: ${userData.dpi})`);
+        console.error('ERROR MESSAGE:', error.message);
+        console.error('ERROR CODE:', error.code);
+        console.error('ERROR DETAILS:', error.details);
+        console.error('ERROR HINT:', error.hint);
+        console.error('ERROR COMPLETO (JSON):', JSON.stringify(error, null, 2));
         console.error('Datos que causaron el error:', JSON.stringify(userData, null, 2));
         errores.push({ usuario, error: `${error.message} (DPI: ${userData.dpi})` });
       } else {
