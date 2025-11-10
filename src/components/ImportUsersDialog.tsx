@@ -169,18 +169,27 @@ export const ImportUsersDialog = ({ open, onOpenChange, onImportComplete }: Impo
           const fechaIngCol = columnMappings.fechaIngreso ? excelHeaders.indexOf(columnMappings.fechaIngreso) : -1;
           const nivelCol = excelHeaders.indexOf(columnMappings.nivel || '');
           const cargoCol = excelHeaders.indexOf(columnMappings.cargo || '');
-          const areaCol = excelHeaders.indexOf(columnMappings.area || '');
+          const areaCol = columnMappings.area ? excelHeaders.indexOf(columnMappings.area) : -1;
+          const direccionUnidadCol = columnMappings.direccionUnidad ? excelHeaders.indexOf(columnMappings.direccionUnidad) : -1;
+          const departamentoDependenciaCol = columnMappings.departamentoDependencia ? excelHeaders.indexOf(columnMappings.departamentoDependencia) : -1;
+          const renglonCol = columnMappings.renglon ? excelHeaders.indexOf(columnMappings.renglon) : -1;
+          const profesionCol = columnMappings.profesion ? excelHeaders.indexOf(columnMappings.profesion) : -1;
           const generoCol = columnMappings.genero ? excelHeaders.indexOf(columnMappings.genero) : -1;
 
           const dpi = String(row[dpiCol] || '').trim().replace(/\s+/g, '');
           const nombreCompleto = String(row[nombreCol] || '').trim();
           const nivelRaw = String(row[nivelCol] || '').trim();
           const nivel = mapearNivelAcodigo(nivelRaw);
-          const cargo = String(row[cargoCol] || '').trim();
-          const area = String(row[areaCol] || '').trim();
+          const cargo = cargoCol >= 0 ? String(row[cargoCol] || '').trim() : '';
+          const areaValue = areaCol >= 0 ? String(row[areaCol] || '').trim() : '';
+          const direccionUnidad = direccionUnidadCol >= 0 ? String(row[direccionUnidadCol] || '').trim() : '';
+          const departamentoDependencia = departamentoDependenciaCol >= 0 ? String(row[departamentoDependenciaCol] || '').trim() : '';
+          const area = areaValue || direccionUnidad || departamentoDependencia;
           const fechaNac = row[fechaNacCol];
           const fechaIng = fechaIngCol >= 0 ? row[fechaIngCol] : '';
           const generoRaw = generoCol >= 0 ? row[generoCol] : '';
+          const renglon = renglonCol >= 0 ? String(row[renglonCol] || '').trim() : '';
+          const profesion = profesionCol >= 0 ? String(row[profesionCol] || '').trim() : '';
 
           if (!dpi || !nombreCompleto || !nivel || !cargo || !area) {
             errors.push(`Fila ${index + 2}: Faltan datos requeridos`);
@@ -225,6 +234,10 @@ export const ImportUsersDialog = ({ open, onOpenChange, onImportComplete }: Impo
             nivel,
             cargo,
             area,
+            direccionUnidad: direccionUnidad || undefined,
+            departamentoDependencia: departamentoDependencia || undefined,
+            renglon: renglon || undefined,
+            profesion: profesion || undefined,
             tipoPuesto: tipoPuesto || undefined,
             genero: genero || undefined,
           });

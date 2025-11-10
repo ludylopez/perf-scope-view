@@ -412,8 +412,14 @@ export const parsearArchivoUsuarios = async (file: File): Promise<{ usuarios: Im
         if (headerLower.includes('fecha') && (headerLower.includes('inicio') || headerLower.includes('laboral'))) columnMap.fechaIngreso = i;
         if (headerLower.includes('nivel')) columnMap.nivel = i;
         if (headerLower.includes('puesto') && !headerLower.includes('nivel')) columnMap.cargo = i;
-        if (headerLower.includes('departamento') || headerLower.includes('dependencia')) columnMap.area = i;
-        if (headerLower.includes('direccion') || headerLower.includes('unidad')) columnMap.direccion = i;
+        if (headerLower.includes('departamento') && headerLower.includes('dependencia')) columnMap.departamentoDependencia = i;
+        if (headerLower.includes('direccion') && headerLower.includes('unidad')) columnMap.direccionUnidad = i;
+        if (!columnMap.area && (headerLower.includes('departamento') || headerLower.includes('dependencia') || headerLower.includes('area') || headerLower.includes('área'))) {
+          columnMap.area = i;
+        }
+        if (!columnMap.direccion && headerLower.includes('direccion')) columnMap.direccion = i;
+        if (headerLower.includes('renglon') || headerLower.includes('renglón')) columnMap.renglon = i;
+        if (headerLower.includes('profesion') || headerLower.includes('profesión') || headerLower.includes('ocupacion')) columnMap.profesion = i;
         if (headerLower.includes('sexo') || headerLower.includes('género') || headerLower.includes('genero')) columnMap.genero = i;
       });
       
@@ -432,9 +438,22 @@ export const parsearArchivoUsuarios = async (file: File): Promise<{ usuarios: Im
           const fechaIng = partsTrimmed[columnMap.fechaIngreso]?.trim() || '';
           const nivelRaw = partsTrimmed[columnMap.nivel]?.trim() || '';
           const nivel = mapearNivelAcodigo(nivelRaw);
-          const cargo = partsTrimmed[columnMap.cargo]?.trim() || '';
-          const area = partsTrimmed[columnMap.area]?.trim() || partsTrimmed[columnMap.direccion]?.trim() || '';
-          const generoRaw = partsTrimmed[columnMap.genero]?.trim() || '';
+          const cargo = columnMap.cargo !== undefined ? partsTrimmed[columnMap.cargo]?.trim() || '' : '';
+          const direccionUnidadValue = columnMap.direccionUnidad !== undefined
+            ? partsTrimmed[columnMap.direccionUnidad]?.trim() || ''
+            : columnMap.direccion !== undefined
+              ? partsTrimmed[columnMap.direccion]?.trim() || ''
+              : '';
+          const departamentoDependenciaValue = columnMap.departamentoDependencia !== undefined
+            ? partsTrimmed[columnMap.departamentoDependencia]?.trim() || ''
+            : '';
+          const areaValue = columnMap.area !== undefined
+            ? partsTrimmed[columnMap.area]?.trim() || ''
+            : '';
+          const area = areaValue || direccionUnidadValue || departamentoDependenciaValue || '';
+          const renglonValue = columnMap.renglon !== undefined ? partsTrimmed[columnMap.renglon]?.trim() || '' : '';
+          const profesionValue = columnMap.profesion !== undefined ? partsTrimmed[columnMap.profesion]?.trim() || '' : '';
+          const generoRaw = columnMap.genero !== undefined ? partsTrimmed[columnMap.genero]?.trim() || '' : '';
           
           if (!dpi || dpi.length < 10) {
             errores.push(`Línea ${i + 1}: DPI inválido o faltante`);
@@ -477,10 +496,10 @@ export const parsearArchivoUsuarios = async (file: File): Promise<{ usuarios: Im
             nivel,
             cargo,
             area,
-            direccionUnidad: direccionUnidad || undefined,
-            departamentoDependencia: departamentoDependencia || undefined,
-            renglon: renglon || undefined,
-            profesion: profesion || undefined,
+            direccionUnidad: direccionUnidadValue || undefined,
+            departamentoDependencia: departamentoDependenciaValue || undefined,
+            renglon: renglonValue || undefined,
+            profesion: profesionValue || undefined,
             tipoPuesto: tipoPuesto || undefined,
             genero: genero || undefined,
           });
@@ -538,13 +557,18 @@ export const parsearArchivoUsuarios = async (file: File): Promise<{ usuarios: Im
           const fechaIng = row[columnMap.fechaIngreso];
           const nivelRaw = String(row[columnMap.nivel] || '').trim();
           const nivel = mapearNivelAcodigo(nivelRaw);
-          const cargo = String(row[columnMap.cargo] || '').trim();
-          const area = String(row[columnMap.area] || '').trim();
-          const direccionUnidad = String(row[columnMap.direccionUnidad] || '').trim();
-          const departamentoDependencia = String(row[columnMap.departamentoDependencia] || '').trim();
-          const renglon = String(row[columnMap.renglon] || '').trim();
-          const profesion = String(row[columnMap.profesion] || '').trim();
-          const generoRaw = String(row[columnMap.genero] || '').trim();
+          const cargo = columnMap.cargo !== undefined ? String(row[columnMap.cargo] || '').trim() : '';
+          const direccionUnidad = columnMap.direccionUnidad !== undefined
+            ? String(row[columnMap.direccionUnidad] || '').trim()
+            : '';
+          const departamentoDependencia = columnMap.departamentoDependencia !== undefined
+            ? String(row[columnMap.departamentoDependencia] || '').trim()
+            : '';
+          const areaValue = columnMap.area !== undefined ? String(row[columnMap.area] || '').trim() : '';
+          const area = areaValue || direccionUnidad || departamentoDependencia;
+          const renglon = columnMap.renglon !== undefined ? String(row[columnMap.renglon] || '').trim() : '';
+          const profesion = columnMap.profesion !== undefined ? String(row[columnMap.profesion] || '').trim() : '';
+          const generoRaw = columnMap.genero !== undefined ? String(row[columnMap.genero] || '').trim() : '';
           
           if (!dpi || dpi.length < 10) {
             errores.push(`Fila ${i + 1}: DPI inválido o faltante`);

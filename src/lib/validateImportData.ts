@@ -113,7 +113,8 @@ export function validateUserRecord(
   // ============================================================
   // 7. AREA (VARCHAR(255), NOT NULL)
   // ============================================================
-  const areaValidation = validateTextField(row.area, 'area', 255, true, rowIndex);
+  const areaSource = row.area || row.direccionUnidad || row.departamentoDependencia;
+  const areaValidation = validateTextField(areaSource, 'area', 255, true, rowIndex);
   if (!areaValidation.isValid) {
     errors.push(areaValidation.error!);
   } else {
