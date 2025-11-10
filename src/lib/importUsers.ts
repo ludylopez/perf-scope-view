@@ -667,70 +667,57 @@ export const importarUsuarios = async (usuarios: ImportedUser[]): Promise<{ exit
   }
 
   // ============================================================
-  // INSERCIÓN EN LOTES
+  // INSERCIÓN UNO POR UNO (MODO DEBUG)
   // ============================================================
-  console.group('📤 INSERTANDO EN SUPABASE');
-  const BATCH_SIZE = 50;
-  for (let i = 0; i < usuariosValidados.length; i += BATCH_SIZE) {
-    const batch = usuariosValidados.slice(i, i + BATCH_SIZE);
+  console.group('📤 INSERTANDO EN SUPABASE (MODO DEBUG: uno por uno)');
 
-    console.log(`\n📦 Procesando lote ${Math.floor(i / BATCH_SIZE) + 1} (${batch.length} usuarios)`);
+  for (let i = 0; i < usuariosValidados.length; i++) {
+    const { usuario, datosCorregidos } = usuariosValidados[i];
+    const userData = datosCorregidos;
 
-    // Usar los datos YA VALIDADOS Y CORREGIDOS
-    const usuariosParaInsertar = batch.map(({ usuario, datosCorregidos }, indexInBatch) => {
-      const userData = datosCorregidos;
+    // Log detallado de cada registro
+    console.log(`\n📋 Usuario ${i + 1}/${usuariosValidados.length} - DPI: ${userData.dpi}`);
+    console.log('Datos a insertar:');
+    console.log(JSON.stringify(userData, null, 2));
 
-      // Log detallado de los primeros 3 registros del primer lote
-      if (i === 0 && indexInBatch < 3) {
-        console.log(`\n📋 Usuario #${indexInBatch + 1} a insertar:`, {
-          dpi: userData.dpi,
-          dpi_length: userData.dpi?.length,
-          nombre: userData.nombre,
-          apellidos: userData.apellidos,
-          fecha_nacimiento: userData.fecha_nacimiento,
-          fecha_nacimiento_tipo: typeof userData.fecha_nacimiento,
-          fecha_nacimiento_length: userData.fecha_nacimiento?.length,
-          fecha_ingreso: userData.fecha_ingreso,
-          nivel: userData.nivel,
-          cargo: userData.cargo,
-          area: userData.area,
-          genero: userData.genero,
-          rol: userData.rol,
-          estado: userData.estado
-        });
-      }
-
-      return userData;
-    });
-    
     try {
-      const { error } = await supabase
+      const { error, data } = await supabase
         .from('users')
-        .upsert(usuariosParaInsertar, {
+        .upsert([userData], {
           onConflict: 'dpi',
           ignoreDuplicates: false,
-        });
-      
+        })
+        .select();
+
       if (error) {
-        console.error('❌ Error al insertar batch:', {
+        console.error(`❌ Error al insertar usuario ${i + 1} (DPI: ${userData.dpi}):`, {
           error: error,
           message: error.message,
           details: error.details,
           hint: error.hint,
           code: error.code
         });
-        batch.forEach(({ usuario }) => {
-          errores.push({ usuario, error: error.message });
-        });
+        console.error('Datos que causaron el error:', JSON.stringify(userData, null, 2));
+        errores.push({ usuario, error: `${error.message} (DPI: ${userData.dpi})` });
       } else {
-        exitosos += batch.length;
-        console.log(`✅ Lote insertado exitosamente (${batch.length} usuarios)`);
+        exitosos++;
+        console.log(`✅ Usuario ${i + 1} insertado exitosamente`);
+
+        // Solo mostrar los primeros 3 para no saturar la consola
+        if (i < 3 && data) {
+          console.log('Datos insertados en DB:', JSON.stringify(data[0], null, 2));
+        }
       }
     } catch (error: any) {
-      console.error('❌ Excepción al insertar batch:', error);
-      batch.forEach(({ usuario }) => {
-        errores.push({ usuario, error: error.message || 'Error desconocido' });
-      });
+      console.error(`❌ Excepción al insertar usuario ${i + 1} (DPI: ${userData.dpi}):`, error);
+      console.error('Datos que causaron el error:', JSON.stringify(userData, null, 2));
+      errores.push({ usuario, error: error.message || 'Error desconocido' });
+    }
+
+    // Pequeña pausa cada 10 registros para no saturar
+    if ((i + 1) % 10 === 0) {
+      console.log(`\n⏸️  Procesados ${i + 1}/${usuariosValidados.length} usuarios...`);
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
   }
 
