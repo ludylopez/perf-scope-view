@@ -18,7 +18,8 @@ import {
   convertirFechaIngreso,
   separarNombre,
   normalizarGenero,
-  inferTipoPuesto
+  inferTipoPuesto,
+  mapearNivelAcodigo
 } from "@/lib/importUsers";
 
 type ImportStep = 'upload' | 'mapping' | 'preview' | 'importing' | 'results';
@@ -171,7 +172,8 @@ export const ImportUsersDialog = ({ open, onOpenChange, onImportComplete }: Impo
 
           const dpi = String(row[dpiCol] || '').trim().replace(/\s+/g, '');
           const nombreCompleto = String(row[nombreCol] || '').trim();
-          const nivel = String(row[nivelCol] || '').trim().toUpperCase();
+          const nivelRaw = String(row[nivelCol] || '').trim();
+          const nivel = mapearNivelAcodigo(nivelRaw);
           const cargo = String(row[cargoCol] || '').trim();
           const area = String(row[areaCol] || '').trim();
           const fechaNac = row[fechaNacCol];
