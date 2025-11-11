@@ -106,8 +106,9 @@ const EvaluacionColaborador = () => {
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  const desempenoDimensions = instrument.dimensionesDesempeno;
-  const potencialDimensions = instrument.dimensionesPotencial;
+  // Validar que instrument exista antes de acceder a sus propiedades
+  const desempenoDimensions = instrument?.dimensionesDesempeno || [];
+  const potencialDimensions = instrument?.dimensionesPotencial || [];
   
   const desempenoTotalItems = desempenoDimensions.reduce((sum, dim) => sum + dim.items.length, 0);
   const potencialTotalItems = potencialDimensions.reduce((sum, dim) => sum + dim.items.length, 0);
@@ -115,17 +116,17 @@ const EvaluacionColaborador = () => {
   const desempenoAnsweredItems = Object.keys(desempenoResponses).length;
   const potencialAnsweredItems = Object.keys(potencialResponses).length;
   
-  const desempenoProgress = (desempenoAnsweredItems / desempenoTotalItems) * 100;
-  const potencialProgress = (potencialAnsweredItems / potencialTotalItems) * 100;
+  const desempenoProgress = desempenoTotalItems > 0 ? (desempenoAnsweredItems / desempenoTotalItems) * 100 : 0;
+  const potencialProgress = potencialTotalItems > 0 ? (potencialAnsweredItems / potencialTotalItems) * 100 : 0;
   
   // Usar useMemo para recalcular cuando cambien las respuestas
   const desempenoComplete = useMemo(() => 
-    isEvaluationComplete(desempenoResponses, desempenoDimensions),
+    desempenoDimensions.length > 0 ? isEvaluationComplete(desempenoResponses, desempenoDimensions) : false,
     [desempenoResponses, desempenoDimensions]
   );
   
   const potencialComplete = useMemo(() => 
-    isEvaluationComplete(potencialResponses, potencialDimensions),
+    potencialDimensions.length > 0 ? isEvaluationComplete(potencialResponses, potencialDimensions) : false,
     [potencialResponses, potencialDimensions]
   );
   
@@ -427,12 +428,21 @@ const EvaluacionColaborador = () => {
     }
   };
 
-  if (!colaborador) {
+  if (!colaborador || !instrument) {
     return (
       <div className="min-h-screen bg-background">
         <Header />
         <main className="container mx-auto px-4 py-8">
-          <p>Cargando...</p>
+          <div className="flex items-center justify-center">
+            <Card className="w-full max-w-md">
+              <CardHeader>
+                <CardTitle>Cargando evaluación...</CardTitle>
+                <CardDescription>
+                  {!colaborador ? "Cargando datos del colaborador..." : "Cargando instrumento de evaluación..."}
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          </div>
         </main>
       </div>
     );
