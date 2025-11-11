@@ -58,20 +58,38 @@ export interface FinalScore {
   posicion9Box?: string;
 }
 
+export interface AccionDesarrollo {
+  descripcion: string;
+  responsable: string;
+  fecha: string;
+  recursos: string[];
+  indicador: string;
+  prioridad: "alta" | "media" | "baja";
+}
+
+export interface DimensionDebil {
+  dimension: string;
+  score: number;
+  accionesEspecificas: string[];
+}
+
+export interface PlanEstructurado {
+  objetivos: string[];
+  acciones: AccionDesarrollo[];
+  dimensionesDebiles: DimensionDebil[];
+}
+
 export interface DevelopmentPlan {
   id: string;
   evaluacionId: string;
   colaboradorId: string;
   periodoId: string;
-  competenciasDesarrollar: Array<{
-    competencia: string;
-    nivelActual: number;
-    nivelObjetivo: number;
-    acciones: string[];
-    plazo: string;
-  }>;
+  competenciasDesarrollar: string[]; // Ahora es array simple de objetivos
   feedbackIndividual?: string;
   feedbackGrupal?: string;
+  planEstructurado?: PlanEstructurado; // Nueva estructura completa del plan
+  recomendaciones?: string[]; // Recomendaciones generales
+  generadoPorIa?: boolean; // Indica si fue generado por IA
   editable: boolean;
   editadoPor?: string;
   fechaCreacion: string;

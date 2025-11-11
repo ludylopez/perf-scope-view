@@ -18,6 +18,7 @@ import { scoreToPercentage } from "@/lib/calculations";
 import { perteneceACuadrilla, getGruposDelColaborador, getEquipoStats } from "@/lib/jerarquias";
 import { supabase } from "@/integrations/supabase/client";
 import { getActivePeriod } from "@/lib/supabase";
+import { GenerarPlanDesarrollo } from "@/components/development/GenerarPlanDesarrollo";
 
 const MOCK_COLABORADORES: Record<string, any> = {
   "1": {
@@ -47,6 +48,7 @@ const VistaComparativa = () => {
   const [gruposColaborador, setGruposColaborador] = useState<any[]>([]);
   const [planDesarrollo, setPlanDesarrollo] = useState<any>(null);
   const [promedioGrupo, setPromedioGrupo] = useState<number | null>(null);
+  const [periodoId, setPeriodoId] = useState<string>("");
 
   useEffect(() => {
     if (!id || !user) {
@@ -58,9 +60,9 @@ const VistaComparativa = () => {
       try {
         // Obtener período activo
         const activePeriod = await getActivePeriod();
-        let periodoId = "2025-1";
+        let currentPeriodoId = "2025-1";
         if (activePeriod) {
-          periodoId = activePeriod.id;
+          currentPeriodoId = activePeriod.id;
         } else {
           const { data: periodData } = await supabase
             .from("evaluation_periods")
@@ -68,9 +70,10 @@ const VistaComparativa = () => {
             .eq("nombre", "2025-1")
             .single();
           if (periodData) {
-            periodoId = periodData.id;
+            currentPeriodoId = periodData.id;
           }
         }
+        setPeriodoId(currentPeriodoId);
 
         // Cargar colaborador desde Supabase
         const { data: colaboradorData, error: colaboradorError } = await supabase
@@ -131,7 +134,7 @@ const VistaComparativa = () => {
               .single();
             
             if (assignment) {
-              const stats = await getEquipoStats(assignment.jefe_id, periodoId);
+              const stats = await getEquipoStats(assignment.jefe_id, currentPeriodoId);
               setPromedioGrupo(stats?.promedioDesempeno || null);
             }
           }
@@ -142,7 +145,7 @@ const VistaComparativa = () => {
           .from("development_plans")
           .select("*")
           .eq("colaborador_id", colaboradorFormatted.dpi)
-          .eq("periodo_id", periodoId)
+          .eq("periodo_id", currentPeriodoId)
           .maybeSingle();
 
         if (planData) {
@@ -153,9 +156,9 @@ const VistaComparativa = () => {
         }
 
         // Cargar ambas evaluaciones
-        const auto = await getSubmittedEvaluation(colaboradorFormatted.dpi, periodoId) || 
+        const auto = await getSubmittedEvaluation(colaboradorFormatted.dpi, currentPeriodoId) ||
                     getMockColaboradorEvaluation(colaboradorFormatted.dpi);
-        const jefe = await getJefeEvaluationDraft(user.dpi, colaboradorFormatted.dpi, periodoId);
+        const jefe = await getJefeEvaluationDraft(user.dpi, colaboradorFormatted.dpi, currentPeriodoId);
 
         if (!auto || !jefe || jefe.estado !== "enviado") {
           toast.error("Ambas evaluaciones deben estar completas para ver la comparación");
@@ -320,6 +323,24 @@ const VistaComparativa = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Generar Plan de Desarrollo con IA */}
+        {colaborador && periodoId && (
+          <div className="mb-6 flex justify-center">
+            <GenerarPlanDesarrollo
+              colaboradorId={colaborador.dpi}
+              periodoId={periodoId}
+              colaboradorNombre={colaborador.nombre}
+              onPlanGenerado={(plan) => {
+                setPlanDesarrollo({
+                  feedbackIndividual: plan.feedbackIndividual,
+                  feedbackGrupal: plan.feedbackGrupal,
+                });
+                toast.success("Plan de desarrollo guardado");
+              }}
+            />
+          </div>
+        )}
 
         {/* Toggle Individual/Grupal */}
         {perteneceCuadrilla && gruposColaborador.length > 0 && (
