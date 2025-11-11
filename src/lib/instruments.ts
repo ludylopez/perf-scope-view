@@ -22,20 +22,23 @@ export const getInstrumentForUser = async (
   overrideInstrumentId?: string
 ): Promise<Instrument | null> => {
   // Si hay override manual, usar ese
-  if (overrideInstrumentId && INSTRUMENTS[overrideInstrumentId]) {
-    return INSTRUMENTS[overrideInstrumentId];
+  if (overrideInstrumentId) {
+    // Permite override por clave (A3) o por ID completo (A3_2025_V1)
+    if (INSTRUMENTS[overrideInstrumentId]) {
+      return INSTRUMENTS[overrideInstrumentId];
+    }
+    const byFullId = Object.values(INSTRUMENTS).find(inst => inst.id === overrideInstrumentId);
+    if (byFullId) return byFullId;
   }
   
   // Asignación automática por nivel
-  // Buscar instrumento que coincida con el nivel del usuario
-  const instrumentKey = Object.keys(INSTRUMENTS).find(key => {
-    const instrument = INSTRUMENTS[key];
-    return instrument.nivel === nivel || instrument.nivel.startsWith(nivel.charAt(0));
-  });
+  // 1) Coincidencia exacta por nivel (A3 -> A3)
+  const exactKey = Object.keys(INSTRUMENTS).find(key => INSTRUMENTS[key].nivel === nivel);
+  if (exactKey) return INSTRUMENTS[exactKey];
   
-  if (instrumentKey && INSTRUMENTS[instrumentKey]) {
-    return INSTRUMENTS[instrumentKey];
-  }
+  // 2) Fallback: primer instrumento que comparta prefijo de nivel (e.g., "A*")
+  const prefixKey = Object.keys(INSTRUMENTS).find(key => INSTRUMENTS[key].nivel.startsWith(nivel.charAt(0)));
+  if (prefixKey) return INSTRUMENTS[prefixKey];
   
   // Fallback: usar el primer instrumento disponible (A1 por defecto)
   return INSTRUMENTS.A1 || null;
