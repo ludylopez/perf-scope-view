@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePeriod } from "@/contexts/PeriodContext";
 import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ import { scoreToPercentage } from "@/lib/calculations";
 const VistaResultadosFinales = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { activePeriodId, activePeriod } = usePeriod();
   const [resultadoFinal, setResultadoFinal] = useState<any>(null);
   const [planDesarrollo, setPlanDesarrollo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -31,9 +33,14 @@ const VistaResultadosFinales = () => {
   }, [user, navigate]);
 
   const loadResultados = async () => {
+    if (!activePeriodId) {
+      toast.error("No hay período activo");
+      return;
+    }
+
     try {
       // Cargar resultado final desde localStorage
-      const resultadoKey = `final_result_${user?.dpi}_2025-1`;
+      const resultadoKey = `final_result_${user?.dpi}_${activePeriodId}`;
       const stored = localStorage.getItem(resultadoKey);
       
       if (stored) {
@@ -46,7 +53,7 @@ const VistaResultadosFinales = () => {
           .from("final_evaluation_results")
           .select("*")
           .eq("colaborador_id", user?.dpi)
-          .eq("periodo_id", "2025-1")
+          .eq("periodo_id", activePeriodId)
           .single();
 
         if (!error && data) {
@@ -59,7 +66,7 @@ const VistaResultadosFinales = () => {
       }
 
       // Cargar plan de desarrollo
-      const planKey = `development_plan_${user?.dpi}_2025-1`;
+      const planKey = `development_plan_${user?.dpi}_${activePeriodId}`;
       const planStored = localStorage.getItem(planKey);
       if (planStored) {
         setPlanDesarrollo(JSON.parse(planStored));
@@ -69,7 +76,7 @@ const VistaResultadosFinales = () => {
           .from("development_plans")
           .select("*")
           .eq("colaborador_id", user?.dpi)
-          .eq("periodo_id", "2025-1")
+          .eq("periodo_id", activePeriodId)
           .single();
         
         if (data) {
@@ -129,7 +136,7 @@ const VistaResultadosFinales = () => {
               Volver al Dashboard
             </Button>
             <h1 className="text-3xl font-bold text-foreground mt-4">
-              Mis Resultados Finales - Periodo 2025-1
+              Mis Resultados Finales - Periodo {activePeriod?.nombre || 'N/A'}
             </h1>
             <p className="text-muted-foreground mt-2">
               Resultado de su evaluación 180° y plan de desarrollo
@@ -282,7 +289,7 @@ const VistaResultadosFinales = () => {
               onClick={() => {
                 exportResultadoIndividualPDF(
                   `${user?.nombre} ${user?.apellidos}`,
-                  "2025-1",
+                  activePeriod?.nombre || "N/A",
                   resultadoFinal,
                   planDesarrollo
                 );

@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePeriod } from "@/contexts/PeriodContext";
 import { Header } from "@/components/layout/Header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,6 +32,7 @@ import { getJerarquiaInfo } from "@/lib/jerarquias";
 const Dashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { activePeriodId, activePeriod, isLoading: periodLoading } = usePeriod();
   
   const [evaluationStatus, setEvaluationStatus] = useState<"not_started" | "in_progress" | "submitted">("not_started");
   const [progress, setProgress] = useState(0);
@@ -42,16 +44,16 @@ const Dashboard = () => {
   const isAdminGeneral = user?.rol === "admin_general";
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !activePeriodId) return;
 
     const checkStatus = async () => {
-      // Check evaluation status
-      const isSubmitted = await hasSubmittedEvaluation(user.dpi, "2025-1");
+      // Check evaluation status con período activo real
+      const isSubmitted = await hasSubmittedEvaluation(user.dpi, activePeriodId);
       if (isSubmitted) {
         setEvaluationStatus("submitted");
         setProgress(100);
       } else {
-        const draft = await getEvaluationDraft(user.dpi, "2025-1");
+        const draft = await getEvaluationDraft(user.dpi, activePeriodId);
         if (draft && Object.keys(draft.responses).length > 0) {
           setEvaluationStatus("in_progress");
           setProgress(draft.progreso);
@@ -63,7 +65,7 @@ const Dashboard = () => {
     };
 
     checkStatus();
-  }, [user]);
+  }, [user, activePeriodId]);
 
   // Cargar información de jerarquía
   useEffect(() => {
@@ -108,7 +110,7 @@ const Dashboard = () => {
   };
 
   const fillSampleData = async () => {
-    if (!user) return;
+    if (!user || !activePeriodId) return;
 
     const instrument = await getInstrumentForUser(user.nivel);
     if (!instrument) {
@@ -137,7 +139,7 @@ const Dashboard = () => {
 
     const draft: EvaluationDraft = {
       usuarioId: user.dpi,
-      periodoId: "2025-1",
+      periodoId: activePeriodId, // Usar período activo real
       tipo: "auto",
       responses,
       comments,
@@ -237,9 +239,9 @@ const Dashboard = () => {
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-medium">Periodo: 2025-1</p>
+                    <p className="font-medium">Periodo: {activePeriod?.nombre || 'Cargando...'}</p>
                     <p className="text-sm text-muted-foreground">
-                      Fecha límite: 31 de Marzo, 2025
+                      Fecha límite: {activePeriod ? new Date(activePeriod.fechaCierreAutoevaluacion).toLocaleDateString('es-GT', { day: 'numeric', month: 'long', year: 'numeric' }) : ''}
                     </p>
                   </div>
                   {getStatusBadge()}
@@ -359,7 +361,7 @@ const Dashboard = () => {
                 <CardContent className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-medium">Periodo: 2025-1</p>
+                      <p className="font-medium">Periodo: {activePeriod?.nombre || 'Cargando...'}</p>
                     </div>
                     {getStatusBadge()}
                   </div>
@@ -550,7 +552,7 @@ const Dashboard = () => {
                       // Crear reporte básico para admin
                       const reportData = {
                         title: "Reporte de Administración",
-                        periodo: "2025-1",
+                        periodo: activePeriod?.nombre || "N/A",
                         fecha: new Date().toLocaleDateString("es-GT"),
                         summary: [
                           { label: "Total Usuarios", value: "124" },
@@ -584,7 +586,7 @@ const Dashboard = () => {
                 </CardHeader>
                 <CardContent>
                   <p className="text-3xl font-bold text-primary">1</p>
-                  <p className="text-xs text-muted-foreground mt-1">2025-1 en curso</p>
+                  <p className="text-xs text-muted-foreground mt-1">{activePeriod?.nombre || 'Sin período'} en curso</p>
                 </CardContent>
               </Card>
 

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePeriod } from "@/contexts/PeriodContext";
 import { useNavigate, useParams } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,7 @@ const VistaPlanDesarrollo = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
+  const { activePeriodId } = usePeriod();
   const [plan, setPlan] = useState<DevelopmentPlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
@@ -29,6 +31,12 @@ const VistaPlanDesarrollo = () => {
   }, [id, navigate]);
 
   const loadPlan = async () => {
+    if (!activePeriodId) {
+      toast.error("No hay período activo");
+      setLoading(false);
+      return;
+    }
+
     try {
       // Intentar cargar desde Supabase primero
       const { supabase } = await import("@/integrations/supabase/client");
@@ -36,7 +44,7 @@ const VistaPlanDesarrollo = () => {
         .from("development_plans")
         .select("*")
         .eq("colaborador_id", id)
-        .eq("periodo_id", "2025-1")
+        .eq("periodo_id", activePeriodId)
         .single();
 
       if (!error && data) {

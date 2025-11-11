@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePeriod } from "@/contexts/PeriodContext";
 import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
@@ -114,6 +115,7 @@ const getDimensionExamples = (dimensionId: string) => {
 const MiAutoevaluacion = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { activePeriodId, activePeriod } = usePeriod();
   const [instrument, setInstrument] = useState<Instrument | null>(null);
 
   const [evaluation, setEvaluation] = useState<any>(null);
@@ -128,7 +130,7 @@ const MiAutoevaluacion = () => {
   };
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !activePeriodId) return;
 
     const loadData = async () => {
       // Cargar instrumento según nivel del usuario
@@ -140,8 +142,8 @@ const MiAutoevaluacion = () => {
       }
       setInstrument(userInstrument);
 
-      // Cargar evaluación enviada
-      const submitted = await getSubmittedEvaluation(user.dpi, "2025-1");
+      // Cargar evaluación enviada con período activo real
+      const submitted = await getSubmittedEvaluation(user.dpi, activePeriodId);
 
       if (!submitted) {
         navigate("/autoevaluacion");
@@ -152,7 +154,7 @@ const MiAutoevaluacion = () => {
     };
 
     loadData();
-  }, [user, navigate]);
+  }, [user, activePeriodId, navigate]);
 
   if (!evaluation || !instrument) {
     return (
@@ -201,7 +203,7 @@ const MiAutoevaluacion = () => {
             Volver al Dashboard
           </Button>
           <div className="text-right">
-            <p className="text-sm text-muted-foreground">Periodo: 2025-1</p>
+            <p className="text-sm text-muted-foreground">Periodo: {activePeriod?.nombre || 'N/A'}</p>
             <p className="text-sm text-muted-foreground">Nivel: {user?.nivel}</p>
           </div>
         </div>
