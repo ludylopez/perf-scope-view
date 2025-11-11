@@ -30,6 +30,7 @@ import { EvaluationInstructions } from "@/components/evaluation/EvaluationInstru
 import { DimensionProgress } from "@/components/evaluation/DimensionProgress";
 import { AutoSaveIndicator } from "@/components/evaluation/AutoSaveIndicator";
 import { Instrument } from "@/types/evaluation";
+import { EvaluationPeriod } from "@/types/period";
 import { getInstrumentForUser } from "@/lib/instruments";
 import {
   saveEvaluationDraft,
@@ -72,6 +73,7 @@ const Autoevaluacion = () => {
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [periodoId, setPeriodoId] = useState<string>("");
+  const [periodoActivo, setPeriodoActivo] = useState<EvaluationPeriod | null>(null);
 
   const dimensions = instrument?.dimensionesDesempeno || [];
   const totalItems = dimensions.reduce((sum, dim) => sum + dim.items.length, 0);
@@ -87,25 +89,46 @@ const Autoevaluacion = () => {
       try {
         // Obtener período activo
         const activePeriod = await getActivePeriod();
+        let resolvedPeriod: EvaluationPeriod | null = null;
+
         if (activePeriod) {
-          setPeriodoId(activePeriod.id);
+          resolvedPeriod = activePeriod;
         } else {
           // Fallback: buscar período 2025-1 por nombre
           const { supabase } = await import("@/integrations/supabase/client");
           const { data: periodData } = await supabase
             .from("evaluation_periods")
-            .select("id")
+            .select("*")
             .eq("nombre", "2025-1")
             .single();
           if (periodData) {
-            setPeriodoId(periodData.id);
+            resolvedPeriod = {
+              id: periodData.id,
+              nombre: periodData.nombre,
+              fechaInicio: periodData.fecha_inicio,
+              fechaFin: periodData.fecha_fin,
+              fechaCierreAutoevaluacion: periodData.fecha_cierre_autoevaluacion,
+              fechaCierreEvaluacionJefe: periodData.fecha_cierre_evaluacion_jefe,
+              estado: periodData.estado,
+              descripcion: periodData.descripcion,
+              createdAt: periodData.created_at,
+              updatedAt: periodData.updated_at,
+            };
           } else {
             toast.error("No se encontró un período de evaluación activo");
             return;
           }
         }
 
-        const periodoIdFinal = activePeriod?.id || periodoId;
+        if (!resolvedPeriod) {
+          toast.error("No se logró determinar el período de evaluación activo");
+          return;
+        }
+
+        setPeriodoActivo(resolvedPeriod);
+        setPeriodoId(resolvedPeriod.id);
+
+        const periodoIdFinal = resolvedPeriod.id;
 
         // Cargar instrumento según nivel del usuario
         const userInstrument = await getInstrumentForUser(user.nivel);
@@ -139,6 +162,23 @@ const Autoevaluacion = () => {
         // Load open questions
         const questions = await getOpenQuestions();
         setOpenQuestions(questions);
+
+        const openQuestionsKey = `open_questions_${user.dpi}_${periodoIdFinal}`;
+        const savedOpenQuestions = localStorage.getItem(openQuestionsKey);
+        if (savedOpenQuestions) {
+          try {
+            const parsed = JSON.parse(savedOpenQuestions);
+            setOpenQuestionResponses(parsed);
+          } catch {
+            // ignore parsing errors
+          }
+        }
+
+        const npsKey = `nps_${user.dpi}_${periodoIdFinal}`;
+        const savedNps = localStorage.getItem(npsKey);
+        if (savedNps) {
+          setNpsScore(parseInt(savedNps));
+        }
       } catch (error) {
         console.error("Error loading data:", error);
         toast.error("Error al cargar datos");
@@ -233,6 +273,15 @@ const handleSaveDraft = () => {
       return;
     }
 
+    const unansweredOpen = openQuestions
+      .filter((q) => q.obligatoria)
+      .filter((q) => !openQuestionResponses[q.id] || openQuestionResponses[q.id].trim().length === 0);
+
+    if (unansweredOpen.length > 0) {
+      toast.error("Por favor, completa las necesidades de desarrollo y recursos marcadas como obligatorias", { duration: 5000 });
+      return;
+    }
+
     setShowSubmitDialog(true);
   };
 
@@ -268,14 +317,36 @@ const handleSaveDraft = () => {
     }
     
     await submitEvaluation(draft);
-    
+
+    // Obtener ID definitivo de la evaluación después del submit
+    let evaluationId = evalData?.id;
+    if (!evaluationId) {
+      const { data: refreshed, error: refreshedError } = await supabase
+        .from("evaluations")
+        .select("id")
+        .eq("usuario_id", user.dpi)
+        .eq("periodo_id", periodoId)
+        .eq("tipo", "auto")
+        .single();
+      if (!refreshedError) {
+        evaluationId = refreshed?.id;
+      }
+    }
+
     // Guardar respuestas a preguntas abiertas
     if (Object.keys(openQuestionResponses).length > 0) {
       const openQuestionsKey = `open_questions_${user.dpi}_${periodoId}`;
       localStorage.setItem(openQuestionsKey, JSON.stringify(openQuestionResponses));
-      
-      // Intentar guardar en Supabase también
-      await saveOpenQuestionResponses("", openQuestionResponses); // El ID se obtendría de Supabase
+
+      if (evaluationId) {
+        await saveOpenQuestionResponses(evaluationId, openQuestionResponses);
+      }
+    }
+
+    // Guardar respuesta NPS en localStorage para referencia y limpiar luego
+    if (npsScore !== undefined) {
+      const npsKey = `nps_${user.dpi}_${periodoId}`;
+      localStorage.setItem(npsKey, npsScore.toString());
     }
     
     toast.success("¡Autoevaluación enviada exitosamente!");
@@ -297,6 +368,28 @@ const handleSaveDraft = () => {
   const currentDim = dimensions[currentDimension];
   const dimProgress = getDimensionProgress(responses, currentDim);
 
+  const formatPeriodRange = (period?: EvaluationPeriod | null) => {
+    if (!period) return "Periodo no definido";
+
+    const options: Intl.DateTimeFormatOptions = {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    };
+
+    const inicio = new Date(period.fechaInicio);
+    const fin = new Date(period.fechaFin);
+
+    if (isNaN(inicio.getTime()) || isNaN(fin.getTime())) {
+      return "Fechas de periodo no disponibles";
+    }
+
+    const inicioStr = inicio.toLocaleDateString("es-ES", options);
+    const finStr = fin.toLocaleDateString("es-ES", options);
+
+    return `${inicioStr} al ${finStr}`;
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -311,7 +404,8 @@ const handleSaveDraft = () => {
           <div className="flex items-center gap-4">
             <AutoSaveIndicator status={autoSaveStatus} />
             <div className="text-right text-sm text-muted-foreground">
-              <p>Periodo: 2025-1</p>
+              <p>Periodo: {periodoActivo?.nombre ?? periodoId ?? "Sin periodo"}</p>
+              <p className="text-xs italic">{formatPeriodRange(periodoActivo)}</p>
               <p>Nivel: {user?.nivel}</p>
             </div>
           </div>
@@ -494,20 +588,29 @@ const handleSaveDraft = () => {
           </CardContent>
         </Card>
 
-        {/* Pregunta NPS - Solo en autoevaluación */}
-        <NPSQuestion
-          value={npsScore}
-          onChange={handleNpsChange}
-        />
+        <Card className="mt-8 border-2 border-dashed border-primary/30">
+          <CardHeader>
+            <CardTitle>Sección final (no pondera en la puntuación)</CardTitle>
+            <CardDescription>
+              Responde estas preguntas para ayudarnos a mejorar la experiencia laboral y tu desempeño.
+              Son obligatorias antes de enviar la autoevaluación.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <NPSQuestion
+              value={npsScore}
+              onChange={handleNpsChange}
+            />
 
-        {/* Preguntas Abiertas */}
-        {openQuestions.length > 0 && (
-          <OpenQuestions
-            questions={openQuestions}
-            responses={openQuestionResponses}
-            onChange={handleOpenQuestionChange}
-          />
-        )}
+            {openQuestions.length > 0 && (
+              <OpenQuestions
+                questions={openQuestions}
+                responses={openQuestionResponses}
+                onChange={handleOpenQuestionChange}
+              />
+            )}
+          </CardContent>
+        </Card>
       </main>
 
       {/* Submit confirmation dialog */}

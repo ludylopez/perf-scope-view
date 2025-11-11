@@ -29,6 +29,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Instrument } from "@/types/evaluation";
+import { EvaluationPeriod } from "@/types/period";
 import {
   saveEvaluationDraft,
   getJefeEvaluationDraft,
@@ -81,6 +82,7 @@ const EvaluacionColaborador = () => {
   const { id } = useParams<{ id: string }>();
   const [instrument, setInstrument] = useState<Instrument | null>(null);
   const [periodoId, setPeriodoId] = useState<string>("");
+  const [periodoActivo, setPeriodoActivo] = useState<EvaluationPeriod | null>(null);
 
   const [colaborador, setColaborador] = useState<any>(null);
   const [autoevaluacion, setAutoevaluacion] = useState<any>(null);
@@ -140,15 +142,29 @@ const EvaluacionColaborador = () => {
         // Obtener período activo
         const activePeriod = await getActivePeriod();
         if (activePeriod) {
+          setPeriodoActivo(activePeriod);
           setPeriodoId(activePeriod.id);
         } else {
           // Fallback: buscar período 2025-1 por nombre
           const { data: periodData } = await supabase
             .from("evaluation_periods")
-            .select("id")
+            .select("*")
             .eq("nombre", "2025-1")
             .single();
           if (periodData) {
+            const fallbackPeriod: EvaluationPeriod = {
+              id: periodData.id,
+              nombre: periodData.nombre,
+              fechaInicio: periodData.fecha_inicio,
+              fechaFin: periodData.fecha_fin,
+              fechaCierreAutoevaluacion: periodData.fecha_cierre_autoevaluacion,
+              fechaCierreEvaluacionJefe: periodData.fecha_cierre_evaluacion_jefe,
+              estado: periodData.estado,
+              descripcion: periodData.descripcion,
+              createdAt: periodData.created_at,
+              updatedAt: periodData.updated_at,
+            };
+            setPeriodoActivo(fallbackPeriod);
             setPeriodoId(periodData.id);
           } else {
             toast.error("No se encontró un período de evaluación activo");
@@ -423,6 +439,28 @@ const EvaluacionColaborador = () => {
   }
 
 
+  const formatPeriodRange = (period?: EvaluationPeriod | null) => {
+    if (!period) return "Periodo no definido";
+
+    const options: Intl.DateTimeFormatOptions = {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    };
+
+    const inicio = new Date(period.fechaInicio);
+    const fin = new Date(period.fechaFin);
+
+    if (isNaN(inicio.getTime()) || isNaN(fin.getTime())) {
+      return "Fechas de periodo no disponibles";
+    }
+
+    const inicioStr = inicio.toLocaleDateString("es-ES", options);
+    const finStr = fin.toLocaleDateString("es-ES", options);
+
+    return `${inicioStr} al ${finStr}`;
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -437,7 +475,7 @@ const EvaluacionColaborador = () => {
           <div className="flex items-center gap-4">
             {!jefeAlreadyEvaluated && <AutoSaveIndicator status={autoSaveStatus} />}
             <div className="text-right text-sm text-muted-foreground">
-              <p>Periodo: 2025-1</p>
+              <p>Periodo: {periodoActivo?.nombre ?? periodoId ?? "Sin periodo"}</p>
               <p>Colaborador: {colaborador.nivel}</p>
             </div>
           </div>
@@ -472,7 +510,7 @@ const EvaluacionColaborador = () => {
               <strong>Evaluador:</strong> {user?.nombre} {user?.apellidos}
             </p>
             <p>
-              <strong>Periodo:</strong> Del 1 de Enero al 31 de Marzo, 2025
+              <strong>Periodo:</strong> {formatPeriodRange(periodoActivo)}
             </p>
           </div>
         </div>
