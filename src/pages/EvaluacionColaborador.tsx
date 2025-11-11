@@ -141,10 +141,12 @@ const EvaluacionColaborador = () => {
     const loadData = async () => {
       try {
         // Obtener período activo
+        let currentPeriodoId: string | null = null;
         const activePeriod = await getActivePeriod();
         if (activePeriod) {
           setPeriodoActivo(activePeriod);
           setPeriodoId(activePeriod.id);
+          currentPeriodoId = activePeriod.id;
         } else {
           // Fallback: buscar período 2025-1 por nombre
           const { data: periodData } = await supabase
@@ -167,6 +169,7 @@ const EvaluacionColaborador = () => {
             };
             setPeriodoActivo(fallbackPeriod);
             setPeriodoId(periodData.id);
+            currentPeriodoId = periodData.id;
           } else {
             toast.error("No se encontró un período de evaluación activo");
             navigate("/evaluacion-equipo");
@@ -231,13 +234,15 @@ const EvaluacionColaborador = () => {
         }
 
         // Cargar autoevaluación del colaborador solo si el jefe ya completó su evaluación
-        const jefeDraft = await getJefeEvaluationDraft(user.dpi, colaboradorFormatted.dpi, periodoId);
+        const jefeDraft = currentPeriodoId
+          ? await getJefeEvaluationDraft(user.dpi, colaboradorFormatted.dpi, currentPeriodoId)
+          : null;
         const jefeCompleto = jefeDraft?.estado === "enviado";
         setJefeAlreadyEvaluated(jefeCompleto);
         
-        if (jefeCompleto) {
+        if (jefeCompleto && currentPeriodoId) {
           // Solo mostrar autoevaluación si el jefe ya completó su evaluación
-          const submittedAuto = await getSubmittedEvaluation(colaboradorFormatted.dpi, periodoId);
+          const submittedAuto = await getSubmittedEvaluation(colaboradorFormatted.dpi, currentPeriodoId);
           const mockAuto = getMockColaboradorEvaluation(colaboradorFormatted.dpi);
           setAutoevaluacion(submittedAuto || mockAuto);
           // Cambiar a la pestaña de autoevaluación cuando está disponible
