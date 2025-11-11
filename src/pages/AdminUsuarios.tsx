@@ -858,14 +858,14 @@ const AdminUsuarios = () => {
                   <div className="space-y-2">
                     <Label>Instrumento de Evaluación</Label>
                     <Select
-                      value={newUser.instrumentoId || ""}
-                      onValueChange={(value) => setNewUser({ ...newUser, instrumentoId: value || "" })}
+                      value={newUser.instrumentoId || "auto"}
+                      onValueChange={(value) => setNewUser({ ...newUser, instrumentoId: value === "auto" ? "" : value })}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder={`Por defecto: ${newUser.nivel || "Seleccionar nivel primero"}`} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Asignar automáticamente según nivel</SelectItem>
+                        <SelectItem value="auto">Asignar automáticamente según nivel</SelectItem>
                         <SelectItem value="A1">A1 - ALCALDE MUNICIPAL</SelectItem>
                         <SelectItem value="A3">A3 - ADMINISTRATIVOS I</SelectItem>
                       </SelectContent>
@@ -1204,14 +1204,14 @@ const AdminUsuarios = () => {
                   <div className="space-y-2">
                     <Label>Instrumento de Evaluación</Label>
                     <Select
-                      value={editingUser.instrumentoId || ""}
-                      onValueChange={(value) => setEditingUser({ ...editingUser, instrumentoId: value || "" })}
+                      value={editingUser.instrumentoId || "auto"}
+                      onValueChange={(value) => setEditingUser({ ...editingUser, instrumentoId: value === "auto" ? "" : value })}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder={`Por defecto: ${editingUser.nivel}`} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Asignar automáticamente según nivel</SelectItem>
+                        <SelectItem value="auto">Asignar automáticamente según nivel</SelectItem>
                         <SelectItem value="A1">A1 - ALCALDE MUNICIPAL</SelectItem>
                         <SelectItem value="A3">A3 - ADMINISTRATIVOS I</SelectItem>
                       </SelectContent>
