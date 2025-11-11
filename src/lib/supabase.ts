@@ -58,7 +58,7 @@ export const getPeriodStatus = async (periodId: string): Promise<PeriodStatus> =
       .from('evaluation_periods')
       .select('*')
       .eq('id', periodId)
-      .single();
+      .maybeSingle();
     
     if (error || !data) {
       return { isActive: false, canSubmitAuto: false, canSubmitJefe: false };
@@ -204,7 +204,7 @@ export const getColaboradorJefe = async (colaboradorId: string): Promise<string 
       .select('jefe_id')
       .eq('colaborador_id', colaboradorId)
       .eq('activo', true)
-      .single();
+      .maybeSingle();
     
     if (error || !data) return null;
     return data.jefe_id;
@@ -348,7 +348,7 @@ export const saveEvaluationToSupabase = async (draft: EvaluationDraft): Promise<
       .eq('usuario_id', draft.usuarioId)
       .eq('periodo_id', draft.periodoId)
       .eq('tipo', draft.tipo)
-      .single();
+      .maybeSingle();
     
     if (existing) {
       const { data, error } = await supabase
@@ -403,7 +403,7 @@ export const getEvaluationFromSupabase = async (
       query = query.eq('evaluador_id', evaluadorId).eq('colaborador_id', colaboradorId);
     }
     
-    const { data, error } = await query.single();
+    const { data, error } = await query.maybeSingle();
     
     if (error || !data) return null;
     

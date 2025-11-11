@@ -397,9 +397,13 @@ const Autoevaluacion = () => {
       estado: "enviado",
       progreso: 100,
       fechaUltimaModificacion: new Date().toISOString(),
+      npsScore: npsScore, // NPS ya incluido en el draft
     };
 
-    // Guardar en Supabase con NPS
+    // Enviar evaluación (incluye NPS automáticamente)
+    await submitEvaluation(draft);
+
+    // Obtener ID de la evaluación para guardar respuestas abiertas
     const { supabase } = await import("@/integrations/supabase/client");
     const { data: evalData } = await supabase
       .from("evaluations")
@@ -407,43 +411,19 @@ const Autoevaluacion = () => {
       .eq("usuario_id", user.dpi)
       .eq("periodo_id", periodoId)
       .eq("tipo", "auto")
-      .single();
+      .maybeSingle();
 
-    if (evalData?.id && npsScore !== undefined) {
-      await supabase
-        .from("evaluations")
-        .update({ nps_score: npsScore })
-        .eq("id", evalData.id);
-    }
-    
-    await submitEvaluation(draft);
-
-    // Obtener ID definitivo de la evaluación después del submit
-    let evaluationId = evalData?.id;
-    if (!evaluationId) {
-      const { data: refreshed, error: refreshedError } = await supabase
-        .from("evaluations")
-        .select("id")
-        .eq("usuario_id", user.dpi)
-        .eq("periodo_id", periodoId)
-        .eq("tipo", "auto")
-        .single();
-      if (!refreshedError) {
-        evaluationId = refreshed?.id;
-      }
-    }
-
-    // Guardar respuestas a preguntas abiertas
+    // Guardar respuestas a preguntas abiertas si hay evaluationId
     if (Object.keys(openQuestionResponses).length > 0) {
       const openQuestionsKey = `open_questions_${user.dpi}_${periodoId}`;
       localStorage.setItem(openQuestionsKey, JSON.stringify(openQuestionResponses));
 
-      if (evaluationId) {
-        await saveOpenQuestionResponses(evaluationId, openQuestionResponses);
+      if (evalData?.id) {
+        await saveOpenQuestionResponses(evalData.id, openQuestionResponses);
       }
     }
 
-    // Guardar respuesta NPS en localStorage para referencia y limpiar luego
+    // Guardar respuesta NPS en localStorage para referencia
     if (npsScore !== undefined) {
       const npsKey = `nps_${user.dpi}_${periodoId}`;
       localStorage.setItem(npsKey, npsScore.toString());
