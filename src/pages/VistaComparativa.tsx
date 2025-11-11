@@ -11,7 +11,8 @@ import { ArrowLeft, BarChart3, TrendingUp, TrendingDown, Minus, Users2, User } f
 import { toast } from "sonner";
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, Cell } from "recharts";
 import { getSubmittedEvaluation, getJefeEvaluationDraft, getMockColaboradorEvaluation } from "@/lib/storage";
-import { INSTRUMENT_A1 } from "@/data/instruments";
+import { Instrument } from "@/types/evaluation";
+import { getInstrumentForUser } from "@/lib/instruments";
 import { getNineBoxDescription, calculateCompleteFinalScore } from "@/lib/finalScore";
 import { scoreToPercentage } from "@/lib/calculations";
 import { perteneceACuadrilla, getGruposDelColaborador, getEquipoStats } from "@/lib/jerarquias";
@@ -33,7 +34,7 @@ const VistaComparativa = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const instrument = INSTRUMENT_A1;
+  const [instrument, setInstrument] = useState<Instrument | null>(null);
 
   const [colaborador, setColaborador] = useState<any>(null);
   const [autoevaluacion, setAutoevaluacion] = useState<any>(null);
@@ -101,6 +102,15 @@ const VistaComparativa = () => {
         }
 
         setColaborador(colaboradorFormatted);
+
+        // Cargar instrumento según el nivel del colaborador
+        const userInstrument = await getInstrumentForUser(colaboradorFormatted.nivel);
+        if (!userInstrument) {
+          toast.error("No se encontró un instrumento de evaluación para el nivel del colaborador");
+          navigate("/evaluacion-equipo");
+          return;
+        }
+        setInstrument(userInstrument);
 
         // Verificar si pertenece a una cuadrilla
         const enCuadrilla = await perteneceACuadrilla(colaboradorFormatted.dpi);
@@ -199,7 +209,7 @@ const VistaComparativa = () => {
     loadData();
   }, [id, user, navigate]);
 
-  if (loading || !colaborador || !resultadoFinal) {
+  if (loading || !colaborador || !resultadoFinal || !instrument) {
     return (
       <div className="min-h-screen bg-background">
         <Header />

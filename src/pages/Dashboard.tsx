@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { getEvaluationDraft, hasSubmittedEvaluation, saveEvaluationDraft, submitEvaluation, EvaluationDraft } from "@/lib/storage";
-import { INSTRUMENT_A1 } from "@/data/instruments";
+import { getInstrumentForUser } from "@/lib/instruments";
 import { toast } from "@/hooks/use-toast";
 import { getJerarquiaInfo } from "@/lib/jerarquias";
 
@@ -107,10 +107,14 @@ const Dashboard = () => {
     }
   };
 
-  const fillSampleData = () => {
+  const fillSampleData = async () => {
     if (!user) return;
 
-    const instrument = INSTRUMENT_A1;
+    const instrument = await getInstrumentForUser(user.nivel);
+    if (!instrument) {
+      toast({ title: "Error", description: "No se encontró instrumento para su nivel", variant: "destructive" });
+      return;
+    }
     const allItems = instrument.dimensionesDesempeno.flatMap(d => d.items);
     
     // Create varied responses (mix of 3, 4, and 5 for realistic data)

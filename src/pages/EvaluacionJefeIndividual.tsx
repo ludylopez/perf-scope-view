@@ -28,7 +28,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { INSTRUMENT_A1 } from "@/data/instruments";
+import { Instrument } from "@/types/evaluation";
 import {
   saveEvaluationDraft,
   getJefeEvaluationDraft,
@@ -62,7 +62,7 @@ const EvaluacionJefeIndividual = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>(); // DPI del jefe subordinado
-  const [instrument, setInstrument] = useState(INSTRUMENT_A1);
+  const [instrument, setInstrument] = useState<Instrument | null>(null);
   const [periodoId, setPeriodoId] = useState<string>("");
 
   const [jefeEvaluado, setJefeEvaluado] = useState<any>(null);
@@ -84,8 +84,8 @@ const EvaluacionJefeIndividual = () => {
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  const desempenoDimensions = instrument.dimensionesDesempeno || [];
-  const potencialDimensions = instrument.dimensionesPotencial || [];
+  const desempenoDimensions = instrument?.dimensionesDesempeno || [];
+  const potencialDimensions = instrument?.dimensionesPotencial || [];
 
   const desempenoTotalItems = desempenoDimensions.reduce((sum, dim) => sum + dim.items.length, 0);
   const desempenoAnsweredItems = Object.keys(desempenoResponses).length;
