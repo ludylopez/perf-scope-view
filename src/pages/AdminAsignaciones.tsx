@@ -18,17 +18,34 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { ArrowLeft, Upload, UserPlus, Users, X, CheckCircle2, AlertCircle } from "lucide-react";
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { ArrowLeft, Upload, UserPlus, Users, X, CheckCircle2, AlertCircle, ChevronsUpDown, Check } from "lucide-react";
 import { updateUserRoleFromAssignments } from "@/lib/userRoleDetection";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import type { AssignmentWithUsers } from "@/types/assignment";
+
+interface User {
+  dpi: string;
+  nombre: string;
+  apellidos: string;
+  cargo: string;
+  nivel: string;
+  area: string;
+  rol: string;
+}
 
 const AdminAsignaciones = () => {
   const { user } = useAuth();
@@ -42,6 +59,9 @@ const AdminAsignaciones = () => {
     jefeId: "",
     grupoId: "",
   });
+  const [users, setUsers] = useState<User[]>([]);
+  const [openColaborador, setOpenColaborador] = useState(false);
+  const [openJefe, setOpenJefe] = useState(false);
 
   useEffect(() => {
     if (!user || (user.rol !== "admin_rrhh" && user.rol !== "admin_general")) {
@@ -49,7 +69,24 @@ const AdminAsignaciones = () => {
       return;
     }
     loadAssignments();
+    loadUsers();
   }, [user, navigate]);
+
+  const loadUsers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("users")
+        .select("dpi, nombre, apellidos, cargo, nivel, area, rol")
+        .eq("estado", "activo")
+        .order("nombre");
+
+      if (error) throw error;
+      setUsers(data || []);
+    } catch (error: any) {
+      console.error("Error loading users:", error);
+      toast.error("Error al cargar usuarios");
+    }
+  };
 
   const loadAssignments = async () => {
     try {
@@ -248,22 +285,126 @@ const AdminAsignaciones = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-4 md:grid-cols-3">
+                {/* Selector de Colaborador */}
                 <div className="space-y-2">
-                  <Label>Colaborador (DPI)</Label>
-                  <Input
-                    placeholder="Ingrese DPI del colaborador"
-                    value={manualAssignment.colaboradorId}
-                    onChange={(e) => setManualAssignment({ ...manualAssignment, colaboradorId: e.target.value })}
-                  />
+                  <Label>Colaborador</Label>
+                  <Popover open={openColaborador} onOpenChange={setOpenColaborador}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={openColaborador}
+                        className="w-full justify-between"
+                      >
+                        {manualAssignment.colaboradorId ? (
+                          <span className="truncate">
+                            {users.find((u) => u.dpi === manualAssignment.colaboradorId)?.nombre}{" "}
+                            {users.find((u) => u.dpi === manualAssignment.colaboradorId)?.apellidos}
+                          </span>
+                        ) : (
+                          "Buscar colaborador..."
+                        )}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[400px] p-0">
+                      <Command>
+                        <CommandInput placeholder="Buscar por nombre, DPI o cargo..." />
+                        <CommandList>
+                          <CommandEmpty>No se encontraron colaboradores.</CommandEmpty>
+                          <CommandGroup>
+                            {users.map((usuario) => (
+                              <CommandItem
+                                key={usuario.dpi}
+                                value={`${usuario.nombre} ${usuario.apellidos} ${usuario.dpi} ${usuario.cargo}`}
+                                onSelect={() => {
+                                  setManualAssignment({ ...manualAssignment, colaboradorId: usuario.dpi });
+                                  setOpenColaborador(false);
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    manualAssignment.colaboradorId === usuario.dpi ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                <div className="flex flex-col">
+                                  <span className="font-medium">
+                                    {usuario.nombre} {usuario.apellidos}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {usuario.cargo} • {usuario.nivel} • DPI: {usuario.dpi}
+                                  </span>
+                                </div>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
+
+                {/* Selector de Jefe */}
                 <div className="space-y-2">
-                  <Label>Jefe Evaluador (DPI)</Label>
-                  <Input
-                    placeholder="Ingrese DPI del jefe"
-                    value={manualAssignment.jefeId}
-                    onChange={(e) => setManualAssignment({ ...manualAssignment, jefeId: e.target.value })}
-                  />
+                  <Label>Jefe Evaluador</Label>
+                  <Popover open={openJefe} onOpenChange={setOpenJefe}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={openJefe}
+                        className="w-full justify-between"
+                      >
+                        {manualAssignment.jefeId ? (
+                          <span className="truncate">
+                            {users.find((u) => u.dpi === manualAssignment.jefeId)?.nombre}{" "}
+                            {users.find((u) => u.dpi === manualAssignment.jefeId)?.apellidos}
+                          </span>
+                        ) : (
+                          "Buscar jefe..."
+                        )}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[400px] p-0">
+                      <Command>
+                        <CommandInput placeholder="Buscar por nombre, DPI o cargo..." />
+                        <CommandList>
+                          <CommandEmpty>No se encontraron jefes.</CommandEmpty>
+                          <CommandGroup>
+                            {users.filter(u => u.rol === "jefe" || u.rol === "admin_rrhh" || u.rol === "admin_general").map((usuario) => (
+                              <CommandItem
+                                key={usuario.dpi}
+                                value={`${usuario.nombre} ${usuario.apellidos} ${usuario.dpi} ${usuario.cargo}`}
+                                onSelect={() => {
+                                  setManualAssignment({ ...manualAssignment, jefeId: usuario.dpi });
+                                  setOpenJefe(false);
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    manualAssignment.jefeId === usuario.dpi ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                <div className="flex flex-col">
+                                  <span className="font-medium">
+                                    {usuario.nombre} {usuario.apellidos}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {usuario.cargo} • {usuario.nivel} • DPI: {usuario.dpi}
+                                  </span>
+                                </div>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
+
                 <div className="space-y-2">
                   <Label>Grupo (Opcional)</Label>
                   <Input
