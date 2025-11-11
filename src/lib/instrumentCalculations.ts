@@ -46,7 +46,7 @@ export interface InstrumentCalculationConfig {
  * Cada uno de los 11 instrumentos puede tener su configuración
  */
 export const INSTRUMENT_CALCULATION_CONFIGS: Record<string, InstrumentCalculationConfig> = {
-  // Instrumento A1 - Configuración por defecto
+  // Instrumento A1 - Configuración con pesos especiales para Alta Dirección
   A1: {
     instrumentId: "A1",
     nivel: "A1",
@@ -58,7 +58,7 @@ export const INSTRUMENT_CALCULATION_CONFIGS: Record<string, InstrumentCalculatio
           .map((item: any) => responses[item.id])
           .filter((v: any) => v !== undefined);
         if (itemResponses.length === 0) continue;
-        
+
         const avg = itemResponses.reduce((sum: number, val: number) => sum + val, 0) / itemResponses.length;
         totalScore += avg * dimension.peso;
       }
@@ -71,18 +71,19 @@ export const INSTRUMENT_CALCULATION_CONFIGS: Record<string, InstrumentCalculatio
           .map((item: any) => potencialResponses[item.id])
           .filter((v: any) => v !== undefined);
         if (itemResponses.length === 0) continue;
-        
+
         const avg = itemResponses.reduce((sum: number, val: number) => sum + val, 0) / itemResponses.length;
         totalScore += avg * dimension.peso;
       }
       return Math.round(totalScore * 100) / 100;
     },
     calcularResultadoFinal: (desempenoAuto, desempenoJefe, potencial) => {
-      const desempenoFinal = Math.round((desempenoJefe * 0.7 + desempenoAuto * 0.3) * 100) / 100;
+      // A1 tiene pesos especiales: 45% autoevaluación + 55% jefe (mayor autonomía por ser Alta Dirección)
+      const desempenoFinal = Math.round((desempenoJefe * 0.55 + desempenoAuto * 0.45) * 100) / 100;
       return { desempenoFinal, potencial };
     },
-    pesoJefe: 0.7,
-    pesoAuto: 0.3,
+    pesoJefe: 0.55, // Pesos especiales para A1
+    pesoAuto: 0.45, // Mayor peso a la autoevaluación por ser Alta Dirección
     thresholds9Box: {
       desempeno: { bajo: 3, medio: 4, alto: 4.5 },
       potencial: { bajo: 3, medio: 4, alto: 4.5 },
