@@ -44,6 +44,7 @@ import {
   getDimensionProgress,
 } from "@/lib/calculations";
 import { OpenQuestions } from "@/components/evaluation/OpenQuestions";
+import { NPSQuestion } from "@/components/evaluation/NPSQuestion";
 import { getOpenQuestions, saveOpenQuestionResponses } from "@/lib/supabase";
 import { getActivePeriod } from "@/lib/supabase";
 import { ArrowLeft, ArrowRight, Save, Send, AlertTriangle } from "lucide-react";
@@ -58,6 +59,7 @@ const Autoevaluacion = () => {
   const [responses, setResponses] = useState<Record<string, number>>({});
   const [comments, setComments] = useState<Record<string, string>>({});
   const [openQuestionResponses, setOpenQuestionResponses] = useState<Record<string, string>>({});
+  const [npsScore, setNpsScore] = useState<number | undefined>(undefined);
   const [openQuestions, setOpenQuestions] = useState<Array<{
     id: string;
     pregunta: string;
@@ -125,6 +127,12 @@ const Autoevaluacion = () => {
         if (draft) {
           setResponses(draft.responses);
           setComments(draft.comments);
+          // Cargar NPS si existe en el draft (almacenado como extensión)
+          const npsKey = `nps_${user.dpi}_${periodoIdFinal}`;
+          const savedNps = localStorage.getItem(npsKey);
+          if (savedNps) {
+            setNpsScore(parseInt(savedNps));
+          }
           toast.info("Se ha cargado su borrador guardado");
         }
 
@@ -159,10 +167,15 @@ const Autoevaluacion = () => {
 
     await saveEvaluationDraft(draft);
     
-    // Guardar también respuestas a preguntas abiertas
+    // Guardar también respuestas a preguntas abiertas y NPS
     if (Object.keys(openQuestionResponses).length > 0) {
       const openQuestionsKey = `open_questions_${user.dpi}_${periodoId}`;
       localStorage.setItem(openQuestionsKey, JSON.stringify(openQuestionResponses));
+    }
+    
+    if (npsScore !== undefined) {
+      const npsKey = `nps_${user.dpi}_${periodoId}`;
+      localStorage.setItem(npsKey, npsScore.toString());
     }
     
     setAutoSaveStatus("saved");
@@ -189,6 +202,11 @@ const Autoevaluacion = () => {
     setHasUnsavedChanges(true);
   };
 
+  const handleNpsChange = (value: number) => {
+    setNpsScore(value);
+    setHasUnsavedChanges(true);
+  };
+
 const handleCommentChange = (dimensionId: string, value: string) => {
   setComments((prev) => ({ ...prev, [dimensionId]: value }));
   setHasUnsavedChanges(true);
@@ -210,6 +228,11 @@ const handleSaveDraft = () => {
       return;
     }
 
+    if (npsScore === undefined) {
+      toast.error("Por favor, responde la pregunta de recomendación institucional (NPS)", { duration: 5000 });
+      return;
+    }
+
     setShowSubmitDialog(true);
   };
 
@@ -227,6 +250,23 @@ const handleSaveDraft = () => {
       fechaUltimaModificacion: new Date().toISOString(),
     };
 
+    // Guardar en Supabase con NPS
+    const { supabase } = await import("@/integrations/supabase/client");
+    const { data: evalData } = await supabase
+      .from("evaluations")
+      .select("id")
+      .eq("usuario_id", user.dpi)
+      .eq("periodo_id", periodoId)
+      .eq("tipo", "auto")
+      .single();
+
+    if (evalData?.id && npsScore !== undefined) {
+      await supabase
+        .from("evaluations")
+        .update({ nps_score: npsScore })
+        .eq("id", evalData.id);
+    }
+    
     await submitEvaluation(draft);
     
     // Guardar respuestas a preguntas abiertas
@@ -453,6 +493,12 @@ const handleSaveDraft = () => {
             )}
           </CardContent>
         </Card>
+
+        {/* Pregunta NPS - Solo en autoevaluación */}
+        <NPSQuestion
+          value={npsScore}
+          onChange={handleNpsChange}
+        />
 
         {/* Preguntas Abiertas */}
         {openQuestions.length > 0 && (

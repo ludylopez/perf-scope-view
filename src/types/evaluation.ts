@@ -41,6 +41,7 @@ export interface EvaluationData {
   dimensiones: DimensionResponse[];
   estado: "borrador" | "enviado";
   fechaEnvio?: string;
+  npsScore?: number; // Net Promoter Score (0-10): Solo para autoevaluaciones
 }
 
 export interface Result {

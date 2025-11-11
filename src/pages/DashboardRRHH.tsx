@@ -40,6 +40,10 @@ interface DashboardStats {
   porcentajeCompletitud: number;
   promedioDesempeno: number;
   promedioPotencial: number;
+  npsPromedio?: number;
+  npsPromoters?: number;
+  npsPassives?: number;
+  npsDetractors?: number;
   distribucion9Box: Record<string, number>;
   evaluacionesPorArea: Array<{ area: string; completadas: number; total: number }>;
   evaluacionesPorNivel: Array<{ nivel: string; completadas: number; total: number }>;
@@ -199,6 +203,14 @@ const DashboardRRHH = () => {
         .select("resultado_final")
         .eq("periodo_id", activePeriodId);
 
+      // Obtener NPS scores de autoevaluaciones
+      const { data: npsData } = await supabase
+        .from("evaluations")
+        .select("nps_score")
+        .eq("periodo_id", activePeriodId)
+        .eq("tipo", "auto")
+        .not("nps_score", "is", null);
+
       // Calcular promedios usando porcentajes directamente
       const promedios = resultadosData?.reduce((acc, r) => {
         const resultado = r.resultado_final as any;
@@ -279,6 +291,20 @@ const DashboardRRHH = () => {
         ...data,
       }));
 
+      // Calcular estadísticas NPS
+      let npsPromedio = 0;
+      let npsPromoters = 0;
+      let npsPassives = 0;
+      let npsDetractors = 0;
+      
+      if (npsData && npsData.length > 0) {
+        const scores = npsData.map(d => d.nps_score).filter(s => s !== null) as number[];
+        npsPromedio = scores.reduce((sum, s) => sum + s, 0) / scores.length;
+        npsPromoters = scores.filter(s => s >= 9).length;
+        npsPassives = scores.filter(s => s >= 7 && s < 9).length;
+        npsDetractors = scores.filter(s => s < 7).length;
+      }
+
       // Tendencia semanal
       const tendenciaSemanal = [
         { semana: "Sem 1", completadas: Math.floor(completadas * 0.1) },
@@ -297,6 +323,10 @@ const DashboardRRHH = () => {
         porcentajeCompletitud: totalEsperadas > 0 ? Math.round((completadas / totalEsperadas) * 100) : 0,
         promedioDesempeno,
         promedioPotencial,
+        npsPromedio,
+        npsPromoters,
+        npsPassives,
+        npsDetractors,
         distribucion9Box,
         evaluacionesPorArea,
         evaluacionesPorNivel,
@@ -477,7 +507,7 @@ const DashboardRRHH = () => {
         </div>
 
         {/* Promedios y Distribución */}
-        <div className="grid gap-6 mb-6 md:grid-cols-3">
+        <div className="grid gap-6 mb-6 md:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader>
               <CardTitle>Promedio de Desempeño</CardTitle>
@@ -497,6 +527,40 @@ const DashboardRRHH = () => {
               <p className="text-4xl font-bold text-accent">{scoreToPercentage(stats.promedioPotencial)}%</p>
               <p className="text-sm text-muted-foreground mt-2">Potencial promedio</p>
               <Progress value={scoreToPercentage(stats.promedioPotencial)} className="mt-4" />
+            </CardContent>
+          </Card>
+
+          {/* Net Promoter Score */}
+          <Card className="border-primary/20">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5" />
+                Net Promoter Score
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-4xl font-bold text-success">
+                {stats.npsPromedio ? stats.npsPromedio.toFixed(1) : "N/A"}
+              </p>
+              <p className="text-sm text-muted-foreground mt-2">
+                Recomendación promedio (0-10)
+              </p>
+              {stats.npsPromoters !== undefined && (
+                <div className="mt-4 space-y-1 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-success">Promotores (9-10):</span>
+                    <span className="font-semibold">{stats.npsPromoters}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-warning">Pasivos (7-8):</span>
+                    <span className="font-semibold">{stats.npsPassives}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-destructive">Detractores (0-6):</span>
+                    <span className="font-semibold">{stats.npsDetractors}</span>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 

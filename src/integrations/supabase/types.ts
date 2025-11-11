@@ -141,6 +141,7 @@ export type Database = {
           fecha_envio: string | null
           fecha_ultima_modificacion: string | null
           id: string
+          nps_score: number | null
           periodo_id: string
           progreso: number | null
           responses: Json
@@ -158,6 +159,7 @@ export type Database = {
           fecha_envio?: string | null
           fecha_ultima_modificacion?: string | null
           id?: string
+          nps_score?: number | null
           periodo_id: string
           progreso?: number | null
           responses?: Json
@@ -175,6 +177,7 @@ export type Database = {
           fecha_envio?: string | null
           fecha_ultima_modificacion?: string | null
           id?: string
+          nps_score?: number | null
           periodo_id?: string
           progreso?: number | null
           responses?: Json

@@ -88,13 +88,40 @@ const DashboardConsolidado = () => {
         .select("desempeno_porcentaje, potencial_porcentaje")
         .eq("periodo_id", activePeriodId);
 
+      // Cargar NPS scores
+      const { data: npsData } = await supabase
+        .from("evaluations")
+        .select("nps_score")
+        .eq("periodo_id", activePeriodId)
+        .eq("tipo", "auto")
+        .not("nps_score", "is", null);
+
       if (promedioData && promedioData.length > 0) {
         const promedioDesempeno = promedioData.reduce((sum, r) => sum + (r.desempeno_porcentaje || 0), 0) / promedioData.length;
         const promedioPotencial = promedioData.reduce((sum, r) => sum + (r.potencial_porcentaje || 0), 0) / promedioData.length;
+        
+        // Calcular NPS
+        let npsPromedio = 0;
+        let npsPromoters = 0;
+        let npsPassives = 0;
+        let npsDetractors = 0;
+        
+        if (npsData && npsData.length > 0) {
+          const scores = npsData.map(d => d.nps_score).filter(s => s !== null) as number[];
+          npsPromedio = scores.reduce((sum, s) => sum + s, 0) / scores.length;
+          npsPromoters = scores.filter(s => s >= 9).length;
+          npsPassives = scores.filter(s => s >= 7 && s < 9).length;
+          npsDetractors = scores.filter(s => s < 7).length;
+        }
+        
         setPromedioOrganizacional({
           desempeno: promedioDesempeno,
           potencial: promedioPotencial,
           total: promedioData.length,
+          npsPromedio,
+          npsPromoters,
+          npsPassives,
+          npsDetractors,
         });
       }
     } catch (error: any) {
@@ -180,7 +207,7 @@ const DashboardConsolidado = () => {
           {/* Tab: Resumen */}
           <TabsContent value="resumen" className="space-y-6">
             {/* Métricas principales */}
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-medium">Total Colaboradores</CardTitle>
@@ -216,6 +243,31 @@ const DashboardConsolidado = () => {
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
                     {promedioOrganizacional ? `${promedioOrganizacional.total} evaluados` : 'Sin datos'}
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="border-primary/20">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium flex items-center gap-1">
+                    <TrendingUp className="h-4 w-4" />
+                    NPS
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-3xl font-bold text-success">
+                    {promedioOrganizacional?.npsPromedio ? promedioOrganizacional.npsPromedio.toFixed(1) : 'N/A'}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {promedioOrganizacional?.npsPromoters !== undefined && (
+                      <>
+                        <span className="text-success">{promedioOrganizacional.npsPromoters}</span>
+                        {' / '}
+                        <span className="text-warning">{promedioOrganizacional.npsPassives}</span>
+                        {' / '}
+                        <span className="text-destructive">{promedioOrganizacional.npsDetractors}</span>
+                      </>
+                    )}
                   </p>
                 </CardContent>
               </Card>
