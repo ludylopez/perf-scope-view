@@ -567,6 +567,8 @@ export type Database = {
           cargo: string
           correo: string | null
           created_at: string | null
+          departamento_dependencia: string | null
+          direccion_unidad: string | null
           dpi: string
           estado: string
           fecha_ingreso: string | null
@@ -577,6 +579,8 @@ export type Database = {
           nivel: string
           nombre: string
           primer_ingreso: boolean | null
+          profesion: string | null
+          renglon: string | null
           rol: string
           telefono: string | null
           tipo_puesto: string | null
@@ -588,6 +592,8 @@ export type Database = {
           cargo: string
           correo?: string | null
           created_at?: string | null
+          departamento_dependencia?: string | null
+          direccion_unidad?: string | null
           dpi: string
           estado?: string
           fecha_ingreso?: string | null
@@ -598,6 +604,8 @@ export type Database = {
           nivel: string
           nombre: string
           primer_ingreso?: boolean | null
+          profesion?: string | null
+          renglon?: string | null
           rol?: string
           telefono?: string | null
           tipo_puesto?: string | null
@@ -609,6 +617,8 @@ export type Database = {
           cargo?: string
           correo?: string | null
           created_at?: string | null
+          departamento_dependencia?: string | null
+          direccion_unidad?: string | null
           dpi?: string
           estado?: string
           fecha_ingreso?: string | null
@@ -619,6 +629,8 @@ export type Database = {
           nivel?: string
           nombre?: string
           primer_ingreso?: boolean | null
+          profesion?: string | null
+          renglon?: string | null
           rol?: string
           telefono?: string | null
           tipo_puesto?: string | null
