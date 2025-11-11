@@ -28,7 +28,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { INSTRUMENT_A1 } from "@/data/instruments";
+import { Instrument } from "@/types/evaluation";
 import {
   saveEvaluationDraft,
   getJefeEvaluationDraft,
@@ -79,7 +79,7 @@ const EvaluacionColaborador = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const [instrument, setInstrument] = useState(INSTRUMENT_A1);
+  const [instrument, setInstrument] = useState<Instrument | null>(null);
   const [periodoId, setPeriodoId] = useState<string>("");
 
   const [colaborador, setColaborador] = useState<any>(null);

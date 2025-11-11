@@ -29,7 +29,8 @@ import { LikertScale } from "@/components/evaluation/LikertScale";
 import { EvaluationInstructions } from "@/components/evaluation/EvaluationInstructions";
 import { DimensionProgress } from "@/components/evaluation/DimensionProgress";
 import { AutoSaveIndicator } from "@/components/evaluation/AutoSaveIndicator";
-import { INSTRUMENT_A1 } from "@/data/instruments";
+import { Instrument } from "@/types/evaluation";
+import { getInstrumentForUser } from "@/lib/instruments";
 import {
   saveEvaluationDraft,
   getEvaluationDraft,
@@ -52,7 +53,7 @@ import { useAutoSave } from "@/hooks/useAutoSave";
 const Autoevaluacion = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const instrument = INSTRUMENT_A1;
+  const [instrument, setInstrument] = useState<Instrument | null>(null);
 
   const [responses, setResponses] = useState<Record<string, number>>({});
   const [comments, setComments] = useState<Record<string, string>>({});
@@ -70,11 +71,11 @@ const Autoevaluacion = () => {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [periodoId, setPeriodoId] = useState<string>("");
 
-  const dimensions = instrument.dimensionesDesempeno;
+  const dimensions = instrument?.dimensionesDesempeno || [];
   const totalItems = dimensions.reduce((sum, dim) => sum + dim.items.length, 0);
   const answeredItems = Object.keys(responses).length;
-  const progressPercentage = (answeredItems / totalItems) * 100;
-  const isComplete = isEvaluationComplete(responses, dimensions);
+  const progressPercentage = totalItems > 0 ? (answeredItems / totalItems) * 100 : 0;
+  const isComplete = instrument ? isEvaluationComplete(responses, dimensions) : false;
 
   // Load existing draft and open questions on mount
   useEffect(() => {
@@ -103,6 +104,14 @@ const Autoevaluacion = () => {
         }
 
         const periodoIdFinal = activePeriod?.id || periodoId;
+
+        // Cargar instrumento según nivel del usuario
+        const userInstrument = await getInstrumentForUser(user.nivel);
+        if (!userInstrument) {
+          toast.error("No se encontró un instrumento de evaluación para su nivel");
+          return;
+        }
+        setInstrument(userInstrument);
 
         // Check if already submitted
         const alreadySubmitted = await hasSubmittedEvaluation(user.dpi, periodoIdFinal);
@@ -232,6 +241,18 @@ const handleSaveDraft = () => {
     toast.success("¡Autoevaluación enviada exitosamente!");
     navigate("/dashboard");
   };
+
+  // Loading state
+  if (!instrument) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container mx-auto px-4 py-8">
+          <p>Cargando instrumento de evaluación...</p>
+        </main>
+      </div>
+    );
+  }
 
   const currentDim = dimensions[currentDimension];
   const dimProgress = getDimensionProgress(responses, currentDim);
