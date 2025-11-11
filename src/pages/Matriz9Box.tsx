@@ -439,14 +439,14 @@ const Matriz9Box = () => {
                                   <div>
                                     <span className="text-muted-foreground">Desempeño: </span>
                                     <span className="font-medium">
-                                      {member.desempenoPorcentaje}% ({member.desempenoFinal.toFixed(2)}/5.0)
+                                      {member.desempenoPorcentaje}%
                                     </span>
                                   </div>
                                   {member.potencialPorcentaje !== undefined && (
                                     <div>
                                       <span className="text-muted-foreground">Potencial: </span>
                                       <span className="font-medium">
-                                        {member.potencialPorcentaje}% ({member.potencial?.toFixed(2)}/5.0)
+                                        {member.potencialPorcentaje}%
                                       </span>
                                     </div>
                                   )}

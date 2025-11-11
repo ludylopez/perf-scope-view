@@ -276,21 +276,18 @@ const VistaComparativa = () => {
                   <p className="text-3xl font-bold text-primary">
                     {scoreToPercentage(resultadoFinal.desempenoAuto)}%
                   </p>
-                  <p className="text-xs text-muted-foreground">({resultadoFinal.desempenoAuto.toFixed(2)}/5.0)</p>
                 </div>
                 <div className="text-center p-4 rounded-lg border">
                   <p className="text-sm text-muted-foreground mb-1">Evaluación Jefe</p>
                   <p className="text-3xl font-bold text-accent">
                     {scoreToPercentage(resultadoFinal.desempenoJefe)}%
                   </p>
-                  <p className="text-xs text-muted-foreground">({resultadoFinal.desempenoJefe.toFixed(2)}/5.0)</p>
                 </div>
                 <div className="text-center p-4 rounded-lg border bg-primary/5">
                   <p className="text-sm text-muted-foreground mb-1">Desempeño Final</p>
                   <p className="text-3xl font-bold text-primary">
                     {scoreToPercentage(resultadoFinal.desempenoFinal)}%
                   </p>
-                  <p className="text-xs text-muted-foreground">({resultadoFinal.desempenoFinal.toFixed(2)}/5.0)</p>
                 </div>
                 {resultadoFinal.potencial && (
                   <div className="text-center p-4 rounded-lg border">
@@ -298,7 +295,6 @@ const VistaComparativa = () => {
                     <p className="text-3xl font-bold text-success">
                       {scoreToPercentage(resultadoFinal.potencial)}%
                     </p>
-                    <p className="text-xs text-muted-foreground">({resultadoFinal.potencial.toFixed(2)}/5.0)</p>
                   </div>
                 )}
               </div>
@@ -546,7 +542,6 @@ const VistaComparativa = () => {
                             {scoreToPercentage(item.autoevaluacion)}%
                           </span>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1">({item.autoevaluacion.toFixed(2)}/5.0)</p>
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground mb-1">Evaluación Jefe</p>
@@ -556,7 +551,6 @@ const VistaComparativa = () => {
                             {scoreToPercentage(item.evaluacionJefe)}%
                           </span>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1">({item.evaluacionJefe.toFixed(2)}/5.0)</p>
                       </div>
                       {vistaModo === "grupal" && perteneceCuadrilla && promedioGrupo !== null && (
                         <div>

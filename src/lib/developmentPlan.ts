@@ -63,11 +63,11 @@ const buildEvaluationContext = (
   let contexto = "CONTEXTO DE EVALUACIÓN:\n\n";
   
   contexto += `RESULTADO FINAL:\n`;
-  contexto += `- Desempeño Autoevaluación: ${scoreToPercentage(resultadoFinal.desempenoAuto)}% (${resultadoFinal.desempenoAuto.toFixed(2)}/5.0)\n`;
-  contexto += `- Desempeño Evaluación Jefe: ${scoreToPercentage(resultadoFinal.desempenoJefe)}% (${resultadoFinal.desempenoJefe.toFixed(2)}/5.0)\n`;
-  contexto += `- Desempeño Final (ponderado): ${scoreToPercentage(resultadoFinal.desempenoFinal)}% (${resultadoFinal.desempenoFinal.toFixed(2)}/5.0)\n`;
+  contexto += `- Desempeño Autoevaluación: ${scoreToPercentage(resultadoFinal.desempenoAuto)}%\n`;
+  contexto += `- Desempeño Evaluación Jefe: ${scoreToPercentage(resultadoFinal.desempenoJefe)}%\n`;
+  contexto += `- Desempeño Final (ponderado): ${scoreToPercentage(resultadoFinal.desempenoFinal)}%\n`;
   if (resultadoFinal.potencial) {
-    contexto += `- Potencial: ${scoreToPercentage(resultadoFinal.potencial)}% (${resultadoFinal.potencial.toFixed(2)}/5.0)\n`;
+    contexto += `- Potencial: ${scoreToPercentage(resultadoFinal.potencial)}%\n`;
   }
   if (resultadoFinal.posicion9Box) {
     contexto += `- Posición 9-Box: ${resultadoFinal.posicion9Box}\n`;
@@ -80,9 +80,10 @@ const buildEvaluationContext = (
     
     const autoAvg = autoItems.length > 0 ? autoItems.reduce((sum, val) => sum + val, 0) / autoItems.length : 0;
     const jefeAvg = jefeItems.length > 0 ? jefeItems.reduce((sum, val) => sum + val, 0) / jefeItems.length : 0;
-    const diferencia = jefeAvg - autoAvg;
-    
-    contexto += `${idx + 1}. ${dim.nombre}: Auto=${scoreToPercentage(autoAvg)}% (${autoAvg.toFixed(2)}/5.0), Jefe=${scoreToPercentage(jefeAvg)}% (${jefeAvg.toFixed(2)}/5.0), Dif=${diferencia > 0 ? '+' : ''}${diferencia.toFixed(2)}\n`;
+    const diferenciaAbsoluta = jefeAvg - autoAvg;
+    const diferenciaPorcentaje = scoreToPercentage(jefeAvg) - scoreToPercentage(autoAvg);
+
+    contexto += `${idx + 1}. ${dim.nombre}: Auto=${scoreToPercentage(autoAvg)}%, Jefe=${scoreToPercentage(jefeAvg)}%, Diferencia=${diferenciaPorcentaje > 0 ? '+' : ''}${diferenciaPorcentaje}%\n`;
     
     if (autoevaluacion.comments[dim.id]) {
       contexto += `   Comentarios colaborador: ${autoevaluacion.comments[dim.id].substring(0, 100)}...\n`;
@@ -97,7 +98,7 @@ const buildEvaluationContext = (
     potencialDimensions.forEach((dim, idx) => {
       const items = dim.items.map(item => evaluacionJefe.evaluacionPotencial?.responses[item.id]).filter(v => v !== undefined);
       const avg = items.length > 0 ? items.reduce((sum: number, val: any) => sum + val, 0) / items.length : 0;
-      contexto += `${idx + 1}. ${dim.nombre}: ${scoreToPercentage(avg)}% (${avg.toFixed(2)}/5.0)\n`;
+      contexto += `${idx + 1}. ${dim.nombre}: ${scoreToPercentage(avg)}%\n`;
     });
   }
 
@@ -209,7 +210,7 @@ const generateBasicDevelopmentPlan = (
     colaboradorId,
     periodoId,
     competenciasDesarrollar,
-    feedbackIndividual: `Su desempeño general es de ${scoreToPercentage(resultadoFinal.desempenoFinal)}% (${resultadoFinal.desempenoFinal.toFixed(2)}/5.0). Se recomienda continuar desarrollando las competencias identificadas para alcanzar un nivel superior.`,
+    feedbackIndividual: `Su desempeño general es de ${scoreToPercentage(resultadoFinal.desempenoFinal)}%. Se recomienda continuar desarrollando las competencias identificadas para alcanzar un nivel superior.`,
     editable: true,
     fechaCreacion: new Date().toISOString(),
   };
