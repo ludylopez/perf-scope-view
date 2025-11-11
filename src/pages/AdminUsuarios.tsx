@@ -856,12 +856,23 @@ const AdminUsuarios = () => {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Instrumento Override</Label>
-                    <Input
-                      value={newUser.instrumentoId}
-                      onChange={(e) => setNewUser({ ...newUser, instrumentoId: e.target.value })}
-                      placeholder="ID del instrumento (opcional)"
-                    />
+                    <Label>Instrumento de Evaluación</Label>
+                    <Select
+                      value={newUser.instrumentoId || ""}
+                      onValueChange={(value) => setNewUser({ ...newUser, instrumentoId: value || "" })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={`Por defecto: ${newUser.nivel || "Seleccionar nivel primero"}`} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">Asignar automáticamente según nivel</SelectItem>
+                        <SelectItem value="A1">A1 - ALCALDE MUNICIPAL</SelectItem>
+                        <SelectItem value="A3">A3 - ADMINISTRATIVOS I</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Por defecto se asigna según el nivel. Use el override solo si es necesario.
+                    </p>
                   </div>
                 </div>
               </div>
@@ -1191,11 +1202,23 @@ const AdminUsuarios = () => {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Instrumento Override</Label>
-                    <Input
+                    <Label>Instrumento de Evaluación</Label>
+                    <Select
                       value={editingUser.instrumentoId || ""}
-                      onChange={(e) => setEditingUser({ ...editingUser, instrumentoId: e.target.value })}
-                    />
+                      onValueChange={(value) => setEditingUser({ ...editingUser, instrumentoId: value || "" })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={`Por defecto: ${editingUser.nivel}`} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">Asignar automáticamente según nivel</SelectItem>
+                        <SelectItem value="A1">A1 - ALCALDE MUNICIPAL</SelectItem>
+                        <SelectItem value="A3">A3 - ADMINISTRATIVOS I</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Actual: {editingUser.instrumentoId || `${editingUser.nivel} (automático)`}
+                    </p>
                   </div>
                 </div>
               </div>
