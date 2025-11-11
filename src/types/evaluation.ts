@@ -109,6 +109,36 @@ export interface DevelopmentPlan {
   updated_at?: string;
 }
 
+export interface PuntoFuerte {
+  dimension: string;
+  reconocimiento: string;
+  ejemplo: string;
+  impacto: string;
+}
+
+export interface AreaDesarrollo {
+  dimension: string;
+  situacion: string;
+  comportamiento: string;
+  impacto: string;
+  sugerencia: string;
+}
+
+export interface GuiaRetroalimentacion {
+  id?: string;
+  colaboradorId: string;
+  periodoId: string;
+  preparacion: string;
+  apertura: string;
+  fortalezas: PuntoFuerte[];
+  areasDesarrollo: AreaDesarrollo[];
+  preguntasDialogo: string[];
+  tipsConduccion: string[];
+  cierre: string;
+  generadoPorIa: boolean;
+  fechaGeneracion: string;
+}
+
 export interface FinalEvaluationResult {
   id: string;
   colaboradorId: string;

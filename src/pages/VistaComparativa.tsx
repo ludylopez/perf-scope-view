@@ -19,6 +19,7 @@ import { perteneceACuadrilla, getGruposDelColaborador, getEquipoStats } from "@/
 import { supabase } from "@/integrations/supabase/client";
 import { getActivePeriod } from "@/lib/supabase";
 import { GenerarPlanDesarrollo } from "@/components/development/GenerarPlanDesarrollo";
+import { GenerarGuiaRetroalimentacion } from "@/components/development/GuiaRetroalimentacion";
 
 const MOCK_COLABORADORES: Record<string, any> = {
   "1": {
@@ -324,9 +325,9 @@ const VistaComparativa = () => {
           </Card>
         </div>
 
-        {/* Generar Plan de Desarrollo con IA */}
+        {/* Generar Plan de Desarrollo y Guía de Retroalimentación con IA */}
         {colaborador && periodoId && (
-          <div className="mb-6 flex justify-center">
+          <div className="mb-6 flex justify-center gap-4 flex-wrap">
             <GenerarPlanDesarrollo
               colaboradorId={colaborador.dpi}
               periodoId={periodoId}
@@ -338,6 +339,11 @@ const VistaComparativa = () => {
                 });
                 toast.success("Plan de desarrollo guardado");
               }}
+            />
+            <GenerarGuiaRetroalimentacion
+              colaboradorId={colaborador.dpi}
+              periodoId={periodoId}
+              colaboradorNombre={colaborador.nombre}
             />
           </div>
         )}
