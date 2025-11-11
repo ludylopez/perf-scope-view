@@ -1,19 +1,10 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog,
@@ -25,11 +16,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { LikertScale } from "@/components/evaluation/LikertScale";
+import { MobileLikertScale } from "@/components/evaluation/MobileLikertScale";
+import { MobileNPSQuestion } from "@/components/evaluation/MobileNPSQuestion";
+import { MobileOpenQuestions } from "@/components/evaluation/MobileOpenQuestions";
 import { EvaluationInstructions } from "@/components/evaluation/EvaluationInstructions";
-import { DimensionProgress } from "@/components/evaluation/DimensionProgress";
 import { AutoSaveIndicator } from "@/components/evaluation/AutoSaveIndicator";
-import { Instrument } from "@/types/evaluation";
+import { WizardHeader } from "@/components/evaluation/wizard/WizardHeader";
+import { WizardStep } from "@/components/evaluation/wizard/WizardStep";
+import { WizardFooter } from "@/components/evaluation/wizard/WizardFooter";
+import { Instrument, Dimension } from "@/types/evaluation";
 import { EvaluationPeriod } from "@/types/period";
 import { getInstrumentForUser } from "@/lib/instruments";
 import {
@@ -40,15 +35,11 @@ import {
   EvaluationDraft,
 } from "@/lib/storage";
 import {
-  isEvaluationComplete,
-  getIncompleteDimensions,
   getDimensionProgress,
 } from "@/lib/calculations";
-import { OpenQuestions } from "@/components/evaluation/OpenQuestions";
-import { NPSQuestion } from "@/components/evaluation/NPSQuestion";
 import { getOpenQuestions, saveOpenQuestionResponses } from "@/lib/supabase";
 import { getActivePeriod } from "@/lib/supabase";
-import { ArrowLeft, ArrowRight, Save, Send, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Save } from "lucide-react";
 import { toast } from "sonner";
 import { useAutoSave } from "@/hooks/useAutoSave";
 
@@ -68,7 +59,8 @@ const Autoevaluacion = () => {
     orden: number;
     obligatoria: boolean;
   }>>([]);
-  const [currentDimension, setCurrentDimension] = useState(0);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [autoSaveStatus, setAutoSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -79,7 +71,55 @@ const Autoevaluacion = () => {
   const totalItems = dimensions.reduce((sum, dim) => sum + dim.items.length, 0);
   const answeredItems = Object.keys(responses).length;
   const progressPercentage = totalItems > 0 ? (answeredItems / totalItems) * 100 : 0;
-  const isComplete = instrument ? isEvaluationComplete(responses, dimensions) : false;
+
+  // Wizard steps: dimensiones + NPS + preguntas abiertas
+  const wizardSteps = useMemo(() => {
+    const steps: Array<{
+      id: string;
+      label: string;
+      completed: boolean;
+      type: "dimension" | "nps" | "open-questions";
+      data?: Dimension;
+    }> = [];
+
+    // Agregar dimensiones
+    dimensions.forEach((dim, idx) => {
+      const dimProgress = getDimensionProgress(responses, dim);
+      steps.push({
+        id: dim.id,
+        label: dim.nombre,
+        completed: dimProgress.answered === dimProgress.total,
+        type: "dimension",
+        data: dim,
+      });
+    });
+
+    // Agregar NPS
+    steps.push({
+      id: "nps",
+      label: "Recomendación",
+      completed: npsScore !== undefined,
+      type: "nps",
+    });
+
+    // Agregar preguntas abiertas
+    if (openQuestions.length > 0) {
+      const allAnswered = openQuestions
+        .filter((q) => q.obligatoria)
+        .every((q) => openQuestionResponses[q.id]?.trim().length > 0);
+      steps.push({
+        id: "open-questions",
+        label: "Necesidades",
+        completed: allAnswered,
+        type: "open-questions",
+      });
+    }
+
+    return steps;
+  }, [dimensions, responses, npsScore, openQuestions, openQuestionResponses]);
+
+  const currentWizardStep = wizardSteps[currentStep];
+  const isLastStep = currentStep === wizardSteps.length - 1;
 
   // Load existing draft and open questions on mount
   useEffect(() => {
@@ -247,46 +287,68 @@ const Autoevaluacion = () => {
     setHasUnsavedChanges(true);
   };
 
-const handleCommentChange = (dimensionId: string, value: string) => {
-  setComments((prev) => ({ ...prev, [dimensionId]: value }));
-  setHasUnsavedChanges(true);
-};
+  const handleCommentChange = (dimensionId: string, value: string) => {
+    setComments((prev) => ({ ...prev, [dimensionId]: value }));
+    setHasUnsavedChanges(true);
+  };
 
-const handleSaveDraft = () => {
+  const handleSaveDraft = () => {
     performAutoSave();
     toast.success("Borrador guardado correctamente");
   };
 
+  // Validación del paso actual
+  const canGoNext = useMemo(() => {
+    if (!currentWizardStep) return false;
+
+    if (currentWizardStep.type === "dimension" && currentWizardStep.data) {
+      // Validar que todas las preguntas de la dimensión actual estén respondidas
+      return currentWizardStep.data.items.every((item) => responses[item.id] !== undefined);
+    }
+
+    if (currentWizardStep.type === "nps") {
+      return npsScore !== undefined;
+    }
+
+    if (currentWizardStep.type === "open-questions") {
+      // Validar preguntas obligatorias
+      return openQuestions
+        .filter((q) => q.obligatoria)
+        .every((q) => openQuestionResponses[q.id]?.trim().length > 0);
+    }
+
+    return false;
+  }, [currentWizardStep, responses, npsScore, openQuestions, openQuestionResponses]);
+
+  const handleNext = () => {
+    if (!canGoNext) {
+      toast.error("Por favor completa todas las respuestas antes de continuar");
+      return;
+    }
+    if (currentStep < wizardSteps.length - 1) {
+      setCurrentStep(currentStep + 1);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
+  const handlePrevious = () => {
+    if (currentStep > 0) {
+      setCurrentStep(currentStep - 1);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
   const handleSubmitClick = () => {
-    if (!isComplete) {
-      const incompleteDims = getIncompleteDimensions(responses, dimensions);
-      const dimNames = incompleteDims.map((d) => d.nombre).join(", ");
-      toast.error(
-        `Faltan ${totalItems - answeredItems} ítems por responder en: ${dimNames}`,
-        { duration: 5000 }
-      );
+    if (!canGoNext) {
+      toast.error("Por favor completa todas las respuestas antes de enviar");
       return;
     }
-
-    if (npsScore === undefined) {
-      toast.error("Por favor, responde la pregunta de recomendación institucional (NPS)", { duration: 5000 });
-      return;
-    }
-
-    const unansweredOpen = openQuestions
-      .filter((q) => q.obligatoria)
-      .filter((q) => !openQuestionResponses[q.id] || openQuestionResponses[q.id].trim().length === 0);
-
-    if (unansweredOpen.length > 0) {
-      toast.error("Por favor, completa las necesidades de desarrollo y recursos marcadas como obligatorias", { duration: 5000 });
-      return;
-    }
-
     setShowSubmitDialog(true);
   };
 
   const handleConfirmSubmit = async () => {
     if (!user || !periodoId) return;
+    setIsSubmitting(true);
 
     const draft: EvaluationDraft = {
       usuarioId: user.dpi,
@@ -350,6 +412,7 @@ const handleSaveDraft = () => {
     }
     
     toast.success("¡Autoevaluación enviada exitosamente!");
+    setIsSubmitting(false);
     navigate("/dashboard");
   };
 
@@ -365,252 +428,147 @@ const handleSaveDraft = () => {
     );
   }
 
-  const currentDim = dimensions[currentDimension];
-  const dimProgress = getDimensionProgress(responses, currentDim);
-
-  const formatPeriodRange = (period?: EvaluationPeriod | null) => {
-    if (!period) return "Periodo no definido";
-
-    const options: Intl.DateTimeFormatOptions = {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    };
-
-    const inicio = new Date(period.fechaInicio);
-    const fin = new Date(period.fechaFin);
-
-    if (isNaN(inicio.getTime()) || isNaN(fin.getTime())) {
-      return "Fechas de periodo no disponibles";
-    }
-
-    const inicioStr = inicio.toLocaleDateString("es-ES", options);
-    const finStr = fin.toLocaleDateString("es-ES", options);
-
-    return `${inicioStr} al ${finStr}`;
-  };
-
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-20">
       <Header />
 
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-4 py-6 sm:py-8">
         {/* Header */}
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <Button variant="ghost" onClick={() => navigate("/dashboard")}>
+        <div className="mb-4 sm:mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard")}>
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Volver al Dashboard
+            <span className="hidden sm:inline">Volver al Dashboard</span>
+            <span className="sm:hidden">Volver</span>
           </Button>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 sm:gap-4">
             <AutoSaveIndicator status={autoSaveStatus} />
-            <div className="text-right text-sm text-muted-foreground">
-              <p>Periodo: {periodoActivo?.nombre ?? periodoId ?? "Sin periodo"}</p>
-              <p className="text-xs italic">{formatPeriodRange(periodoActivo)}</p>
-              <p>Nivel: {user?.nivel}</p>
-            </div>
+            <Button variant="outline" size="sm" onClick={handleSaveDraft}>
+              <Save className="mr-2 h-3 w-3" />
+              Guardar
+            </Button>
           </div>
         </div>
 
-        {/* Title and description */}
+        {/* Title and period info */}
         <div className="mb-6 space-y-2">
-          <h1 className="text-3xl font-bold text-foreground">
-            INSTRUMENTO DE EVALUACIÓN DE DESEMPEÑO Y POTENCIAL
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
+            Autoevaluación de Desempeño
           </h1>
-          <p className="text-xl text-muted-foreground">
-            {user?.cargo} - NIVEL {user?.nivel}
+          <p className="text-base sm:text-lg text-muted-foreground">
+            {user?.nombre} {user?.apellidos} • {user?.cargo}
           </p>
-          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-            <p>
-              <strong>Nombre:</strong> {user?.nombre} {user?.apellidos}
-            </p>
-            <p>
-              <strong>Periodo:</strong> Del 1 de Enero al 31 de Marzo, 2025
-            </p>
+          <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm text-muted-foreground">
+            <Badge variant="outline">Nivel {user?.nivel}</Badge>
+            <span>•</span>
+            <span>{periodoActivo?.nombre ?? "Período activo"}</span>
             {instrument.tiempoEstimado && (
-              <Badge variant="outline">⏱️ {instrument.tiempoEstimado}</Badge>
+              <>
+                <span>•</span>
+                <Badge variant="secondary">⏱️ {instrument.tiempoEstimado}</Badge>
+              </>
             )}
           </div>
         </div>
 
-        {/* Instructions */}
+        {/* Instructions - Collapsible on mobile */}
         <div className="mb-6">
           <EvaluationInstructions />
         </div>
 
-        {/* Progress */}
+        {/* Wizard Header con Stepper */}
+        <WizardHeader
+          steps={wizardSteps}
+          currentStep={currentStep}
+          totalProgress={progressPercentage}
+          answeredItems={answeredItems}
+          totalItems={totalItems}
+        />
+
+        {/* Wizard Step Content */}
         <div className="mb-6">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium">Progreso General</span>
-            <span className="text-sm text-muted-foreground">
-              {answeredItems} de {totalItems} ítems respondidos ({Math.round(progressPercentage)}%)
-            </span>
-          </div>
-          <Progress value={progressPercentage} className="h-2" />
-        </div>
+          {currentWizardStep?.type === "dimension" && currentWizardStep.data && (
+            <WizardStep
+              title={currentWizardStep.data.nombre}
+              description={currentWizardStep.data.descripcion}
+              weight={currentWizardStep.data.peso}
+              currentStep={currentStep}
+              totalSteps={wizardSteps.length}
+              answered={getDimensionProgress(responses, currentWizardStep.data).answered}
+              total={getDimensionProgress(responses, currentWizardStep.data).total}
+            >
+              <div className="space-y-6">
+                {currentWizardStep.data.items.map((item) => (
+                  <MobileLikertScale
+                    key={item.id}
+                    itemId={item.id}
+                    itemText={`${item.orden}. ${item.texto}`}
+                    value={responses[item.id]}
+                    onChange={(value) => handleResponseChange(item.id, value)}
+                  />
+                ))}
 
-        {/* Evaluation form */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-xl">
-                  {currentDim.nombre}
-                </CardTitle>
-                <CardDescription className="mt-2">
-                  <strong>Peso: {Math.round(currentDim.peso * 100)}%</strong> •{" "}
-                  Dimensión {currentDimension + 1} de {dimensions.length}
-                </CardDescription>
-                {currentDim.descripcion && (
-                  <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
-                    {currentDim.descripcion}
+                <div className="mt-8 space-y-3 pt-6 border-t-2">
+                  <Label htmlFor={`comment-${currentWizardStep.data.id}`} className="text-base font-semibold">
+                    Comentarios y evidencias (opcional)
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Agregue comentarios, ejemplos concretos, logros específicos o evidencias que respalden su autoevaluación en esta dimensión.
                   </p>
-                )}
+                  <Textarea
+                    id={`comment-${currentWizardStep.data.id}`}
+                    placeholder="Escriba sus comentarios aquí..."
+                    value={comments[currentWizardStep.data.id] || ""}
+                    onChange={(e) => handleCommentChange(currentWizardStep.data!.id, e.target.value)}
+                    rows={5}
+                    maxLength={1000}
+                    className="resize-none text-base"
+                  />
+                  <p className="text-xs text-muted-foreground text-right">
+                    {comments[currentWizardStep.data.id]?.length || 0}/1000 caracteres
+                  </p>
+                </div>
               </div>
-              <DimensionProgress
-                answered={dimProgress.answered}
-                total={dimProgress.total}
-              />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <Tabs value={currentDimension.toString()} className="w-full">
-              <TabsList className="mb-6 w-full flex-wrap justify-start h-auto gap-2">
-                {dimensions.map((dim, idx) => {
-                  const progress = getDimensionProgress(responses, dim);
-                  const isComplete = progress.answered === progress.total;
+            </WizardStep>
+          )}
 
-                  return (
-                    <TabsTrigger
-                      key={dim.id}
-                      value={idx.toString()}
-                      onClick={() => setCurrentDimension(idx)}
-                      className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span>Dim. {idx + 1}</span>
-                        {isComplete && <span>✓</span>}
-                        {!isComplete && (
-                          <Badge variant="secondary" className="text-xs">
-                            {progress.answered}/{progress.total}
-                          </Badge>
-                        )}
-                      </div>
-                    </TabsTrigger>
-                  );
-                })}
-              </TabsList>
+          {currentWizardStep?.type === "nps" && (
+            <WizardStep
+              title="Recomendación Institucional"
+              description="Tu opinión nos ayuda a mejorar como organización"
+              currentStep={currentStep}
+              totalSteps={wizardSteps.length}
+            >
+              <MobileNPSQuestion value={npsScore} onChange={handleNpsChange} />
+            </WizardStep>
+          )}
 
-              {dimensions.map((dim, idx) => (
-                <TabsContent key={dim.id} value={idx.toString()} className="space-y-4">
-                  {dim.items.map((item) => (
-                    <LikertScale
-                      key={item.id}
-                      itemId={item.id}
-                      itemText={`${item.orden}. ${item.texto}`}
-                      value={responses[item.id]}
-                      onChange={(value) => handleResponseChange(item.id, value)}
-                    />
-                  ))}
-
-                  <div className="mt-6 space-y-2 pt-6 border-t">
-                    <Label htmlFor={`comment-${dim.id}`}>
-                      Comentarios y evidencias
-                    </Label>
-                    <p className="text-xs text-muted-foreground mb-2">
-                      Agregue comentarios, ejemplos concretos, logros específicos o
-                      evidencias que respalden su autoevaluación en esta dimensión.
-                      Recomendado para calificaciones de 1 o 5.
-                    </p>
-                    <Textarea
-                      id={`comment-${dim.id}`}
-                      placeholder="Escriba sus comentarios aquí..."
-                      value={comments[dim.id] || ""}
-                      onChange={(e) => handleCommentChange(dim.id, e.target.value)}
-                      rows={4}
-                      maxLength={1000}
-                      className="resize-none"
-                    />
-                    <p className="text-xs text-muted-foreground text-right">
-                      {comments[dim.id]?.length || 0}/1000 caracteres
-                    </p>
-                  </div>
-                </TabsContent>
-              ))}
-            </Tabs>
-
-            {/* Navigation and action buttons */}
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-between">
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setCurrentDimension(Math.max(0, currentDimension - 1))}
-                  disabled={currentDimension === 0}
-                >
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Anterior
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() =>
-                    setCurrentDimension(Math.min(dimensions.length - 1, currentDimension + 1))
-                  }
-                  disabled={currentDimension === dimensions.length - 1}
-                >
-                  Siguiente
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </div>
-
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={handleSaveDraft}>
-                  <Save className="mr-2 h-4 w-4" />
-                  Guardar Borrador
-                </Button>
-                <Button 
-                  onClick={handleSubmitClick}
-                  disabled={!isComplete}
-                  className="relative"
-                >
-                  <Send className="mr-2 h-4 w-4" />
-                  Enviar Evaluación
-                </Button>
-              </div>
-            </div>
-
-            {!isComplete && (
-              <div className="mt-4 flex items-center gap-2 text-sm text-warning">
-                <AlertTriangle className="h-4 w-4" />
-                <span>
-                  Complete todos los ítems para poder enviar su evaluación
-                </span>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="mt-8 border-2 border-dashed border-primary/30">
-          <CardHeader>
-            <CardTitle>Sección final (no pondera en la puntuación)</CardTitle>
-            <CardDescription>
-              Responde estas preguntas para ayudarnos a mejorar la experiencia laboral y tu desempeño.
-              Son obligatorias antes de enviar la autoevaluación.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <NPSQuestion
-              value={npsScore}
-              onChange={handleNpsChange}
-            />
-
-            {openQuestions.length > 0 && (
-              <OpenQuestions
+          {currentWizardStep?.type === "open-questions" && (
+            <WizardStep
+              title="Necesidades de Desarrollo"
+              description="Comparta sus necesidades para mejorar su desempeño"
+              currentStep={currentStep}
+              totalSteps={wizardSteps.length}
+            >
+              <MobileOpenQuestions
                 questions={openQuestions}
                 responses={openQuestionResponses}
                 onChange={handleOpenQuestionChange}
               />
-            )}
-          </CardContent>
-        </Card>
+            </WizardStep>
+          )}
+        </div>
+
+        {/* Wizard Footer con Navegación */}
+        <WizardFooter
+          currentStep={currentStep}
+          totalSteps={wizardSteps.length}
+          onPrevious={handlePrevious}
+          onNext={handleNext}
+          onSubmit={handleSubmitClick}
+          canGoNext={canGoNext}
+          isLastStep={isLastStep}
+          isSubmitting={isSubmitting}
+        />
       </main>
 
       {/* Submit confirmation dialog */}

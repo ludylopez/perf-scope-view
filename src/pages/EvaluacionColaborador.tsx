@@ -92,12 +92,10 @@ const EvaluacionColaborador = () => {
   const [gruposColaborador, setGruposColaborador] = useState<any[]>([]);
   const [generarFeedbackGrupal, setGenerarFeedbackGrupal] = useState(false);
   
-  // Estados para evaluación de desempeño del jefe
   const [desempenoResponses, setDesempenoResponses] = useState<Record<string, number>>({});
   const [desempenoComments, setDesempenoComments] = useState<Record<string, string>>({});
   const [currentDesempenoDimension, setCurrentDesempenoDimension] = useState(0);
   
-  // Estados para evaluación de potencial del jefe
   const [potencialResponses, setPotencialResponses] = useState<Record<string, number>>({});
   const [potencialComments, setPotencialComments] = useState<Record<string, string>>({});
   const [currentPotencialDimension, setCurrentPotencialDimension] = useState(0);
