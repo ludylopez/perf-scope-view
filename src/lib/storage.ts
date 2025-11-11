@@ -1,4 +1,5 @@
 import { saveEvaluationToSupabase, getEvaluationFromSupabase } from "./supabase";
+import { isValidUUID } from "./utils";
 
 export interface EvaluationDraft {
   usuarioId: string;
@@ -24,7 +25,7 @@ const JEFE_EVALUATION_PREFIX = "jefe_evaluation_";
 
 export const saveEvaluationDraft = async (draft: EvaluationDraft): Promise<void> => {
   // Validar que periodoId sea un UUID válido antes de guardar
-  if (!draft.periodoId || !draft.periodoId.includes('-')) {
+  if (!isValidUUID(draft.periodoId)) {
     console.error('❌ No se puede guardar draft con periodoId inválido:', draft.periodoId);
     return;
   }
@@ -48,7 +49,7 @@ export const getEvaluationDraft = async (
   periodoId: string
 ): Promise<EvaluationDraft | null> => {
   // Validar que periodoId sea un UUID válido antes de hacer cualquier operación
-  if (!periodoId || !periodoId.includes('-')) {
+  if (!isValidUUID(periodoId)) {
     console.warn('⚠️ periodoId inválido en getEvaluationDraft:', periodoId);
     return null;
   }
@@ -65,7 +66,7 @@ export const getEvaluationDraft = async (
   try {
     const draft = JSON.parse(stored) as EvaluationDraft;
     // Validar que el draft tenga un periodoId válido
-    if (!draft.periodoId || !draft.periodoId.includes('-')) {
+    if (!isValidUUID(draft.periodoId)) {
       console.warn('🧹 Limpiando draft con periodoId inválido:', draft.periodoId);
       localStorage.removeItem(key);
       return null;

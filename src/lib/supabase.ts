@@ -4,6 +4,7 @@ import { EvaluationPeriod, PeriodStatus } from "@/types/period";
 import { UserAssignment, AssignmentWithUsers } from "@/types/assignment";
 import { Group, GroupWithMembers, GroupMember } from "@/types/group";
 import { OpenQuestion, OpenQuestionResponse } from "@/types/openQuestions";
+import { isValidUUID } from "@/lib/utils";
 
 // Verificar si Supabase está disponible
 const isSupabaseAvailable = () => {
@@ -306,7 +307,7 @@ export const saveEvaluationToSupabase = async (draft: EvaluationDraft): Promise<
   if (!isSupabaseAvailable()) return null;
   
   // Validar que periodoId sea un UUID válido
-  if (!draft.periodoId || !draft.periodoId.includes('-')) {
+  if (!isValidUUID(draft.periodoId)) {
     console.warn('⚠️ periodoId inválido en saveEvaluationToSupabase:', draft.periodoId);
     return null;
   }
@@ -380,7 +381,7 @@ export const getEvaluationFromSupabase = async (
   if (!isSupabaseAvailable()) return null;
   
   // Validar que periodoId sea un UUID válido
-  if (!periodoId || !periodoId.includes('-')) {
+  if (!isValidUUID(periodoId)) {
     console.warn('⚠️ periodoId inválido en getEvaluationFromSupabase:', periodoId);
     return null;
   }

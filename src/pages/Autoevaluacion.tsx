@@ -42,6 +42,7 @@ import { getActivePeriod } from "@/lib/supabase";
 import { ArrowLeft, Save } from "lucide-react";
 import { toast } from "sonner";
 import { useAutoSave } from "@/hooks/useAutoSave";
+import { isValidUUID } from "@/lib/utils";
 
 const Autoevaluacion = () => {
   const { user } = useAuth();
@@ -260,7 +261,7 @@ const Autoevaluacion = () => {
     }
 
     // Validar que periodoId sea un UUID válido
-    if (!periodoId.includes('-')) {
+    if (!isValidUUID(periodoId)) {
       console.error("❌ periodoId inválido (no es UUID):", periodoId);
       toast.error("Error: ID de período inválido. Recargue la página.");
       return;
