@@ -371,9 +371,9 @@ const AdminAsignaciones = () => {
                       <Command>
                         <CommandInput placeholder="Buscar por nombre, DPI o cargo..." />
                         <CommandList>
-                          <CommandEmpty>No se encontraron jefes.</CommandEmpty>
+                          <CommandEmpty>No se encontraron usuarios.</CommandEmpty>
                           <CommandGroup>
-                            {users.filter(u => u.rol === "jefe" || u.rol === "admin_rrhh" || u.rol === "admin_general").map((usuario) => (
+                            {users.map((usuario) => (
                               <CommandItem
                                 key={usuario.dpi}
                                 value={`${usuario.nombre} ${usuario.apellidos} ${usuario.dpi} ${usuario.cargo}`}
