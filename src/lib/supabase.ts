@@ -19,11 +19,14 @@ export const getActivePeriod = async (): Promise<EvaluationPeriod | null> => {
   if (!isSupabaseAvailable()) return null;
   
   try {
+    // Buscar período activo (puede ser 'en_curso' o 'activo')
     const { data, error } = await supabase
       .from('evaluation_periods')
       .select('*')
-      .eq('estado', 'en_curso')
-      .single();
+      .or('estado.eq.en_curso,estado.eq.activo')
+      .order('fecha_inicio', { ascending: false })
+      .limit(1)
+      .maybeSingle();
     
     if (error || !data) return null;
     
@@ -302,6 +305,12 @@ export const saveOpenQuestionResponses = async (
 export const saveEvaluationToSupabase = async (draft: EvaluationDraft): Promise<string | null> => {
   if (!isSupabaseAvailable()) return null;
   
+  // Validar que periodoId sea un UUID válido
+  if (!draft.periodoId || !draft.periodoId.includes('-')) {
+    console.warn('⚠️ periodoId inválido en saveEvaluationToSupabase:', draft.periodoId);
+    return null;
+  }
+  
   try {
     const evaluationData: any = {
       usuario_id: draft.usuarioId,
@@ -369,6 +378,12 @@ export const getEvaluationFromSupabase = async (
   colaboradorId?: string
 ): Promise<EvaluationDraft | null> => {
   if (!isSupabaseAvailable()) return null;
+  
+  // Validar que periodoId sea un UUID válido
+  if (!periodoId || !periodoId.includes('-')) {
+    console.warn('⚠️ periodoId inválido en getEvaluationFromSupabase:', periodoId);
+    return null;
+  }
   
   try {
     let query = supabase
