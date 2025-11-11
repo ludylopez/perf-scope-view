@@ -6,8 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Progress } from "@/components/ui/progress";
 import { ArrowLeft, Edit, Save, Printer, X, Download } from "lucide-react";
 import { toast } from "sonner";
 import { DevelopmentPlan } from "@/types/evaluation";
@@ -32,44 +30,36 @@ const VistaPlanDesarrollo = () => {
 
   const loadPlan = async () => {
     try {
-      // Cargar desde localStorage (por ahora)
-      const planKey = `development_plan_${id}_2025-1`;
-      const stored = localStorage.getItem(planKey);
-      
-      if (stored) {
-        const planData = JSON.parse(stored);
+      // Intentar cargar desde Supabase primero
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { data, error } = await supabase
+        .from("development_plans")
+        .select("*")
+        .eq("colaborador_id", id)
+        .eq("periodo_id", "2025-1")
+        .single();
+
+      if (!error && data) {
+        const planData: DevelopmentPlan = {
+          id: data.id,
+          evaluacionId: data.evaluacion_id,
+          colaboradorId: data.colaborador_id,
+          periodoId: data.periodo_id,
+          competenciasDesarrollar: data.competencias_desarrollar || [],
+          feedbackIndividual: data.feedback_individual || "",
+          feedbackGrupal: data.feedback_grupal,
+          planEstructurado: data.plan_estructurado,
+          recomendaciones: data.recomendaciones,
+          editable: data.editable,
+          editadoPor: data.editado_por,
+          fechaCreacion: data.fecha_creacion,
+          fechaModificacion: data.fecha_modificacion,
+        };
         setPlan(planData);
         setEditedPlan(planData);
       } else {
-        // Intentar cargar desde Supabase
-        const { supabase } = await import("@/integrations/supabase/client");
-        const { data, error } = await supabase
-          .from("development_plans")
-          .select("*")
-          .eq("colaborador_id", id)
-          .eq("periodo_id", "2025-1")
-          .single();
-
-        if (!error && data) {
-          const planData: DevelopmentPlan = {
-            id: data.id,
-            evaluacionId: data.evaluacion_id,
-            colaboradorId: data.colaborador_id,
-            periodoId: data.periodo_id,
-            competenciasDesarrollar: data.competencias_desarrollar,
-            feedbackIndividual: data.feedback_individual || "",
-            feedbackGrupal: data.feedback_grupal,
-            editable: data.editable,
-            editadoPor: data.editado_por,
-            fechaCreacion: data.fecha_creacion,
-            fechaModificacion: data.fecha_modificacion,
-          };
-          setPlan(planData);
-          setEditedPlan(planData);
-        } else {
-          toast.error("No se encontró plan de desarrollo");
-          navigate("/dashboard");
-        }
+        toast.error("No se encontró plan de desarrollo");
+        navigate("/dashboard");
       }
     } catch (error) {
       console.error("Error loading plan:", error);
@@ -83,20 +73,12 @@ const VistaPlanDesarrollo = () => {
     if (!editedPlan) return;
 
     try {
-      // Guardar en localStorage
-      const planKey = `development_plan_${editedPlan.colaboradorId}_${editedPlan.periodoId}`;
-      localStorage.setItem(planKey, JSON.stringify({
-        ...editedPlan,
-        fechaModificacion: new Date().toISOString(),
-        editadoPor: user?.dpi,
-      }));
-
       // Guardar en Supabase
       const { supabase } = await import("@/integrations/supabase/client");
       const { error } = await supabase
         .from("development_plans")
         .update({
-          competencias_desarrollar: editedPlan.competenciasDesarrollar,
+          competencias_desarrollar: editedPlan.competenciasDesarrollar || [],
           feedback_individual: editedPlan.feedbackIndividual,
           feedback_grupal: editedPlan.feedbackGrupal,
           fecha_modificacion: new Date().toISOString(),
@@ -120,13 +102,10 @@ const VistaPlanDesarrollo = () => {
     window.print();
   };
 
-  const handleUpdateCompetencia = (index: number, field: string, value: any) => {
-    if (!editedPlan) return;
+  const handleUpdateCompetencia = (index: number, value: string) => {
+    if (!editedPlan || !editedPlan.competenciasDesarrollar) return;
     const nuevasCompetencias = [...editedPlan.competenciasDesarrollar];
-    nuevasCompetencias[index] = {
-      ...nuevasCompetencias[index],
-      [field]: value,
-    };
+    nuevasCompetencias[index] = value;
     setEditedPlan({
       ...editedPlan,
       competenciasDesarrollar: nuevasCompetencias,
@@ -138,20 +117,14 @@ const VistaPlanDesarrollo = () => {
     setEditedPlan({
       ...editedPlan,
       competenciasDesarrollar: [
-        ...editedPlan.competenciasDesarrollar,
-        {
-          competencia: "",
-          nivelActual: 3,
-          nivelObjetivo: 4,
-          acciones: [""],
-          plazo: "6 meses",
-        },
+        ...(editedPlan.competenciasDesarrollar || []),
+        "",
       ],
     });
   };
 
   const handleRemoveCompetencia = (index: number) => {
-    if (!editedPlan) return;
+    if (!editedPlan || !editedPlan.competenciasDesarrollar) return;
     const nuevasCompetencias = editedPlan.competenciasDesarrollar.filter((_, i) => i !== index);
     setEditedPlan({
       ...editedPlan,
@@ -182,6 +155,7 @@ const VistaPlanDesarrollo = () => {
   }
 
   const currentPlan = editing ? editedPlan : plan;
+  if (!currentPlan) return null;
 
   return (
     <div className="min-h-screen bg-background">
@@ -242,7 +216,7 @@ const VistaPlanDesarrollo = () => {
           <CardHeader>
             <CardTitle className="text-2xl">Plan de Desarrollo Personalizado</CardTitle>
             <CardDescription>
-              Periodo: {plan.periodoId} • Generado: {new Date(plan.fechaCreacion).toLocaleDateString("es-GT")}
+              Periodo: {plan.periodoId} • Generado: {plan.fechaCreacion && new Date(plan.fechaCreacion).toLocaleDateString("es-GT")}
               {plan.fechaModificacion && (
                 <> • Última modificación: {new Date(plan.fechaModificacion).toLocaleDateString("es-GT")}</>
               )}
@@ -250,140 +224,119 @@ const VistaPlanDesarrollo = () => {
           </CardHeader>
         </Card>
 
-        {/* Competencias a Desarrollar */}
-        <Card className="mb-6 print:border-0 print:shadow-none">
-          <CardHeader>
-            <CardTitle>Competencias a Desarrollar</CardTitle>
-            <CardDescription>
-              Acciones concretas para el crecimiento profesional
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {currentPlan.competenciasDesarrollar.map((comp, index) => (
-              <div key={index} className="border rounded-lg p-4 space-y-4">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label>Competencia</Label>
-                    {editing ? (
-                      <Textarea
-                        value={comp.competencia}
-                        onChange={(e) => handleUpdateCompetencia(index, "competencia", e.target.value)}
-                        rows={2}
-                      />
-                    ) : (
-                      <p className="font-medium">{comp.competencia}</p>
-                    )}
-                  </div>
-                  <div className="grid gap-4 md:grid-cols-3">
-                    <div className="space-y-2">
-                      <Label>Nivel Actual</Label>
-                      {editing ? (
-                        <input
-                          type="number"
-                          min="1"
-                          max="5"
-                          value={comp.nivelActual}
-                          onChange={(e) => handleUpdateCompetencia(index, "nivelActual", parseFloat(e.target.value))}
-                          className="w-full px-3 py-2 border rounded-md"
-                        />
-                      ) : (
-                        <Badge variant="outline">{comp.nivelActual}/5</Badge>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Nivel Objetivo</Label>
-                      {editing ? (
-                        <input
-                          type="number"
-                          min="1"
-                          max="5"
-                          value={comp.nivelObjetivo}
-                          onChange={(e) => handleUpdateCompetencia(index, "nivelObjetivo", parseFloat(e.target.value))}
-                          className="w-full px-3 py-2 border rounded-md"
-                        />
-                      ) : (
-                        <Badge>{comp.nivelObjetivo}/5</Badge>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Plazo</Label>
-                      {editing ? (
-                        <input
-                          type="text"
-                          value={comp.plazo}
-                          onChange={(e) => handleUpdateCompetencia(index, "plazo", e.target.value)}
-                          className="w-full px-3 py-2 border rounded-md"
-                        />
-                      ) : (
-                        <p className="text-sm">{comp.plazo}</p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Acciones Concretas</Label>
+        {/* Objetivos de Desarrollo */}
+        {currentPlan.competenciasDesarrollar && currentPlan.competenciasDesarrollar.length > 0 && (
+          <Card className="mb-6 print:border-0 print:shadow-none print:break-inside-avoid">
+            <CardHeader>
+              <CardTitle>Objetivos de Desarrollo</CardTitle>
+              <CardDescription>
+                Competencias y áreas identificadas para mejorar
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {currentPlan.competenciasDesarrollar.map((objetivo, index) => (
+                <div key={index} className="flex gap-2 items-start">
                   {editing ? (
-                    <div className="space-y-2">
-                      {comp.acciones.map((accion, accIdx) => (
-                        <div key={accIdx} className="flex gap-2">
-                          <Textarea
-                            value={accion}
-                            onChange={(e) => {
-                              const nuevasAcciones = [...comp.acciones];
-                              nuevasAcciones[accIdx] = e.target.value;
-                              handleUpdateCompetencia(index, "acciones", nuevasAcciones);
-                            }}
-                            rows={2}
-                            placeholder="Acción específica..."
-                          />
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              const nuevasAcciones = comp.acciones.filter((_, i) => i !== accIdx);
-                              handleUpdateCompetencia(index, "acciones", nuevasAcciones);
-                            }}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
+                    <>
+                      <Textarea
+                        value={objetivo}
+                        onChange={(e) => handleUpdateCompetencia(index, e.target.value)}
+                        rows={2}
+                        className="flex-1"
+                      />
                       <Button
-                        variant="outline"
+                        variant="ghost"
                         size="sm"
-                        onClick={() => {
-                          handleUpdateCompetencia(index, "acciones", [...comp.acciones, ""]);
-                        }}
+                        onClick={() => handleRemoveCompetencia(index)}
                       >
-                        + Agregar Acción
+                        <X className="h-4 w-4" />
                       </Button>
-                    </div>
+                    </>
                   ) : (
-                    <ul className="list-disc list-inside space-y-1">
-                      {comp.acciones.map((accion, accIdx) => (
-                        <li key={accIdx}>{accion}</li>
-                      ))}
-                    </ul>
+                    <>
+                      <span className="text-primary mt-1">•</span>
+                      <p>{objetivo}</p>
+                    </>
                   )}
                 </div>
-                {editing && (
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => handleRemoveCompetencia(index)}
-                  >
-                    Eliminar Competencia
-                  </Button>
-                )}
-              </div>
-            ))}
-            {editing && (
-              <Button variant="outline" onClick={handleAddCompetencia}>
-                + Agregar Nueva Competencia
-              </Button>
-            )}
-          </CardContent>
-        </Card>
+              ))}
+              {editing && (
+                <Button variant="outline" onClick={handleAddCompetencia}>
+                  + Agregar Objetivo
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Plan Estructurado con Acciones Detalladas */}
+        {currentPlan.planEstructurado && currentPlan.planEstructurado.acciones && currentPlan.planEstructurado.acciones.length > 0 && (
+          <Card className="mb-6 print:border-0 print:shadow-none print:break-inside-avoid">
+            <CardHeader>
+              <CardTitle>Plan de Acción Detallado</CardTitle>
+              <CardDescription>
+                Acciones concretas con responsables, fechas e indicadores
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {currentPlan.planEstructurado.acciones.map((accion, index) => (
+                <div key={index} className="border rounded-lg p-4 space-y-3">
+                  <div className="flex items-start justify-between">
+                    <p className="font-medium flex-1">{accion.descripcion}</p>
+                    <Badge variant={accion.prioridad === "alta" ? "destructive" : accion.prioridad === "media" ? "default" : "secondary"}>
+                      {accion.prioridad === "alta" ? "🔴 Alta" : accion.prioridad === "media" ? "🟡 Media" : "🟢 Baja"}
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Responsable:</span> <span className="font-medium">{accion.responsable}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Fecha:</span> <span className="font-medium">{accion.fecha}</span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-muted-foreground">Indicador:</span> <span className="font-medium">{accion.indicador}</span>
+                    </div>
+                    {accion.recursos && accion.recursos.length > 0 && (
+                      <div className="col-span-2">
+                        <span className="text-muted-foreground">Recursos:</span> <span>{accion.recursos.join(", ")}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Dimensiones que Requieren Atención */}
+        {currentPlan.planEstructurado && currentPlan.planEstructurado.dimensionesDebiles && currentPlan.planEstructurado.dimensionesDebiles.length > 0 && (
+          <Card className="mb-6 border-warning print:border-0 print:shadow-none">
+            <CardHeader>
+              <CardTitle>Dimensiones que Requieren Atención</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {currentPlan.planEstructurado.dimensionesDebiles.map((dim, idx) => (
+                <div key={idx} className="border-l-4 border-warning pl-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-semibold">{dim.dimension}</h4>
+                    <Badge variant="outline">
+                      Score: {dim.score.toFixed(2)}/5.0 ({((dim.score / 5) * 100).toFixed(0)}%)
+                    </Badge>
+                  </div>
+                  <ul className="space-y-1 text-sm">
+                    {dim.accionesEspecificas.map((accion, i) => (
+                      <li key={i} className="flex items-start gap-2">
+                        <span className="text-warning mt-1">•</span>
+                        <span>{accion}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Feedback Individual */}
         {currentPlan.feedbackIndividual && (
@@ -425,6 +378,25 @@ const VistaPlanDesarrollo = () => {
           </Card>
         )}
 
+        {/* Recomendaciones */}
+        {currentPlan.recomendaciones && currentPlan.recomendaciones.length > 0 && (
+          <Card className="mb-6 print:border-0 print:shadow-none">
+            <CardHeader>
+              <CardTitle>Recomendaciones Generales</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-2">
+                {currentPlan.recomendaciones.map((rec, idx) => (
+                  <li key={idx} className="flex items-start gap-2">
+                    <span className="text-primary mt-1">→</span>
+                    <span>{rec}</span>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Espacio para Firmas */}
         <Card className="print:border-0 print:shadow-none print:mt-12">
           <CardContent className="py-8">
@@ -455,4 +427,3 @@ const VistaPlanDesarrollo = () => {
 };
 
 export default VistaPlanDesarrollo;
-

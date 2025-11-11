@@ -192,24 +192,16 @@ const generateBasicDevelopmentPlan = (
   resultadoFinal: FinalScore,
   dimensions: Dimension[]
 ): DevelopmentPlan => {
-  const competenciasDesarrollar = dimensions.slice(0, 3).map((dim, idx) => ({
-    competencia: dim.nombre,
-    nivelActual: Math.round(resultadoFinal.desempenoFinal * 10) / 10,
-    nivelObjetivo: Math.min(5, Math.round(resultadoFinal.desempenoFinal * 10) / 10 + 0.5),
-    acciones: [
-      `Participar en capacitaciones específicas sobre ${dim.nombre.toLowerCase()}`,
-      `Aplicar conocimientos en proyectos asignados`,
-      `Buscar retroalimentación constante del jefe inmediato`,
-    ],
-    plazo: "6 meses",
-  }));
+  const objetivos = dimensions.slice(0, 3).map((dim) => 
+    `Mejorar competencia en ${dim.nombre}`
+  );
 
   return {
     id: crypto.randomUUID(),
     evaluacionId: "",
     colaboradorId,
     periodoId,
-    competenciasDesarrollar,
+    competenciasDesarrollar: objetivos,
     feedbackIndividual: `Su desempeño general es de ${scoreToPercentage(resultadoFinal.desempenoFinal)}%. Se recomienda continuar desarrollando las competencias identificadas para alcanzar un nivel superior.`,
     editable: true,
     fechaCreacion: new Date().toISOString(),

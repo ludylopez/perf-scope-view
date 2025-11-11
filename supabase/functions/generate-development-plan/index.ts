@@ -413,8 +413,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
         throw new Error("No se encontró JSON en la respuesta");
       }
     } catch (parseError) {
+      const errorMessage = parseError instanceof Error ? parseError.message : String(parseError);
       return new Response(
-        JSON.stringify({ success: false, error: `Error parseando respuesta de IA: ${parseError.message}` }),
+        JSON.stringify({ success: false, error: `Error parseando respuesta de IA: ${errorMessage}` }),
         { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
       );
     }

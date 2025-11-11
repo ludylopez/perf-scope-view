@@ -81,19 +81,32 @@ export interface PlanEstructurado {
 
 export interface DevelopmentPlan {
   id: string;
-  evaluacionId: string;
+  evaluacion_id?: string;
+  evaluacionId?: string;
+  colaborador_id?: string;
   colaboradorId: string;
+  periodo_id?: string;
   periodoId: string;
-  competenciasDesarrollar: string[]; // Ahora es array simple de objetivos
-  feedbackIndividual?: string;
-  feedbackGrupal?: string;
-  planEstructurado?: PlanEstructurado; // Nueva estructura completa del plan
+  competencias_desarrollar?: string[]; // Array simple de objetivos (snake_case de BD)
+  competenciasDesarrollar?: string[]; // Array simple de objetivos (camelCase para código)
+  feedback_individual?: string; // snake_case de BD
+  feedbackIndividual?: string; // camelCase para código
+  feedback_grupal?: string; // snake_case de BD
+  feedbackGrupal?: string; // camelCase para código
+  plan_estructurado?: PlanEstructurado; // snake_case de BD
+  planEstructurado?: PlanEstructurado; // Nueva estructura completa del plan (camelCase)
   recomendaciones?: string[]; // Recomendaciones generales
-  generadoPorIa?: boolean; // Indica si fue generado por IA
+  generado_por_ia?: boolean; // snake_case de BD
+  generadoPorIa?: boolean; // Indica si fue generado por IA (camelCase)
   editable: boolean;
-  editadoPor?: string;
-  fechaCreacion: string;
-  fechaModificacion?: string;
+  editado_por?: string; // snake_case de BD
+  editadoPor?: string; // camelCase para código
+  fecha_creacion?: string; // snake_case de BD
+  fechaCreacion?: string; // camelCase para código
+  fecha_modificacion?: string; // snake_case de BD
+  fechaModificacion?: string; // camelCase para código
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface FinalEvaluationResult {
