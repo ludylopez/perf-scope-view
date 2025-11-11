@@ -323,7 +323,12 @@ export const saveEvaluationToSupabase = async (draft: EvaluationDraft): Promise<
       progreso: draft.progreso,
       fecha_ultima_modificacion: draft.fechaUltimaModificacion,
     };
-    
+
+    // Incluir NPS si está presente en el borrador
+    if ((draft as any).npsScore !== undefined) {
+      evaluationData.nps_score = (draft as any).npsScore;
+    }
+
     if (draft.tipo === 'jefe' && draft.evaluadorId && draft.colaboradorId) {
       evaluationData.evaluador_id = draft.evaluadorId;
       evaluationData.colaborador_id = draft.colaboradorId;

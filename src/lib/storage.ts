@@ -18,6 +18,8 @@ export interface EvaluationDraft {
     responses: Record<string, number>;
     comments: Record<string, string>;
   };
+  // Opcional: puntaje NPS (guardado junto con la evaluación)
+  npsScore?: number;
 }
 
 const STORAGE_KEY_PREFIX = "evaluation_";

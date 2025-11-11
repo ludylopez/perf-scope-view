@@ -279,6 +279,7 @@ const Autoevaluacion = () => {
       estado: "borrador",
       progreso: progressPercentage,
       fechaUltimaModificacion: new Date().toISOString(),
+      npsScore: npsScore,
     };
 
     await saveEvaluationDraft(draft);
