@@ -16,10 +16,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { LikertScale } from "@/components/evaluation/LikertScale";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { INSTRUMENT_A1 } from "@/data/instruments";
+import { Instrument } from "@/types/evaluation";
+import { getInstrumentForUser } from "@/lib/instruments";
 import { getSubmittedEvaluation } from "@/lib/storage";
-import { 
-  calculatePerformanceScore, 
+import {
+  calculatePerformanceScore,
   getDimensionProgress,
   scoreToPercentage,
   calculateDimensionPercentage,
@@ -28,6 +29,7 @@ import {
 import { ArrowLeft, CheckCircle2, FileDown, Sparkles, TrendingUp, Target, Award, AlertCircle, Lightbulb, Shield, Brain, Heart, Users, HandHeart, ChevronDown, ChevronUp } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { toast } from "sonner";
 import {
   RadarChart,
   PolarGrid,
@@ -112,7 +114,7 @@ const getDimensionExamples = (dimensionId: string) => {
 const MiAutoevaluacion = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const instrument = INSTRUMENT_A1;
+  const [instrument, setInstrument] = useState<Instrument | null>(null);
 
   const [evaluation, setEvaluation] = useState<any>(null);
   const [currentDimension, setCurrentDimension] = useState(0);
@@ -128,9 +130,19 @@ const MiAutoevaluacion = () => {
   useEffect(() => {
     if (!user) return;
 
-    const loadEvaluation = async () => {
+    const loadData = async () => {
+      // Cargar instrumento según nivel del usuario
+      const userInstrument = await getInstrumentForUser(user.nivel);
+      if (!userInstrument) {
+        toast.error("No se encontró un instrumento de evaluación para su nivel");
+        navigate("/dashboard");
+        return;
+      }
+      setInstrument(userInstrument);
+
+      // Cargar evaluación enviada
       const submitted = await getSubmittedEvaluation(user.dpi, "2025-1");
-      
+
       if (!submitted) {
         navigate("/autoevaluacion");
         return;
@@ -139,10 +151,10 @@ const MiAutoevaluacion = () => {
       setEvaluation(submitted);
     };
 
-    loadEvaluation();
+    loadData();
   }, [user, navigate]);
 
-  if (!evaluation) {
+  if (!evaluation || !instrument) {
     return (
       <div className="min-h-screen bg-background">
         <Header />
