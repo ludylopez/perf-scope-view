@@ -15,6 +15,7 @@ export interface User {
   renglon?: string;
   profesion?: string;
   jefeInmediato?: string;
+  instrumentoId?: string; // Override manual de instrumento
   rol: UserRole;
   estado: "activo" | "inactivo";
   primerIngreso: boolean;

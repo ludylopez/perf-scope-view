@@ -21,26 +21,40 @@ export const getInstrumentForUser = async (
   nivel: string,
   overrideInstrumentId?: string
 ): Promise<Instrument | null> => {
+  console.log(`[Instruments] Obteniendo instrumento para nivel: ${nivel}, override: ${overrideInstrumentId}`);
+  
   // Si hay override manual, usar ese
   if (overrideInstrumentId) {
     // Permite override por clave (A3) o por ID completo (A3_2025_V1)
     if (INSTRUMENTS[overrideInstrumentId]) {
+      console.log(`[Instruments] ✅ Usando override por clave: ${overrideInstrumentId}`);
       return INSTRUMENTS[overrideInstrumentId];
     }
     const byFullId = Object.values(INSTRUMENTS).find(inst => inst.id === overrideInstrumentId);
-    if (byFullId) return byFullId;
+    if (byFullId) {
+      console.log(`[Instruments] ✅ Usando override por ID completo: ${overrideInstrumentId}`);
+      return byFullId;
+    }
+    console.log(`[Instruments] ⚠️ Override no encontrado: ${overrideInstrumentId}, usando asignación automática`);
   }
   
   // Asignación automática por nivel
   // 1) Coincidencia exacta por nivel (A3 -> A3)
   const exactKey = Object.keys(INSTRUMENTS).find(key => INSTRUMENTS[key].nivel === nivel);
-  if (exactKey) return INSTRUMENTS[exactKey];
+  if (exactKey) {
+    console.log(`[Instruments] ✅ Coincidencia exacta encontrada: ${exactKey} para nivel ${nivel}`);
+    return INSTRUMENTS[exactKey];
+  }
   
   // 2) Fallback: primer instrumento que comparta prefijo de nivel (e.g., "A*")
   const prefixKey = Object.keys(INSTRUMENTS).find(key => INSTRUMENTS[key].nivel.startsWith(nivel.charAt(0)));
-  if (prefixKey) return INSTRUMENTS[prefixKey];
+  if (prefixKey) {
+    console.log(`[Instruments] ⚠️ Usando fallback por prefijo: ${prefixKey} para nivel ${nivel}`);
+    return INSTRUMENTS[prefixKey];
+  }
   
-  // Fallback: usar el primer instrumento disponible (A1 por defecto)
+  // Fallback final: usar A1 por defecto
+  console.log(`[Instruments] ⚠️ Sin coincidencias, usando fallback A1 para nivel ${nivel}`);
   return INSTRUMENTS.A1 || null;
 };
 

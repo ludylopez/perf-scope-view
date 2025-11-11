@@ -164,6 +164,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           departamentoDependencia: data.departamento_dependencia,
           renglon: data.renglon,
           profesion: data.profesion,
+          instrumentoId: data.instrumento_id, // Mapear override de instrumento
           rol: data.rol as User["rol"],
           estado: data.estado as "activo" | "inactivo",
           primerIngreso: data.primer_ingreso || false,
