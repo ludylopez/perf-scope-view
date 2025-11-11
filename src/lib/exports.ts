@@ -214,13 +214,13 @@ export const exportResultadoIndividualPDF = (
   doc.setFontSize(11);
   doc.setFont("helvetica", "normal");
   const resultados = [
-    ["Desempeño Final", resultado.desempenoFinal ? `${scoreToPercentage(resultado.desempenoFinal)}% (${resultado.desempenoFinal.toFixed(2)}/5.0)` : "N/A"],
-    ["Autoevaluación", resultado.desempenoAuto ? `${scoreToPercentage(resultado.desempenoAuto)}% (${resultado.desempenoAuto.toFixed(2)}/5.0)` : "N/A"],
-    ["Evaluación Jefe", resultado.desempenoJefe ? `${scoreToPercentage(resultado.desempenoJefe)}% (${resultado.desempenoJefe.toFixed(2)}/5.0)` : "N/A"],
+    ["Desempeño Final", resultado.desempenoFinal ? `${scoreToPercentage(resultado.desempenoFinal)}%` : "N/A"],
+    ["Autoevaluación", resultado.desempenoAuto ? `${scoreToPercentage(resultado.desempenoAuto)}%` : "N/A"],
+    ["Evaluación Jefe", resultado.desempenoJefe ? `${scoreToPercentage(resultado.desempenoJefe)}%` : "N/A"],
   ];
 
   if (resultado.potencial) {
-    resultados.push(["Potencial", `${scoreToPercentage(resultado.potencial)}% (${resultado.potencial.toFixed(2)}/5.0)`]);
+    resultados.push(["Potencial", `${scoreToPercentage(resultado.potencial)}%`]);
   }
 
   if (resultado.posicion9Box) {

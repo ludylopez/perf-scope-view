@@ -333,9 +333,6 @@ const EstadisticasGrupales = () => {
                   <p className="text-3xl font-bold text-info">
                     {scoreToPercentage(currentStats.promedioDesempeno)}%
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    ({currentStats.promedioDesempeno.toFixed(2)}/5.0)
-                  </p>
                   <Progress value={scoreToPercentage(currentStats.promedioDesempeno)} className="mt-2 h-2" />
                 </CardContent>
               </Card>
@@ -347,9 +344,6 @@ const EstadisticasGrupales = () => {
                 <CardContent>
                   <p className="text-3xl font-bold text-accent">
                     {scoreToPercentage(currentStats.promedioPotencial)}%
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    ({currentStats.promedioPotencial.toFixed(2)}/5.0)
                   </p>
                   <Progress value={scoreToPercentage(currentStats.promedioPotencial)} className="mt-2 h-2" />
                 </CardContent>
@@ -455,11 +449,11 @@ const EstadisticasGrupales = () => {
                 <div className="space-y-4">
                   <div className="p-4 bg-muted rounded-lg">
                     <p className="text-sm">
-                      <strong>Resumen del Desempeño:</strong> El grupo {currentStats.nombreGrupo} presenta un 
-                      promedio de desempeño de {scoreToPercentage(currentStats.promedioDesempeno)}% ({currentStats.promedioDesempeno.toFixed(2)}/5.0) y un potencial 
-                      promedio de {scoreToPercentage(currentStats.promedioPotencial)}% ({currentStats.promedioPotencial.toFixed(2)}/5.0). 
-                      {currentStats.evaluacionesCompletadas === currentStats.totalMiembros 
-                        ? " Todas las evaluaciones han sido completadas." 
+                      <strong>Resumen del Desempeño:</strong> El grupo {currentStats.nombreGrupo} presenta un
+                      promedio de desempeño de {scoreToPercentage(currentStats.promedioDesempeno)}% y un potencial
+                      promedio de {scoreToPercentage(currentStats.promedioPotencial)}%.
+                      {currentStats.evaluacionesCompletadas === currentStats.totalMiembros
+                        ? " Todas las evaluaciones han sido completadas."
                         : ` Faltan ${currentStats.totalMiembros - currentStats.evaluacionesCompletadas} evaluaciones por completar.`}
                     </p>
                   </div>
