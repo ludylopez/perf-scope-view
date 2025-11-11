@@ -173,9 +173,10 @@ export const getMockColaboradorEvaluation = (colaboradorId: string): EvaluationD
     "dim6": "Orientación al ciudadano muy presente. Representación institucional sobresaliente. Buen manejo de comunicación pública."
   };
   
+  // NOTA: Este es un mock para pruebas, usar UUID real en producción
   return {
     usuarioId: colaboradorId,
-    periodoId: "2025-1",
+    periodoId: "00000000-0000-0000-0000-000000000000", // Mock UUID, no usar en producción
     tipo: "auto",
     responses,
     comments,

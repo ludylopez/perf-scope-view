@@ -134,13 +134,16 @@ const Autoevaluacion = () => {
         if (activePeriod) {
           resolvedPeriod = activePeriod;
         } else {
-          // Fallback: buscar período 2025-1 por nombre
+          // Fallback: buscar período activo en base de datos
           const { supabase } = await import("@/integrations/supabase/client");
           const { data: periodData } = await supabase
             .from("evaluation_periods")
             .select("*")
-            .eq("nombre", "2025-1")
+            .eq("estado", "activo")
+            .order("fecha_inicio", { ascending: false })
+            .limit(1)
             .single();
+          
           if (periodData) {
             resolvedPeriod = {
               id: periodData.id,
@@ -165,10 +168,33 @@ const Autoevaluacion = () => {
           return;
         }
 
+        // CRÍTICO: Asegurar que periodoId sea el UUID, no el nombre
+        console.log("✅ Período activo cargado:", resolvedPeriod.nombre, "UUID:", resolvedPeriod.id);
+        
         setPeriodoActivo(resolvedPeriod);
         setPeriodoId(resolvedPeriod.id);
 
         const periodoIdFinal = resolvedPeriod.id;
+        
+        // Limpiar drafts antiguos con periodo_id incorrecto (nombre en vez de UUID)
+        const oldKeys = Object.keys(localStorage).filter(
+          key => key.startsWith(`evaluation_${user.dpi}_`) && !key.includes(periodoIdFinal)
+        );
+        oldKeys.forEach(key => {
+          const oldData = localStorage.getItem(key);
+          if (oldData) {
+            try {
+              const parsed = JSON.parse(oldData);
+              // Si el periodoId no es un UUID válido (no contiene guiones), eliminarlo
+              if (parsed.periodoId && !parsed.periodoId.includes('-')) {
+                console.log("🧹 Limpiando draft antiguo con periodoId inválido:", parsed.periodoId);
+                localStorage.removeItem(key);
+              }
+            } catch {
+              // Ignorar errores de parsing
+            }
+          }
+        });
 
         // Cargar instrumento según nivel del usuario
         const userInstrument = await getInstrumentForUser(user.nivel);
@@ -188,14 +214,9 @@ const Autoevaluacion = () => {
         // Load draft
         const draft = await getEvaluationDraft(user.dpi, periodoIdFinal);
         if (draft) {
+          console.log("📄 Draft cargado con periodo UUID:", draft.periodoId);
           setResponses(draft.responses);
           setComments(draft.comments);
-          // Cargar NPS si existe en el draft (almacenado como extensión)
-          const npsKey = `nps_${user.dpi}_${periodoIdFinal}`;
-          const savedNps = localStorage.getItem(npsKey);
-          if (savedNps) {
-            setNpsScore(parseInt(savedNps));
-          }
           toast.info("Se ha cargado su borrador guardado");
         }
 
@@ -203,6 +224,7 @@ const Autoevaluacion = () => {
         const questions = await getOpenQuestions();
         setOpenQuestions(questions);
 
+        // Cargar respuestas a preguntas abiertas
         const openQuestionsKey = `open_questions_${user.dpi}_${periodoIdFinal}`;
         const savedOpenQuestions = localStorage.getItem(openQuestionsKey);
         if (savedOpenQuestions) {
@@ -214,10 +236,12 @@ const Autoevaluacion = () => {
           }
         }
 
+        // Cargar NPS
         const npsKey = `nps_${user.dpi}_${periodoIdFinal}`;
         const savedNps = localStorage.getItem(npsKey);
         if (savedNps) {
           setNpsScore(parseInt(savedNps));
+          console.log("📊 NPS cargado:", savedNps);
         }
       } catch (error) {
         console.error("Error loading data:", error);
@@ -230,13 +254,24 @@ const Autoevaluacion = () => {
 
   // Auto-save functionality mejorado con hook personalizado
   const performAutoSave = useCallback(async () => {
-    if (!user || !periodoId) return;
+    if (!user || !periodoId) {
+      console.warn("⚠️ No se puede auto-guardar: usuario o periodo no disponible");
+      return;
+    }
+
+    // Validar que periodoId sea un UUID válido
+    if (!periodoId.includes('-')) {
+      console.error("❌ periodoId inválido (no es UUID):", periodoId);
+      toast.error("Error: ID de período inválido. Recargue la página.");
+      return;
+    }
 
     setAutoSaveStatus("saving");
+    console.log("💾 Auto-guardando evaluación para periodo UUID:", periodoId);
     
     const draft: EvaluationDraft = {
       usuarioId: user.dpi,
-      periodoId: periodoId,
+      periodoId: periodoId, // Debe ser UUID
       tipo: "auto",
       responses,
       comments,
@@ -256,12 +291,13 @@ const Autoevaluacion = () => {
     if (npsScore !== undefined) {
       const npsKey = `nps_${user.dpi}_${periodoId}`;
       localStorage.setItem(npsKey, npsScore.toString());
+      console.log("📊 NPS guardado:", npsScore);
     }
     
     setAutoSaveStatus("saved");
     setHasUnsavedChanges(false);
     setTimeout(() => setAutoSaveStatus("idle"), 2000);
-  }, [user, periodoId, responses, comments, progressPercentage, openQuestionResponses]);
+  }, [user, periodoId, responses, comments, progressPercentage, openQuestionResponses, npsScore]);
 
   // Usar hook de auto-guardado mejorado
   // Guarda automáticamente 2 segundos después de la última edición
