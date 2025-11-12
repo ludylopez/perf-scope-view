@@ -518,24 +518,68 @@ Deno.serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    // Usar gemini-1.5-pro (modelo estable y disponible en v1beta)
-    const modelUsed = "gemini-1.5-pro";
-    console.log(`Llamando a Gemini API con modelo: ${modelUsed}`);
+    // Intentar con diferentes modelos disponibles en v1beta
+    // Orden: gemini-2.5-flash (más reciente), gemini-pro (clásico), gemini-1.5-pro (si está disponible)
+    let geminiResponse;
+    let modelUsed = "gemini-2.5-flash";
+    let lastError: string | null = null;
     
-    const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${geminiApiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 8000,
-          },
-        }),
+    const modelsToTry = [
+      "gemini-2.5-flash",
+      "gemini-pro", 
+      "gemini-1.5-pro"
+    ];
+    
+    for (const model of modelsToTry) {
+      try {
+        modelUsed = model;
+        console.log(`Intentando con modelo: ${modelUsed}`);
+        
+        geminiResponse = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: {
+                temperature: 0.7,
+                maxOutputTokens: 8000,
+              },
+            }),
+          }
+        );
+        
+        if (geminiResponse.ok) {
+          console.log(`✅ Modelo ${modelUsed} funcionó correctamente`);
+          break;
+        } else {
+          const errorText = await geminiResponse.text();
+          lastError = errorText;
+          console.warn(`⚠️ Modelo ${modelUsed} falló:`, errorText.substring(0, 200));
+          // Continuar con el siguiente modelo
+          continue;
+        }
+      } catch (fetchError: any) {
+        lastError = fetchError.message || String(fetchError);
+        console.warn(`⚠️ Error en fetch con modelo ${modelUsed}:`, lastError);
+        // Continuar con el siguiente modelo
+        continue;
       }
-    );
+    }
+    
+    // Si ninguno funcionó, devolver error
+    if (!geminiResponse || !geminiResponse.ok) {
+      const errorMessage = lastError || "Todos los modelos de Gemini fallaron";
+      console.error("❌ Todos los modelos fallaron. Último error:", errorMessage);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: `Error en Gemini API: ${errorMessage.substring(0, 500)}` 
+        }),
+        { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
+      );
+    }
 
     if (!geminiResponse.ok) {
       const errorText = await geminiResponse.text();
