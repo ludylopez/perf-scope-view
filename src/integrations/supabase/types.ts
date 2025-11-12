@@ -734,6 +734,10 @@ export type Database = {
           users_count: number
         }[]
       }
+      get_antiguedad_completa_stats: {
+        Args: { periodo_id_param: string }
+        Returns: Json
+      }
       get_antiguedad_distribution: { Args: never; Returns: Json }
       get_antiguedad_vs_desempeno: {
         Args: { periodo_id_param: string }
@@ -757,6 +761,10 @@ export type Database = {
         Returns: Json
       }
       get_eligibility_stats: { Args: never; Returns: Json }
+      get_equidad_completa_stats: {
+        Args: { periodo_id_param: string }
+        Returns: Json
+      }
       get_equipo_stats: {
         Args: { jefe_dpi: string; periodo_id_param: string }
         Returns: Json
@@ -792,7 +800,19 @@ export type Database = {
         Args: { jefe_dpi: string; periodo_id_param: string }
         Returns: Json
       }
+      get_resumen_seguimiento: {
+        Args: { periodo_id_param: string }
+        Returns: Json
+      }
       get_rotacion_stats: { Args: never; Returns: Json }
+      get_seguimiento_evaluaciones: {
+        Args: { periodo_id_param: string }
+        Returns: Json
+      }
+      get_tendencia_semanal: {
+        Args: { periodo_id_param: string }
+        Returns: Json
+      }
       get_tiempo_promedio_por_area: { Args: never; Returns: Json }
       get_top_mejoras: {
         Args: {

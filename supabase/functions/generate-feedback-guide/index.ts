@@ -275,21 +275,21 @@ function buildPrompt(data: any): string {
       nombre: dim.nombre || dim.dimension || "Dimensión",
       scoreJefe: dim.evaluacionJefe || dim.scoreJefe || 0,
       scoreAuto: dim.autoevaluacion || dim.scoreAuto || 0,
-    })).sort((a, b) => (b.scoreJefe || 0) - (a.scoreJefe || 0));
+    })).sort((a: any, b: any) => (b.scoreJefe || 0) - (a.scoreJefe || 0));
   } else if (instrumento.dimensionesDesempeno) {
     // Fallback: calcular desde el instrumento
     dimensionesConScore = instrumento.dimensionesDesempeno.map((dim: any) => {
       const items = dim.items || [];
       const scoresJefe = items.map((item: any) => jefeResponses[item.id] || 0);
       const scoresAuto = items.map((item: any) => autoResponses[item.id] || 0);
-      const avgJefe = scoresJefe.length > 0 ? scoresJefe.reduce((a, b) => a + b, 0) / scoresJefe.length : 0;
-      const avgAuto = scoresAuto.length > 0 ? scoresAuto.reduce((a, b) => a + b, 0) / scoresAuto.length : 0;
+      const avgJefe = scoresJefe.length > 0 ? scoresJefe.reduce((a: number, b: number) => a + b, 0) / scoresJefe.length : 0;
+      const avgAuto = scoresAuto.length > 0 ? scoresAuto.reduce((a: number, b: number) => a + b, 0) / scoresAuto.length : 0;
       return {
         nombre: dim.nombre || "Dimensión",
         scoreJefe: avgJefe,
         scoreAuto: avgAuto,
       };
-    }).sort((a, b) => b.scoreJefe - a.scoreJefe);
+    }).sort((a: any, b: any) => b.scoreJefe - a.scoreJefe);
   }
 
   const top3Fuertes = dimensionesConScore.slice(0, 3);
