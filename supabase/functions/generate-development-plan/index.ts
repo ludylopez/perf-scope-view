@@ -609,6 +609,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
 
     // Guardar plan en base de datos
+    // Nota: La tabla development_plans solo tiene estas columnas:
+    // id, evaluacion_id, colaborador_id, periodo_id, competencias_desarrollar,
+    // feedback_individual, feedback_grupal, editable, editado_por, fecha_creacion, fecha_modificacion
     const { data: planInserted, error: planError } = await supabase
       .from("development_plans")
       .insert({
@@ -618,13 +621,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
         competencias_desarrollar: planData.objetivos || [],
         feedback_individual: planData.feedbackIndividual || "",
         feedback_grupal: planData.feedbackGrupal || null,
-        plan_estructurado: {
-          objetivos: planData.objetivos || [],
-          acciones: planData.acciones || [],
-          dimensionesDebiles: planData.dimensionesDebiles || [],
-        },
-        recomendaciones: planData.recomendaciones || [],
-        generado_por_ia: true,
         editable: true,
       })
       .select("*")
