@@ -104,10 +104,22 @@ const getDimensionFriendlyTitle = (dimension: any): string => {
   
   // Simplificar nombres técnicos a algo más comprensible
   if (nombre.toLowerCase().includes("competencias laborales") && nombre.toLowerCase().includes("técnica")) {
-    return "Tus Habilidades Técnicas";
+    return "Competencias Laborales";
   }
   if (nombre.toLowerCase().includes("comportamiento") && nombre.toLowerCase().includes("organizacional")) {
-    return "Tu Actitud y Valores";
+    return "Comportamiento Organizacional";
+  }
+  if (nombre.toLowerCase().includes("relaciones interpersonales") || nombre.toLowerCase().includes("trabajo en equipo")) {
+    return "Relaciones Interpersonales";
+  }
+  if (nombre.toLowerCase().includes("orientación al servicio") || nombre.toLowerCase().includes("atención al usuario")) {
+    return "Orientación al Servicio";
+  }
+  if (nombre.toLowerCase().includes("calidad del trabajo")) {
+    return "Calidad del Trabajo";
+  }
+  if (nombre.toLowerCase().includes("productividad") || nombre.toLowerCase().includes("cumplimiento")) {
+    return "Productividad";
   }
   if (nombre.toLowerCase().includes("liderazgo") || nombre.toLowerCase().includes("dirección")) {
     return "Tu Liderazgo";
@@ -124,6 +136,32 @@ const getDimensionFriendlyTitle = (dimension: any): string => {
   
   // Si no hay match, usar el nombre original pero más corto
   return nombre.length > 40 ? nombre.substring(0, 40) + "..." : nombre;
+};
+
+// Helper para obtener descripción corta y simple
+const getDimensionShortDescription = (dimension: any): string => {
+  const nombre = dimension.nombre.toLowerCase();
+  
+  if (nombre.includes("competencias laborales") && nombre.includes("técnica")) {
+    return "Técnicas y específicas";
+  }
+  if (nombre.includes("comportamiento") && nombre.includes("organizacional")) {
+    return "Actitud laboral";
+  }
+  if (nombre.includes("relaciones interpersonales") || nombre.includes("trabajo en equipo")) {
+    return "Trabajo en equipo";
+  }
+  if (nombre.includes("orientación al servicio") || nombre.includes("atención al usuario")) {
+    return "Atención al usuario";
+  }
+  if (nombre.includes("calidad del trabajo")) {
+    return "Estándares y precisión";
+  }
+  if (nombre.includes("productividad") || nombre.includes("cumplimiento")) {
+    return "Cumplimiento de objetivos";
+  }
+  
+  return "Desempeño evaluado";
 };
 
 const MiAutoevaluacion = () => {
@@ -536,36 +574,45 @@ const MiAutoevaluacion = () => {
         </Card>
 
         <div className="grid gap-6 mb-6 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Award className="h-5 w-5 text-success" />
-                Fortalezas Identificadas
-              </CardTitle>
-              <CardDescription>
-                Dimensiones con mejor desempeño
-              </CardDescription>
+          <Card className="border-success/20 bg-gradient-to-br from-success/5 to-transparent">
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-xl bg-success/20">
+                  <Award className="h-6 w-6 text-success" />
+                </div>
+                <div>
+                  <CardTitle className="text-xl">Fortalezas Identificadas</CardTitle>
+                  <CardDescription className="text-xs mt-0.5">
+                    Dimensiones con mejor desempeño
+                  </CardDescription>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {fortalezas.map((dim, idx) => (
-                  <div key={idx} className="flex items-start gap-3 p-3 rounded-lg border border-success/20 bg-success/5">
-                    <div className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-success/20 text-success font-bold text-sm">
+                  <div key={idx} className="group flex items-start gap-4 p-4 rounded-xl border-2 border-success/30 bg-card hover:border-success/50 hover:shadow-lg transition-all duration-300">
+                    <div className="flex-shrink-0 flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-br from-success to-success/70 text-white font-bold text-lg shadow-md group-hover:scale-110 transition-transform">
                       {idx + 1}
                     </div>
-                    <div className="flex-1">
-                      <p className="font-semibold text-sm">{dim.nombreCompleto}</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Puntaje: {dim.puntaje.toFixed(2)}/5.0
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <h4 className="font-bold text-base leading-tight">{dim.dimension}</h4>
+                        <span className="text-2xl font-extrabold text-success flex-shrink-0">{dim.tuEvaluacion}%</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mb-3">
+                        {getDimensionShortDescription(dim.dimensionData)}
                       </p>
-                      <div className="flex items-center gap-2 mt-2">
-                        <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-3 bg-muted rounded-full overflow-hidden shadow-inner">
                           <div 
-                            className="h-full bg-success transition-all" 
+                            className="h-full bg-gradient-to-r from-success to-success/80 transition-all duration-700 ease-out rounded-full shadow-sm" 
                             style={{ width: `${dim.tuEvaluacion}%` }}
                           />
                         </div>
-                        <span className="text-sm font-bold text-success">{dim.tuEvaluacion}%</span>
+                        <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">
+                          {dim.puntaje.toFixed(1)}/5.0
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -574,30 +621,41 @@ const MiAutoevaluacion = () => {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Target className="h-5 w-5 text-warning" />
-                Áreas de Oportunidad
-              </CardTitle>
-              <CardDescription>
-                Dimensiones para enfocarse en mejorar
-              </CardDescription>
+          <Card className="border-warning/20 bg-gradient-to-br from-warning/5 to-transparent">
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-xl bg-warning/20">
+                  <Target className="h-6 w-6 text-warning" />
+                </div>
+                <div>
+                  <CardTitle className="text-xl">Áreas de Oportunidad</CardTitle>
+                  <CardDescription className="text-xs mt-0.5">
+                    Dimensiones para enfocarse en mejorar
+                  </CardDescription>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {areasDeOportunidad.map((dim, idx) => (
-                  <div key={idx} className="flex items-start gap-3 p-3 rounded-lg border border-warning/20 bg-warning/5">
-                    <div className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-warning/20 text-warning font-bold text-sm">
+                  <div key={idx} className="group flex items-start gap-4 p-4 rounded-xl border-2 border-warning/30 bg-card hover:border-warning/50 hover:shadow-lg transition-all duration-300">
+                    <div className="flex-shrink-0 flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-br from-warning to-warning/70 text-white font-bold text-lg shadow-md group-hover:scale-110 transition-transform">
                       {idx + 1}
                     </div>
-                    <div className="flex-1">
-                      <p className="font-semibold text-sm">{dim.nombreCompleto}</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Puntaje: {dim.puntaje.toFixed(2)}/5.0
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <h4 className="font-bold text-base leading-tight">{dim.dimension}</h4>
+                        <span className="text-2xl font-extrabold text-warning flex-shrink-0">{dim.tuEvaluacion}%</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mb-3">
+                        {getDimensionShortDescription(dim.dimensionData)}
                       </p>
-                      <div className="flex items-center gap-2 mt-2">
-                        <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-3 bg-muted rounded-full overflow-hidden shadow-inner">
+                          <div 
+                            className="h-full bg-gradient-to-r from-warning to-warning/80 transition-all duration-700 ease-out rounded-full shadow-sm" 
+                            style={{ width: `${dim.tuEvaluacion}%` }}
+                          />
                           <div 
                             className="h-full bg-warning transition-all" 
                             style={{ width: `${dim.tuEvaluacion}%` }}
