@@ -342,13 +342,27 @@ export const saveEvaluationToSupabase = async (draft: EvaluationDraft): Promise<
     }
     
     // Buscar si ya existe
-    const { data: existing } = await supabase
+    const { data: existing, error: existingError } = await supabase
       .from('evaluations')
       .select('id')
       .eq('usuario_id', draft.usuarioId)
       .eq('periodo_id', draft.periodoId)
       .eq('tipo', draft.tipo)
       .maybeSingle();
+
+    if (existingError) {
+      console.error('[Supabase] ❌ Error buscando evaluación existente', {
+        message: existingError.message,
+        details: existingError.details,
+        hint: existingError.hint,
+        code: existingError.code,
+        filtros: {
+          usuario_id: draft.usuarioId,
+          periodo_id: draft.periodoId,
+          tipo: draft.tipo,
+        },
+      });
+    }
     
     if (existing) {
       const { data, error } = await supabase
@@ -357,8 +371,18 @@ export const saveEvaluationToSupabase = async (draft: EvaluationDraft): Promise<
         .eq('id', existing.id)
         .select('id')
         .single();
-      
-      if (error) return null;
+
+      if (error) {
+        console.error('[Supabase] ❌ Error actualizando evaluación', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+          payload: evaluationData,
+          id: existing.id,
+        });
+        return null;
+      }
       return data.id;
     } else {
       const { data, error } = await supabase
@@ -366,11 +390,21 @@ export const saveEvaluationToSupabase = async (draft: EvaluationDraft): Promise<
         .insert(evaluationData)
         .select('id')
         .single();
-      
-      if (error) return null;
+
+      if (error) {
+        console.error('[Supabase] ❌ Error insertando evaluación', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+          payload: evaluationData,
+        });
+        return null;
+      }
       return data.id;
     }
-  } catch {
+  } catch (err) {
+    console.error('[Supabase] ❌ Excepción guardando evaluación', err, draft);
     return null;
   }
 };
