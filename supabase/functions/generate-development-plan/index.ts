@@ -23,61 +23,114 @@ interface DevelopmentPlanResponse {
 function buildPrompt(data: any): string {
   const { colaborador, autoevaluacion, evaluacionJefe, resultadoFinal, instrumento, grupos } = data;
 
+  // Validar que los datos necesarios estén presentes
+  if (!autoevaluacion || !evaluacionJefe || !instrumento || !resultadoFinal) {
+    throw new Error("Datos incompletos para construir el prompt");
+  }
+
+  // Asegurar que responses existe y es un objeto
+  const autoResponses = autoevaluacion.responses || {};
+  const jefeResponses = evaluacionJefe.responses || {};
+  const autoComments = autoevaluacion.comments || {};
+  const jefeComments = evaluacionJefe.comments || {};
+
+  // Validar que dimensionesDesempeno existe
+  if (!instrumento.dimensionesDesempeno || !Array.isArray(instrumento.dimensionesDesempeno)) {
+    throw new Error("Configuración de instrumento inválida: dimensionesDesempeno no encontrada");
+  }
+
   // Construir detalle de evaluación ítem por ítem
   let detalleDesempeno = "";
   instrumento.dimensionesDesempeno.forEach((dim: any) => {
-    const dimScoreAuto = dim.items.map((item: any) => autoevaluacion.responses[item.id] || 0);
-    const dimScoreJefe = dim.items.map((item: any) => evaluacionJefe.responses[item.id] || 0);
-    const avgAuto = dimScoreAuto.reduce((a: number, b: number) => a + b, 0) / dimScoreAuto.length;
-    const avgJefe = dimScoreJefe.reduce((a: number, b: number) => a + b, 0) / dimScoreJefe.length;
+    if (!dim.items || !Array.isArray(dim.items)) {
+      console.warn("Dimensión sin items válidos:", dim);
+      return;
+    }
 
-    detalleDesempeno += `\n### ${dim.nombre} (Peso: ${(dim.peso * 100).toFixed(1)}%)\n`;
+    const dimScoreAuto = dim.items.map((item: any) => {
+      const value = autoResponses[item.id];
+      return typeof value === 'number' ? value : 0;
+    });
+    const dimScoreJefe = dim.items.map((item: any) => {
+      const value = jefeResponses[item.id];
+      return typeof value === 'number' ? value : 0;
+    });
+    
+    const avgAuto = dimScoreAuto.length > 0 
+      ? dimScoreAuto.reduce((a: number, b: number) => a + b, 0) / dimScoreAuto.length 
+      : 0;
+    const avgJefe = dimScoreJefe.length > 0 
+      ? dimScoreJefe.reduce((a: number, b: number) => a + b, 0) / dimScoreJefe.length 
+      : 0;
+
+    detalleDesempeno += `\n### ${dim.nombre || 'Dimensión sin nombre'} (Peso: ${((dim.peso || 0) * 100).toFixed(1)}%)\n`;
     detalleDesempeno += `Score Autoevaluación: ${avgAuto.toFixed(2)}/5.0 (${((avgAuto / 5) * 100).toFixed(1)}%)\n`;
     detalleDesempeno += `Score Evaluación Jefe: ${avgJefe.toFixed(2)}/5.0 (${((avgJefe / 5) * 100).toFixed(1)}%)\n`;
 
     dim.items.forEach((item: any) => {
-      const scoreAuto = autoevaluacion.responses[item.id] || 0;
-      const scoreJefe = evaluacionJefe.responses[item.id] || 0;
-      detalleDesempeno += `  - ${item.texto}\n`;
+      const scoreAuto = typeof autoResponses[item.id] === 'number' ? autoResponses[item.id] : 0;
+      const scoreJefe = typeof jefeResponses[item.id] === 'number' ? jefeResponses[item.id] : 0;
+      detalleDesempeno += `  - ${item.texto || 'Item sin texto'}\n`;
       detalleDesempeno += `    Autoevaluación: ${scoreAuto}/5  |  Jefe: ${scoreJefe}/5\n`;
     });
 
-    if (autoevaluacion.comments[dim.id]) {
-      detalleDesempeno += `  📝 Comentario del colaborador: ${autoevaluacion.comments[dim.id]}\n`;
+    if (autoComments[dim.id]) {
+      detalleDesempeno += `  📝 Comentario del colaborador: ${autoComments[dim.id]}\n`;
     }
-    if (evaluacionJefe.comments[dim.id]) {
-      detalleDesempeno += `  📝 Comentario del jefe: ${evaluacionJefe.comments[dim.id]}\n`;
+    if (jefeComments[dim.id]) {
+      detalleDesempeno += `  📝 Comentario del jefe: ${jefeComments[dim.id]}\n`;
     }
   });
 
   // Construir detalle de potencial
   let detallePotencial = "";
-  if (instrumento.dimensionesPotencial && evaluacionJefe.evaluacionPotencial?.responses) {
+  const potencialResponses = evaluacionJefe.evaluacion_potencial?.responses || {};
+  const potencialComments = evaluacionJefe.evaluacion_potencial?.comments || {};
+  
+  if (instrumento.dimensionesPotencial && Array.isArray(instrumento.dimensionesPotencial) && Object.keys(potencialResponses).length > 0) {
     instrumento.dimensionesPotencial.forEach((dim: any) => {
-      const dimScore = dim.items.map((item: any) => evaluacionJefe.evaluacionPotencial.responses[item.id] || 0);
-      const avg = dimScore.reduce((a: number, b: number) => a + b, 0) / dimScore.length;
+      if (!dim.items || !Array.isArray(dim.items)) {
+        console.warn("Dimensión de potencial sin items válidos:", dim);
+        return;
+      }
 
-      detallePotencial += `\n### ${dim.nombre} (Peso: ${(dim.peso * 100).toFixed(1)}%)\n`;
+      const dimScore = dim.items.map((item: any) => {
+        const value = potencialResponses[item.id];
+        return typeof value === 'number' ? value : 0;
+      });
+      const avg = dimScore.length > 0 
+        ? dimScore.reduce((a: number, b: number) => a + b, 0) / dimScore.length 
+        : 0;
+
+      detallePotencial += `\n### ${dim.nombre || 'Dimensión sin nombre'} (Peso: ${((dim.peso || 0) * 100).toFixed(1)}%)\n`;
       detallePotencial += `Score: ${avg.toFixed(2)}/5.0 (${((avg / 5) * 100).toFixed(1)}%)\n`;
 
       dim.items.forEach((item: any) => {
-        const score = evaluacionJefe.evaluacionPotencial.responses[item.id] || 0;
-        detallePotencial += `  - ${item.texto}\n`;
+        const score = typeof potencialResponses[item.id] === 'number' ? potencialResponses[item.id] : 0;
+        detallePotencial += `  - ${item.texto || 'Item sin texto'}\n`;
         detallePotencial += `    Evaluación: ${score}/5\n`;
       });
 
-      if (evaluacionJefe.evaluacionPotencial.comments?.[dim.id]) {
-        detallePotencial += `  📝 Comentario: ${evaluacionJefe.evaluacionPotencial.comments[dim.id]}\n`;
+      if (potencialComments[dim.id]) {
+        detallePotencial += `  📝 Comentario: ${potencialComments[dim.id]}\n`;
       }
     });
   }
 
   // Identificar dimensiones más débiles (menores scores)
-  const dimensionesConScore = instrumento.dimensionesDesempeno.map((dim: any) => {
-    const dimScoreJefe = dim.items.map((item: any) => evaluacionJefe.responses[item.id] || 0);
-    const avg = dimScoreJefe.reduce((a: number, b: number) => a + b, 0) / dimScoreJefe.length;
-    return { nombre: dim.nombre, score: avg, peso: dim.peso };
-  }).sort((a: any, b: any) => a.score - b.score); // Ordenar de menor a mayor
+  const dimensionesConScore = instrumento.dimensionesDesempeno
+    .filter((dim: any) => dim.items && Array.isArray(dim.items) && dim.items.length > 0)
+    .map((dim: any) => {
+      const dimScoreJefe = dim.items.map((item: any) => {
+        const value = jefeResponses[item.id];
+        return typeof value === 'number' ? value : 0;
+      });
+      const avg = dimScoreJefe.length > 0 
+        ? dimScoreJefe.reduce((a: number, b: number) => a + b, 0) / dimScoreJefe.length 
+        : 0;
+      return { nombre: dim.nombre || 'Dimensión sin nombre', score: avg, peso: dim.peso || 0 };
+    })
+    .sort((a: any, b: any) => a.score - b.score); // Ordenar de menor a mayor
 
   const top3Debiles = dimensionesConScore.slice(0, 3);
 
@@ -399,8 +452,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const pesoJefe = instrumentId === "A1" ? 0.55 : 0.70;
     const desempenoFinal = desempenoJefe * pesoJefe + desempenoAuto * pesoAuto;
 
+    // Normalizar evaluacion_potencial (puede venir como evaluacionPotencial o evaluacion_potencial)
+    const evaluacionPotencial = evaluacionJefe.evaluacion_potencial || evaluacionJefe.evaluacionPotencial || null;
     const potencial = calcularPromedioPotencial(
-      evaluacionJefe.evaluacion_potencial?.responses,
+      evaluacionPotencial?.responses,
       instrumentConfig.dimensionesPotencial
     );
 
@@ -420,15 +475,39 @@ Deno.serve(async (req: Request): Promise<Response> => {
       posicion9Box,
     };
 
+    // Normalizar formato de evaluaciones para asegurar compatibilidad
+    const autoevaluacionNormalizada = {
+      ...autoevaluacion,
+      responses: autoevaluacion.responses || {},
+      comments: autoevaluacion.comments || {},
+    };
+
+    const evaluacionJefeNormalizada = {
+      ...evaluacionJefe,
+      responses: evaluacionJefe.responses || {},
+      comments: evaluacionJefe.comments || {},
+      // Asegurar que evaluacion_potencial esté en el formato correcto
+      evaluacion_potencial: evaluacionJefe.evaluacion_potencial || evaluacionJefe.evaluacionPotencial || null,
+    };
+
     // Construir prompt para Gemini
-    const prompt = buildPrompt({
-      colaborador, // Incluye todos los campos EXCEPTO que el DPI no se usa en el prompt
-      autoevaluacion,
-      evaluacionJefe,
-      resultadoFinal,
-      instrumento: instrumentConfig,
-      grupos,
-    });
+    let prompt: string;
+    try {
+      prompt = buildPrompt({
+        colaborador, // Incluye todos los campos EXCEPTO que el DPI no se usa en el prompt
+        autoevaluacion: autoevaluacionNormalizada,
+        evaluacionJefe: evaluacionJefeNormalizada,
+        resultadoFinal,
+        instrumento: instrumentConfig,
+        grupos,
+      });
+    } catch (promptError: any) {
+      console.error("Error construyendo prompt:", promptError);
+      return new Response(
+        JSON.stringify({ success: false, error: `Error construyendo prompt: ${promptError.message}` }),
+        { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
+      );
+    }
 
     // Llamar a Gemini
     const geminiApiKey = Deno.env.get("GEMINI_API_KEY");

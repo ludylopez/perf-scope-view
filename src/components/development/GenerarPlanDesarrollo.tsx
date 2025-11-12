@@ -45,10 +45,27 @@ export const GenerarPlanDesarrollo = ({
         },
       });
 
+      // Si hay error, intentar extraer el mensaje del body
       if (error) {
         console.error("Error from Supabase function:", error);
-        // Intentar extraer el mensaje de error del response
-        const errorMessage = error.message || error.toString() || "Error desconocido";
+        
+        // Intentar obtener el mensaje del error
+        let errorMessage = error.message || "Error desconocido";
+        
+        // Si el error tiene contexto, intentar extraer el mensaje del body
+        if (error.context && error.context.body) {
+          try {
+            const errorBody = typeof error.context.body === 'string' 
+              ? JSON.parse(error.context.body) 
+              : error.context.body;
+            if (errorBody?.error) {
+              errorMessage = errorBody.error;
+            }
+          } catch (e) {
+            console.warn("No se pudo parsear el body del error:", e);
+          }
+        }
+        
         throw new Error(errorMessage);
       }
 
@@ -72,7 +89,8 @@ export const GenerarPlanDesarrollo = ({
       console.error("Error details:", {
         message: errorMessage,
         error: error,
-        data: error?.response?.data,
+        context: error?.context,
+        stack: error?.stack,
       });
       toast.error(`Error al generar plan: ${errorMessage}`);
     } finally {
