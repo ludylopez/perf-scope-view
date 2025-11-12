@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, BarChart3, TrendingUp, TrendingDown, Minus, Users2, User } from "lucide-react";
+import { ArrowLeft, BarChart3, TrendingUp, TrendingDown, Minus, Users2, User, Target, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, Cell } from "recharts";
 import { getSubmittedEvaluation, getJefeEvaluationDraft, getMockColaboradorEvaluation } from "@/lib/storage";
@@ -142,7 +142,7 @@ const VistaComparativa = () => {
           }
         }
 
-        // Cargar plan de desarrollo para verificar si hay feedback grupal
+        // Cargar plan de desarrollo completo
         const { data: planData } = await supabase
           .from("development_plans")
           .select("*")
@@ -151,9 +151,26 @@ const VistaComparativa = () => {
           .maybeSingle();
 
         if (planData) {
+          // Extraer la estructura del plan desde competencias_desarrollar
+          const competencias = planData.competencias_desarrollar || {};
+          const planEstructurado = typeof competencias === 'object' && competencias.acciones 
+            ? {
+                objetivos: competencias.objetivos || [],
+                acciones: competencias.acciones || [],
+                dimensionesDebiles: competencias.dimensionesDebiles || [],
+              }
+            : null;
+          
+          const recomendaciones = typeof competencias === 'object' && competencias.recomendaciones
+            ? competencias.recomendaciones
+            : [];
+
           setPlanDesarrollo({
+            id: planData.id,
             feedbackIndividual: planData.feedback_individual,
             feedbackGrupal: planData.feedback_grupal,
+            planEstructurado: planEstructurado,
+            recomendaciones: recomendaciones,
           });
         }
 
@@ -345,8 +362,11 @@ const VistaComparativa = () => {
               colaboradorNombre={colaborador.nombre}
               onPlanGenerado={(plan) => {
                 setPlanDesarrollo({
+                  id: plan.id,
                   feedbackIndividual: plan.feedbackIndividual,
                   feedbackGrupal: plan.feedbackGrupal,
+                  planEstructurado: plan.planEstructurado,
+                  recomendaciones: plan.recomendaciones,
                 });
                 toast.success("Plan de desarrollo guardado");
               }}
@@ -485,6 +505,84 @@ const VistaComparativa = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Plan de Desarrollo - Acciones y Objetivos */}
+        {planDesarrollo && planDesarrollo.planEstructurado && (
+          <div className="space-y-6 mb-6">
+            {/* Objetivos */}
+            {planDesarrollo.planEstructurado.objetivos && planDesarrollo.planEstructurado.objetivos.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Target className="h-5 w-5 text-primary" />
+                    Objetivos de Desarrollo
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-2">
+                    {planDesarrollo.planEstructurado.objetivos.map((obj: string, idx: number) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <CheckCircle2 className="h-5 w-5 text-success mt-0.5 flex-shrink-0" />
+                        <span>{obj}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Acciones Priorizadas */}
+            {planDesarrollo.planEstructurado.acciones && planDesarrollo.planEstructurado.acciones.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Plan de Acción Detallado</CardTitle>
+                  <CardDescription>
+                    Acciones concretas con responsables, fechas e indicadores
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {planDesarrollo.planEstructurado.acciones
+                      .sort((a: any, b: any) => {
+                        const prioridadOrder = { alta: 1, media: 2, baja: 3 };
+                        return (prioridadOrder[a.prioridad] || 99) - (prioridadOrder[b.prioridad] || 99);
+                      })
+                      .map((accion: any, idx: number) => (
+                        <div key={idx} className="border rounded-lg p-4 hover:bg-accent/5 transition-colors">
+                          <div className="flex items-start justify-between gap-4 mb-3">
+                            <p className="font-medium flex-1">{accion.descripcion}</p>
+                            <Badge variant={accion.prioridad === "alta" ? "destructive" : accion.prioridad === "media" ? "default" : "secondary"}>
+                              {accion.prioridad === "alta" ? "🔴 Alta" : accion.prioridad === "media" ? "🟡 Media" : "🟢 Baja"}
+                            </Badge>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                              <span className="text-muted-foreground">Responsable:</span>{" "}
+                              <span className="font-medium">{accion.responsable}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Fecha:</span>{" "}
+                              <span className="font-medium">{accion.fecha}</span>
+                            </div>
+                            <div className="col-span-2">
+                              <span className="text-muted-foreground">Indicador:</span>{" "}
+                              <span className="font-medium">{accion.indicador}</span>
+                            </div>
+                            {accion.recursos && accion.recursos.length > 0 && (
+                              <div className="col-span-2">
+                                <span className="text-muted-foreground">Recursos:</span>{" "}
+                                <span>{accion.recursos.join(", ")}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
 
         {/* Feedback Individual y Grupal */}
         {planDesarrollo && (

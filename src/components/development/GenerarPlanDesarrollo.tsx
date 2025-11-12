@@ -82,9 +82,47 @@ export const GenerarPlanDesarrollo = ({
       }
 
       if (responseData?.success && responseData.plan) {
-        setPlan(responseData.plan);
-        setEditedFeedback(responseData.plan.feedback_individual || "");
-        setEditedFeedbackGrupal(responseData.plan.feedback_grupal || "");
+        // Extraer la estructura del plan desde competencias_desarrollar
+        const planData = responseData.plan;
+        const competencias = planData.competencias_desarrollar || {};
+        
+        // Si competencias_desarrollar es un objeto con la estructura completa, extraerla
+        const planEstructurado = typeof competencias === 'object' && competencias.acciones 
+          ? {
+              objetivos: competencias.objetivos || [],
+              acciones: competencias.acciones || [],
+              dimensionesDebiles: competencias.dimensionesDebiles || [],
+            }
+          : null;
+        
+        const objetivos = typeof competencias === 'object' && competencias.objetivos
+          ? competencias.objetivos
+          : Array.isArray(competencias) ? competencias : [];
+        
+        const recomendaciones = typeof competencias === 'object' && competencias.recomendaciones
+          ? competencias.recomendaciones
+          : [];
+
+        // Construir el plan completo con la estructura correcta
+        const planCompleto: DevelopmentPlan = {
+          id: planData.id,
+          evaluacionId: planData.evaluacion_id,
+          colaboradorId: planData.colaborador_id,
+          periodoId: planData.periodo_id,
+          competenciasDesarrollar: objetivos,
+          feedbackIndividual: planData.feedback_individual || "",
+          feedbackGrupal: planData.feedback_grupal || null,
+          planEstructurado: planEstructurado,
+          recomendaciones: recomendaciones,
+          editable: planData.editable,
+          editadoPor: planData.editado_por,
+          fechaCreacion: planData.fecha_creacion,
+          fechaModificacion: planData.fecha_modificacion,
+        };
+
+        setPlan(planCompleto);
+        setEditedFeedback(planCompleto.feedbackIndividual || "");
+        setEditedFeedbackGrupal(planCompleto.feedbackGrupal || "");
         setShowModal(true);
         toast.success("Plan de desarrollo generado exitosamente");
       } else {
@@ -182,7 +220,7 @@ export const GenerarPlanDesarrollo = ({
           {plan && (
             <div className="space-y-6">
               {/* Objetivos */}
-              {plan.competencias_desarrollar && plan.competencias_desarrollar.length > 0 && (
+              {plan.planEstructurado?.objetivos && plan.planEstructurado.objetivos.length > 0 && (
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-lg">
@@ -192,7 +230,7 @@ export const GenerarPlanDesarrollo = ({
                   </CardHeader>
                   <CardContent>
                     <ul className="space-y-2">
-                      {plan.competencias_desarrollar.map((obj: string, idx: number) => (
+                      {plan.planEstructurado.objetivos.map((obj: string, idx: number) => (
                         <li key={idx} className="flex items-start gap-2">
                           <CheckCircle2 className="h-5 w-5 text-success mt-0.5 flex-shrink-0" />
                           <span>{obj}</span>
@@ -204,7 +242,7 @@ export const GenerarPlanDesarrollo = ({
               )}
 
               {/* Acciones Priorizadas */}
-              {plan.plan_estructurado?.acciones && plan.plan_estructurado.acciones.length > 0 && (
+              {plan.planEstructurado?.acciones && plan.planEstructurado.acciones.length > 0 && (
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-lg">Acciones Priorizadas</CardTitle>
@@ -214,7 +252,7 @@ export const GenerarPlanDesarrollo = ({
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
-                      {plan.plan_estructurado.acciones
+                      {plan.planEstructurado.acciones
                         .sort((a: AccionDesarrollo, b: AccionDesarrollo) => {
                           const prioridadOrder = { alta: 1, media: 2, baja: 3 };
                           return (prioridadOrder[a.prioridad] || 99) - (prioridadOrder[b.prioridad] || 99);
@@ -255,7 +293,7 @@ export const GenerarPlanDesarrollo = ({
               )}
 
               {/* Dimensiones que Requieren Atención */}
-              {plan.plan_estructurado?.dimensionesDebiles && plan.plan_estructurado.dimensionesDebiles.length > 0 && (
+              {plan.planEstructurado?.dimensionesDebiles && plan.planEstructurado.dimensionesDebiles.length > 0 && (
                 <Card className="border-warning">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-lg">
@@ -265,7 +303,7 @@ export const GenerarPlanDesarrollo = ({
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
-                      {plan.plan_estructurado.dimensionesDebiles.map((dim: DimensionDebil, idx: number) => (
+                      {plan.planEstructurado.dimensionesDebiles.map((dim: DimensionDebil, idx: number) => (
                         <div key={idx} className="border-l-4 border-warning pl-4">
                           <div className="flex items-center justify-between mb-2">
                             <h4 className="font-semibold">{dim.dimension}</h4>

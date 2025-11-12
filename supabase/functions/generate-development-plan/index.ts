@@ -221,8 +221,12 @@ ${detallePotencial}` : ''}
 - Las acciones deben ser ESPECÍFICAS, no genéricas
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📋 INSTRUCCIONES PARA GENERAR EL PLAN
+📋 INSTRUCCIONES PARA GENERAR EL PLAN DE DESARROLLO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚠️ **IMPORTANTE**: Estás generando un PLAN DE DESARROLLO, NO una guía de retroalimentación.
+El plan debe enfocarse en ACCIONES CONCRETAS con responsables, fechas, recursos e indicadores.
+El feedback individual es solo un complemento narrativo, pero el NÚCLEO del plan son las ACCIONES.
 
 Genera un Plan de Desarrollo COMPLETO y ESTRUCTURADO en formato JSON con la siguiente estructura EXACTA:
 
@@ -241,6 +245,8 @@ Genera un Plan de Desarrollo COMPLETO y ESTRUCTURADO en formato JSON con la sigu
       "indicador": "Indicador simple y medible de cumplimiento (ej: 'Completar curso', 'Aplicar en 3 casos', 'Reducir errores en 30%')",
       "prioridad": "alta" | "media" | "baja"
     }
+    // ⚠️ CRÍTICO: Debes generar AL MENOS 5-8 acciones concretas. Este es el NÚCLEO del plan.
+    // Cada acción debe ser específica, con responsable claro, fecha realista, recursos identificados e indicador medible.
   ],
   "dimensionesDebiles": [
     {
@@ -271,6 +277,25 @@ Genera un Plan de Desarrollo COMPLETO y ESTRUCTURADO en formato JSON con la sigu
 6. **BALANCE**: Incluir desarrollo técnico Y conductual según necesidad
 7. **LENGUAJE**: Español profesional, sin tecnicismos innecesarios, sin palabras en inglés
 8. **FEEDBACK CONSTRUCTIVO**: Reconocer fortalezas + identificar oportunidades + proponer caminos concretos
+
+⚠️ **IMPORTANTE SOBRE EL FORMATO Y PRIORIDADES:**
+1. **PRIMERO Y MÁS IMPORTANTE**: El campo "acciones" DEBE contener AL MENOS 5-8 acciones concretas, específicas y accionables
+   - Cada acción debe tener: descripción detallada, responsable claro, fecha realista, recursos identificados, indicador medible, prioridad
+   - Las acciones de prioridad "alta" deben enfocarse en las 3 dimensiones más débiles identificadas
+   - Las acciones deben ser REALISTAS y APLICABLES al contexto de Esquipulas
+   
+2. **SEGUNDO**: El campo "objetivos" debe contener 3-5 objetivos específicos, medibles y alcanzables
+
+3. **TERCERO**: El campo "dimensionesDebiles" debe identificar las dimensiones con menor score y proponer acciones específicas para cada una
+
+4. **CUARTO**: El campo "recomendaciones" debe contener 3-5 recomendaciones generales
+
+5. **ÚLTIMO (complementario)**: El campo "feedbackIndividual" es un texto narrativo de retroalimentación (máximo 600 palabras)
+   - Este es SOLO un complemento, NO es el plan de acción
+   - El plan de acción REAL está en el array "acciones"
+   - El feedback debe ser constructivo pero breve - no debe ser el foco principal
+
+🎯 **RECUERDA**: Estás generando un PLAN DE ACCIÓN, no solo feedback. Las acciones son lo más importante.
 
 Responde ÚNICAMENTE con el JSON, sin texto adicional antes o después.`;
 }
