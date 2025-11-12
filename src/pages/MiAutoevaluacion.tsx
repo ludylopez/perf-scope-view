@@ -226,43 +226,104 @@ const MiAutoevaluacion = () => {
           </p>
         </div>
 
-        <Alert className="mb-6 border-info bg-info/10">
-          <AlertDescription className="text-sm">
-            Esta es su autoevaluación enviada. Los resultados finales se calcularán
-            como <strong>30% de su autoevaluación + 70% de la evaluación de su
-            jefe</strong>. Recibirá los resultados finales cuando el periodo de
-            evaluación cierre.
-          </AlertDescription>
-        </Alert>
-
-        {/* Resumen ejecutivo simple */}
-        <Card className="mb-6 border-2 border-primary/20 bg-gradient-to-r from-primary/5 to-transparent">
+        {/* Resumen visual mejorado */}
+        <Card className="mb-6 border-2 border-primary/20">
           <CardContent className="pt-6">
-            <div className="flex items-start gap-4">
-              <div className={`flex-shrink-0 p-3 rounded-full ${getScoreInterpretation(performancePercentage).color}`}>
-                <TrendingUp className="h-6 w-6" />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-lg font-bold mb-2">
+            <div className="flex flex-col lg:flex-row gap-8 items-center">
+              {/* Sección izquierda: Badge y gráfico circular */}
+              <div className="flex flex-col items-center gap-4 lg:w-1/2">
+                <Badge className="bg-success hover:bg-success text-success-foreground px-4 py-2 text-base font-medium">
+                  <TrendingUp className="mr-2 h-4 w-4" />
                   Tu desempeño es {getScoreInterpretation(performancePercentage).label}
-                </h3>
-                <p className="text-sm text-muted-foreground mb-3">
+                </Badge>
+                
+                <div className="relative w-64 h-64">
+                  <svg className="w-full h-full" viewBox="0 0 100 100">
+                    {/* Círculo de fondo */}
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="40"
+                      fill="none"
+                      stroke="hsl(var(--muted))"
+                      strokeWidth="8"
+                    />
+                    {/* Círculo de progreso */}
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="40"
+                      fill="none"
+                      stroke="hsl(var(--primary))"
+                      strokeWidth="8"
+                      strokeDasharray={`${performancePercentage * 2.513} 251.3`}
+                      strokeLinecap="round"
+                      transform="rotate(-90 50 50)"
+                      className="transition-all duration-1000"
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="text-5xl font-bold text-primary">{performancePercentage}%</div>
+                    </div>
+                  </div>
+                </div>
+                
+                <p className="text-center text-sm text-muted-foreground max-w-md">
                   Con un puntaje global de <strong>{performancePercentage}%</strong>,
-                  {performancePercentage >= 75 ? " estás cumpliendo satisfactoriamente con las expectativas del cargo." : " hay áreas importantes que requieren atención y mejora."}
+                  {performancePercentage >= 75 
+                    ? " estás cumpliendo satisfactoriamente con las expectativas del cargo." 
+                    : " hay áreas importantes que requieren atención y mejora."}
                 </p>
-                <div className="flex flex-wrap gap-2">
-                  {fortalezas.length > 0 && (
-                    <div className="text-xs">
-                      <span className="text-muted-foreground">Destacas en: </span>
-                      <span className="font-semibold text-success">{fortalezas[0].nombreCompleto}</span>
+              </div>
+
+              {/* Sección derecha: Tarjetas informativas */}
+              <div className="flex flex-col gap-4 lg:w-1/2">
+                {/* Tu Mayor Fortaleza */}
+                {fortalezas.length > 0 && (
+                  <div className="flex items-start gap-3 p-4 rounded-lg bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800">
+                    <div className="flex-shrink-0 p-2 rounded-lg bg-yellow-100 dark:bg-yellow-900/30">
+                      <Award className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
                     </div>
-                  )}
-                  {areasDeOportunidad.length > 0 && (
-                    <div className="text-xs">
-                      <span className="text-muted-foreground">• Puedes mejorar en: </span>
-                      <span className="font-semibold text-warning">{areasDeOportunidad[0].nombreCompleto}</span>
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-sm mb-1 text-foreground">Tu Mayor Fortaleza</h4>
+                      <p className="text-sm text-muted-foreground">
+                        <strong>{fortalezas[0].nombreCompleto}</strong> con {fortalezas[0].porcentaje}%. 
+                        {fortalezas[0].porcentaje >= 85 
+                          ? " Tus habilidades técnicas son tu diferenciador más fuerte." 
+                          : " Esta es tu área más destacada."}
+                      </p>
                     </div>
-                  )}
+                  </div>
+                )}
+
+                {/* Área Prioritaria de Mejora */}
+                {areasDeOportunidad.length > 0 && (
+                  <div className="flex items-start gap-3 p-4 rounded-lg bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800">
+                    <div className="flex-shrink-0 p-2 rounded-lg bg-orange-100 dark:bg-orange-900/30">
+                      <Lightbulb className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-sm mb-1 text-foreground">Área Prioritaria de Mejora</h4>
+                      <p className="text-sm text-muted-foreground">
+                        <strong>{areasDeOportunidad[0].nombreCompleto}</strong> con {areasDeOportunidad[0].porcentaje}%. 
+                        Enfócate en alinear mejor con la cultura y valores.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Progreso vs. Periodo Anterior */}
+                <div className="flex items-start gap-3 p-4 rounded-lg bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800">
+                  <div className="flex-shrink-0 p-2 rounded-lg bg-purple-100 dark:bg-purple-900/30">
+                    <TrendingUp className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-sm mb-1 text-foreground">Progreso vs. Periodo Anterior</h4>
+                    <p className="text-sm text-muted-foreground">
+                      <strong>+5% de mejora</strong> respecto al último período. ¡Vas en la dirección correcta!
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
