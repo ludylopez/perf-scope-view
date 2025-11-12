@@ -1,14 +1,17 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-serve(async (req) => {
+Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response(null, {
+      status: 204,
+      headers: corsHeaders,
+    });
   }
 
   try {
@@ -16,48 +19,66 @@ serve(async (req) => {
 
     if (!colaborador_id || !periodo_id) {
       return new Response(
-        JSON.stringify({ success: false, error: "Faltan parámetros requeridos" }),
+        JSON.stringify({ success: false, error: "colaborador_id y periodo_id son requeridos" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     // Crear cliente de Supabase
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const geminiApiKey = Deno.env.get("GEMINI_API_KEY")!;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
+    
+    if (!geminiApiKey) {
+      return new Response(
+        JSON.stringify({ success: false, error: "GEMINI_API_KEY no configurada" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // 1. Obtener información del colaborador (SIN DPI)
     const { data: colaborador, error: errorColab } = await supabase
-      .from("usuarios")
-      .select("nombre, apellido, email, nivel, puesto, formacion_academica, pertenece_cuadrilla")
+      .from("users")
+      .select("nombre, apellidos, nivel, cargo, area, formacion_academica")
       .eq("dpi", colaborador_id)
       .single();
 
     if (errorColab || !colaborador) {
-      throw new Error("Colaborador no encontrado");
+      console.error("Error obteniendo colaborador:", errorColab);
+      return new Response(
+        JSON.stringify({ success: false, error: `Colaborador no encontrado: ${errorColab?.message || "No encontrado"}` }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // 2. Obtener autoevaluación
     const { data: autoevaluacion, error: errorAuto } = await supabase
-      .from("evaluaciones")
-      .select("responses, estado")
+      .from("evaluations")
+      .select("responses, comments, estado")
       .eq("usuario_id", colaborador_id)
       .eq("periodo_id", periodo_id)
       .eq("tipo", "auto")
+      .eq("estado", "enviado")
       .single();
 
     // 3. Obtener evaluación del jefe
     const { data: evaluacionJefe, error: errorJefe } = await supabase
-      .from("evaluaciones")
-      .select("responses, estado")
-      .eq("usuario_id", colaborador_id)
+      .from("evaluations")
+      .select("responses, comments, evaluacion_potencial, estado")
+      .eq("colaborador_id", colaborador_id)
       .eq("periodo_id", periodo_id)
       .eq("tipo", "jefe")
+      .eq("estado", "enviado")
       .single();
 
     if (errorAuto || !autoevaluacion || errorJefe || !evaluacionJefe) {
-      throw new Error("No se encontraron las evaluaciones completas");
+      console.error("Error obteniendo evaluaciones:", { errorAuto, errorJefe });
+      return new Response(
+        JSON.stringify({ success: false, error: "No se encontraron las evaluaciones completas" }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // 4. Obtener resultado final
@@ -69,22 +90,26 @@ serve(async (req) => {
       .single();
 
     if (errorResultado || !resultadoFinal) {
-      throw new Error("No se encontró el resultado final de la evaluación");
+      console.error("Error obteniendo resultado final:", errorResultado);
+      return new Response(
+        JSON.stringify({ success: false, error: "No se encontró el resultado final de la evaluación" }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // 5. Obtener instrumento según el nivel del colaborador
-    const nivel = colaborador.nivel;
-    const { data: instrumentoData, error: errorInstrumento } = await supabase
-      .from("instrumentos")
-      .select("*")
-      .eq("nivel", nivel)
-      .single();
+    const instrumentId = colaborador.nivel || "A1";
+    const { data: instrumentConfig, error: errorInstrumento } = await supabase.rpc("get_instrument_config", {
+      instrument_id: instrumentId,
+    });
 
-    if (errorInstrumento || !instrumentoData) {
-      throw new Error(`No se encontró instrumento para nivel ${nivel}`);
+    if (errorInstrumento || !instrumentConfig) {
+      console.error("Error obteniendo instrumento:", errorInstrumento);
+      return new Response(
+        JSON.stringify({ success: false, error: `No se encontró instrumento para nivel ${instrumentId}` }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
-
-    const instrumento = instrumentoData.estructura;
 
     // 6. Construir prompt para Gemini
     const prompt = buildPrompt({
@@ -92,72 +117,124 @@ serve(async (req) => {
       autoevaluacion,
       evaluacionJefe,
       resultadoFinal,
-      instrumento,
+      instrumento: instrumentConfig,
     });
 
-    // 7. Llamar a Gemini
-    console.log("Llamando a Gemini API...");
-    const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${geminiApiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 6000,
-            responseMimeType: "application/json",
-          },
-        }),
+    // 7. Llamar a Gemini con fallback de modelos
+    let geminiResponse;
+    let modelUsed = "gemini-2.5-flash";
+    let lastError: string | null = null;
+    
+    const modelsToTry = ["gemini-2.5-flash", "gemini-pro"];
+    
+    for (const model of modelsToTry) {
+      try {
+        modelUsed = model;
+        console.log(`Intentando con modelo: ${modelUsed}`);
+        
+        geminiResponse = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: {
+                temperature: 0.7,
+                maxOutputTokens: 6000,
+                responseMimeType: "application/json",
+              },
+            }),
+          }
+        );
+        
+        if (geminiResponse.ok) {
+          console.log(`✅ Modelo ${modelUsed} funcionó correctamente`);
+          break;
+        } else {
+          const errorText = await geminiResponse.text();
+          lastError = errorText;
+          console.warn(`⚠️ Modelo ${modelUsed} falló:`, errorText.substring(0, 200));
+          continue;
+        }
+      } catch (fetchError: any) {
+        lastError = fetchError.message || String(fetchError);
+        console.warn(`⚠️ Error en fetch con modelo ${modelUsed}:`, lastError);
+        continue;
       }
-    );
+    }
 
-    if (!geminiResponse.ok) {
-      const errorText = await geminiResponse.text();
-      throw new Error(`Error en Gemini API: ${errorText}`);
+    if (!geminiResponse || !geminiResponse.ok) {
+      const errorMessage = lastError || "Todos los modelos de Gemini fallaron";
+      console.error("❌ Todos los modelos fallaron:", errorMessage);
+      return new Response(
+        JSON.stringify({ success: false, error: `Error en Gemini API: ${errorMessage.substring(0, 500)}` }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const geminiData = await geminiResponse.json();
-    const generatedText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
+    let generatedText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    // Si responseMimeType es application/json, el texto puede venir parseado
+    if (!generatedText && geminiData.candidates?.[0]?.content?.parts?.[0]?.json) {
+      generatedText = JSON.stringify(geminiData.candidates[0].content.parts[0].json);
+    }
 
     if (!generatedText) {
-      throw new Error("No se recibió respuesta de Gemini");
+      return new Response(
+        JSON.stringify({ success: false, error: "No se recibió respuesta de Gemini" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // Parsear respuesta JSON
     let guiaGenerada;
     try {
-      guiaGenerada = JSON.parse(generatedText);
+      // Intentar parsear directamente
+      if (typeof generatedText === 'string') {
+        guiaGenerada = JSON.parse(generatedText);
+      } else {
+        guiaGenerada = generatedText;
+      }
     } catch (e) {
       console.error("Error parseando JSON de Gemini:", generatedText);
-      throw new Error("Error al procesar respuesta de IA");
+      // Intentar extraer JSON del texto
+      const jsonMatch = generatedText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        guiaGenerada = JSON.parse(jsonMatch[0]);
+      } else {
+        return new Response(
+          JSON.stringify({ success: false, error: "Error al procesar respuesta de IA: formato inválido" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     // 8. Preparar objeto de guía
     const guia = {
       colaboradorId: colaborador_id,
       periodoId: periodo_id,
-      preparacion: guiaGenerada.preparacion,
-      apertura: guiaGenerada.apertura,
-      fortalezas: guiaGenerada.fortalezas,
-      areasDesarrollo: guiaGenerada.areasDesarrollo,
-      preguntasDialogo: guiaGenerada.preguntasDialogo,
-      tipsConduccion: guiaGenerada.tipsConduccion,
-      cierre: guiaGenerada.cierre,
+      preparacion: guiaGenerada.preparacion || "",
+      apertura: guiaGenerada.apertura || "",
+      fortalezas: guiaGenerada.fortalezas || [],
+      areasDesarrollo: guiaGenerada.areasDesarrollo || [],
+      preguntasDialogo: guiaGenerada.preguntasDialogo || [],
+      tipsConduccion: guiaGenerada.tipsConduccion || [],
+      cierre: guiaGenerada.cierre || "",
       generadoPorIa: true,
       fechaGeneracion: new Date().toISOString(),
     };
 
     return new Response(
       JSON.stringify({ success: true, guia }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 
   } catch (error: any) {
     console.error("Error en generate-feedback-guide:", error);
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ success: false, error: error?.message || "Error interno del servidor" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
@@ -166,40 +243,69 @@ serve(async (req) => {
 function buildPrompt(data: any): string {
   const { colaborador, autoevaluacion, evaluacionJefe, resultadoFinal, instrumento } = data;
 
-  // Calcular dimensiones más fuertes y más débiles
-  const dimensionesConScore = resultadoFinal.comparativo.dimensiones
-    .map((dim: any) => ({
-      nombre: dim.nombre,
-      scoreJefe: dim.evaluacionJefe,
-      scoreAuto: dim.autoevaluacion,
-    }))
-    .sort((a, b) => b.scoreJefe - a.scoreJefe);
+  // Normalizar datos
+  const autoResponses = autoevaluacion.responses || {};
+  const jefeResponses = evaluacionJefe.responses || {};
+  const resultado = resultadoFinal.resultado_final || {};
+  const comparativo = resultadoFinal.comparativo || {};
+
+  // Calcular dimensiones más fuertes y más débiles desde el comparativo
+  let dimensionesConScore: any[] = [];
+  
+  if (comparativo.dimensiones && Array.isArray(comparativo.dimensiones)) {
+    dimensionesConScore = comparativo.dimensiones.map((dim: any) => ({
+      nombre: dim.nombre || dim.dimension || "Dimensión",
+      scoreJefe: dim.evaluacionJefe || dim.scoreJefe || 0,
+      scoreAuto: dim.autoevaluacion || dim.scoreAuto || 0,
+    })).sort((a, b) => (b.scoreJefe || 0) - (a.scoreJefe || 0));
+  } else if (instrumento.dimensionesDesempeno) {
+    // Fallback: calcular desde el instrumento
+    dimensionesConScore = instrumento.dimensionesDesempeno.map((dim: any) => {
+      const items = dim.items || [];
+      const scoresJefe = items.map((item: any) => jefeResponses[item.id] || 0);
+      const scoresAuto = items.map((item: any) => autoResponses[item.id] || 0);
+      const avgJefe = scoresJefe.length > 0 ? scoresJefe.reduce((a, b) => a + b, 0) / scoresJefe.length : 0;
+      const avgAuto = scoresAuto.length > 0 ? scoresAuto.reduce((a, b) => a + b, 0) / scoresAuto.length : 0;
+      return {
+        nombre: dim.nombre || "Dimensión",
+        scoreJefe: avgJefe,
+        scoreAuto: avgAuto,
+      };
+    }).sort((a, b) => b.scoreJefe - a.scoreJefe);
+  }
 
   const top3Fuertes = dimensionesConScore.slice(0, 3);
   const top3Debiles = dimensionesConScore.slice(-3).reverse();
 
   // Construir información detallada
   let detalleEvaluacion = "";
-  instrumento.dimensionesDesempeno.forEach((dim: any) => {
-    detalleEvaluacion += `\n**${dim.nombre}**\n`;
-    dim.items.forEach((item: any) => {
-      const scoreAuto = autoevaluacion.responses[item.id] || 0;
-      const scoreJefe = evaluacionJefe.responses[item.id] || 0;
-      detalleEvaluacion += `  - ${item.texto}\n`;
-      detalleEvaluacion += `    Auto: ${scoreAuto}/5  |  Jefe: ${scoreJefe}/5\n`;
+  if (instrumento.dimensionesDesempeno && Array.isArray(instrumento.dimensionesDesempeno)) {
+    instrumento.dimensionesDesempeno.forEach((dim: any) => {
+      detalleEvaluacion += `\n**${dim.nombre || "Dimensión"}**\n`;
+      if (dim.items && Array.isArray(dim.items)) {
+        dim.items.forEach((item: any) => {
+          const scoreAuto = autoResponses[item.id] || 0;
+          const scoreJefe = jefeResponses[item.id] || 0;
+          detalleEvaluacion += `  - ${item.texto || "Item"}\n`;
+          detalleEvaluacion += `    Auto: ${scoreAuto}/5  |  Jefe: ${scoreJefe}/5\n`;
+        });
+      }
     });
-  });
+  }
 
   // Información de potencial
   let detallePotencial = "";
-  if (instrumento.dimensionesPotencial && resultadoFinal.resultado_final.potencial) {
-    detallePotencial = `\n📊 **POTENCIAL**: ${resultadoFinal.resultado_final.potencial}%\n`;
+  const potencialResponses = evaluacionJefe.evaluacion_potencial?.responses || {};
+  if (instrumento.dimensionesPotencial && Array.isArray(instrumento.dimensionesPotencial) && resultado.potencial) {
+    detallePotencial = `\n📊 **POTENCIAL**: ${resultado.potencial.toFixed(2)}/5.0\n`;
     instrumento.dimensionesPotencial.forEach((dim: any) => {
-      detallePotencial += `\n**${dim.nombre}**\n`;
-      dim.items.forEach((item: any) => {
-        const score = evaluacionJefe.responses[item.id] || 0;
-        detallePotencial += `  - ${item.texto}: ${score}/5\n`;
-      });
+      detallePotencial += `\n**${dim.nombre || "Dimensión"}**\n`;
+      if (dim.items && Array.isArray(dim.items)) {
+        dim.items.forEach((item: any) => {
+          const score = potencialResponses[item.id] || 0;
+          detallePotencial += `  - ${item.texto || "Item"}: ${score}/5\n`;
+        });
+      }
     });
   }
 
@@ -208,23 +314,23 @@ function buildPrompt(data: any): string {
 Tu tarea es generar una **Guía de Retroalimentación** para que un jefe municipal pueda conducir una reunión efectiva de análisis de desempeño con su colaborador.
 
 📋 **INFORMACIÓN DEL COLABORADOR:**
-- Nombre: ${colaborador.nombre} ${colaborador.apellido}
-- Puesto: ${colaborador.puesto}
+- Nombre: ${colaborador.nombre} ${colaborador.apellidos}
+- Cargo: ${colaborador.cargo}
 - Nivel: ${colaborador.nivel}
+- Área: ${colaborador.area || "No especificada"}
 - Formación académica: ${colaborador.formacion_academica || "No especificada"}
-- Pertenece a cuadrilla: ${colaborador.pertenece_cuadrilla ? "Sí" : "No"}
 
 📊 **RESULTADOS DE LA EVALUACIÓN:**
-- Desempeño Final: ${resultadoFinal.resultado_final.desempenoFinal}%
-- Autoevaluación: ${resultadoFinal.resultado_final.desempenoAuto}%
-- Evaluación del Jefe: ${resultadoFinal.resultado_final.desempenoJefe}%
+- Desempeño Final: ${resultado.desempenoFinal?.toFixed(2) || "N/A"}/5.0
+- Autoevaluación: ${resultado.desempenoAuto?.toFixed(2) || "N/A"}/5.0
+- Evaluación del Jefe: ${resultado.desempenoJefe?.toFixed(2) || "N/A"}/5.0
 ${detallePotencial}
 
 🌟 **TOP 3 DIMENSIONES MÁS FUERTES:**
-${top3Fuertes.map((d, i) => `${i + 1}. ${d.nombre}: ${d.scoreJefe}%`).join('\n')}
+${top3Fuertes.map((d, i) => `${i + 1}. ${d.nombre}: ${d.scoreJefe.toFixed(2)}/5.0`).join('\n')}
 
 ⚠️ **TOP 3 DIMENSIONES A MEJORAR:**
-${top3Debiles.map((d, i) => `${i + 1}. ${d.nombre}: ${d.scoreJefe}%`).join('\n')}
+${top3Debiles.map((d, i) => `${i + 1}. ${d.nombre}: ${d.scoreJefe.toFixed(2)}/5.0`).join('\n')}
 
 📝 **DETALLE COMPLETO DE LA EVALUACIÓN:**
 ${detalleEvaluacion}
@@ -267,7 +373,6 @@ Genera un JSON con esta estructura EXACTA:
       "ejemplo": "Ejemplo concreto de un comportamiento observado",
       "impacto": "Impacto positivo que generó"
     }
-    // Incluir las 2-3 dimensiones más fuertes
   ],
 
   "areasDesarrollo": [
@@ -278,21 +383,18 @@ Genera un JSON con esta estructura EXACTA:
       "impacto": "Efecto negativo o consecuencia del comportamiento",
       "sugerencia": "Acción concreta y realista para mejorar"
     }
-    // Incluir las 2-3 dimensiones más débiles
   ],
 
   "preguntasDialogo": [
     "Pregunta abierta 1 para fomentar reflexión",
     "Pregunta abierta 2 para fomentar compromiso",
     "Pregunta abierta 3 para explorar soluciones"
-    // 4-5 preguntas en total
   ],
 
   "tipsConduccion": [
     "Tip práctico 1 para conducir la reunión",
     "Tip práctico 2",
     "Tip práctico 3"
-    // 5-6 tips breves
   ],
 
   "cierre": "Texto (2-3 oraciones) para cerrar la reunión de forma positiva, confirmar compromisos y próximos pasos"

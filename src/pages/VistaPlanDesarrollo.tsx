@@ -48,16 +48,30 @@ const VistaPlanDesarrollo = () => {
         .single();
 
       if (!error && data) {
+        // Si competencias_desarrollar es un objeto con la estructura completa, extraerla
+        const competencias = data.competencias_desarrollar || {};
+        const planEstructurado = typeof competencias === 'object' && competencias.acciones 
+          ? {
+              objetivos: competencias.objetivos || [],
+              acciones: competencias.acciones || [],
+              dimensionesDebiles: competencias.dimensionesDebiles || [],
+            }
+          : null;
+        
+        const recomendaciones = typeof competencias === 'object' && competencias.recomendaciones
+          ? competencias.recomendaciones
+          : Array.isArray(competencias) ? competencias : [];
+
         const planData: DevelopmentPlan = {
           id: data.id,
           evaluacionId: data.evaluacion_id,
           colaboradorId: data.colaborador_id,
           periodoId: data.periodo_id,
-          competenciasDesarrollar: data.competencias_desarrollar || [],
+          competenciasDesarrollar: Array.isArray(competencias) ? competencias : [],
           feedbackIndividual: data.feedback_individual || "",
           feedbackGrupal: data.feedback_grupal,
-          planEstructurado: data.plan_estructurado,
-          recomendaciones: data.recomendaciones,
+          planEstructurado: planEstructurado || data.plan_estructurado,
+          recomendaciones: recomendaciones || data.recomendaciones || [],
           editable: data.editable,
           editadoPor: data.editado_por,
           fechaCreacion: data.fecha_creacion,
