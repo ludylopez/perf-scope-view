@@ -518,44 +518,24 @@ Deno.serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    // Intentar con gemini-1.5-flash primero (más rápido y económico), luego fallback a gemini-1.5-pro
-    let geminiResponse;
-    let modelUsed = "gemini-1.5-flash";
+    // Usar gemini-1.5-pro (modelo estable y disponible en v1beta)
+    const modelUsed = "gemini-1.5-pro";
+    console.log(`Llamando a Gemini API con modelo: ${modelUsed}`);
     
-    try {
-      geminiResponse = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: {
-              temperature: 0.7,
-              maxOutputTokens: 8000,
-            },
-          }),
-        }
-      );
-    } catch (fetchError) {
-      console.error("Error en fetch a Gemini Flash:", fetchError);
-      // Fallback a gemini-1.5-pro
-      modelUsed = "gemini-1.5-pro";
-      geminiResponse = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${geminiApiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: {
-              temperature: 0.7,
-              maxOutputTokens: 8000,
-            },
-          }),
-        }
-      );
-    }
+    const geminiResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${geminiApiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 8000,
+          },
+        }),
+      }
+    );
 
     if (!geminiResponse.ok) {
       const errorText = await geminiResponse.text();
