@@ -27,7 +27,7 @@ import {
   calculateDimensionPercentage,
   calculateDimensionAverage
 } from "@/lib/calculations";
-import { ArrowLeft, CheckCircle2, FileDown, Sparkles, TrendingUp, Target, Award, AlertCircle, Lightbulb, Shield, Brain, Heart, Users, HandHeart, ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowLeft, CheckCircle2, FileDown, Sparkles, TrendingUp, Target, Award, AlertCircle, Lightbulb } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
@@ -43,75 +43,12 @@ import {
   Legend
 } from "recharts";
 
-// Helper para obtener el ícono de cada dimensión
-const getDimensionIcon = (dimensionId: string) => {
-  const icons: Record<string, any> = {
-    dim1: Target,
-    dim2: Shield,
-    dim3: Brain,
-    dim4: Heart,
-    dim5: Users,
-    dim6: HandHeart,
-  };
-  return icons[dimensionId] || Target;
-};
-
-// Helper para obtener el color de cada dimensión
-const getDimensionColor = (dimensionId: string) => {
-  const colors: Record<string, string> = {
-    dim1: "text-blue-500 bg-blue-500/10",
-    dim2: "text-purple-500 bg-purple-500/10",
-    dim3: "text-orange-500 bg-orange-500/10",
-    dim4: "text-pink-500 bg-pink-500/10",
-    dim5: "text-indigo-500 bg-indigo-500/10",
-    dim6: "text-teal-500 bg-teal-500/10",
-  };
-  return colors[dimensionId] || "text-primary bg-primary/10";
-};
-
 // Helper para interpretar el puntaje
 const getScoreInterpretation = (percentage: number) => {
   if (percentage >= 90) return { label: "Excelente", color: "text-green-600 bg-green-50 border-green-200" };
   if (percentage >= 75) return { label: "Bueno", color: "text-blue-600 bg-blue-50 border-blue-200" };
   if (percentage >= 60) return { label: "Regular", color: "text-yellow-600 bg-yellow-50 border-yellow-200" };
   return { label: "Necesita mejorar", color: "text-orange-600 bg-orange-50 border-orange-200" };
-};
-
-// Helper para obtener ejemplos de cada dimensión
-const getDimensionExamples = (dimensionId: string) => {
-  const examples: Record<string, string[]> = {
-    dim1: [
-      "Cumplir con las metas del Plan Operativo Anual",
-      "Ejecutar el presupuesto en tiempo y forma",
-      "Implementar acuerdos del Concejo Municipal"
-    ],
-    dim2: [
-      "Mantener transparencia en el manejo de recursos",
-      "Cumplir con leyes y normativas vigentes",
-      "Presentar informes completos y puntuales"
-    ],
-    dim3: [
-      "Dominar la gestión pública municipal",
-      "Aplicar herramientas de planificación estratégica",
-      "Tomar decisiones fundamentadas"
-    ],
-    dim4: [
-      "Actuar con integridad y transparencia",
-      "Orientarse a resultados y mejora continua",
-      "Mantener compromiso con las responsabilidades"
-    ],
-    dim5: [
-      "Dirigir efectivamente al equipo directivo",
-      "Coordinar entre dependencias municipales",
-      "Comunicarse clara y oportunamente"
-    ],
-    dim6: [
-      "Priorizar el interés ciudadano",
-      "Atender demandas de la población",
-      "Mantener buena imagen institucional"
-    ]
-  };
-  return examples[dimensionId] || [];
 };
 
 // Helper para obtener descripción amigable de la dimensión
@@ -197,15 +134,7 @@ const MiAutoevaluacion = () => {
 
   const [evaluation, setEvaluation] = useState<any>(null);
   const [currentDimension, setCurrentDimension] = useState(0);
-  const [expandedDimensions, setExpandedDimensions] = useState<Record<number, boolean>>({});
   const [promedioMunicipal, setPromedioMunicipal] = useState<Record<string, number>>({});
-
-  const toggleDimension = (idx: number) => {
-    setExpandedDimensions(prev => ({
-      ...prev,
-      [idx]: !prev[idx]
-    }));
-  };
 
   useEffect(() => {
     if (!user || !activePeriodId) return;
@@ -434,206 +363,174 @@ const MiAutoevaluacion = () => {
         </Card>
 
         <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Panorama de Competencias</CardTitle>
-            <CardDescription>
-              Vista integral de tu desempeño por dimensión comparado con el promedio municipal
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[500px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <RadarChart data={radarData}>
-                  <defs>
-                    <linearGradient id="colorTuEval" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
-                    </linearGradient>
-                  </defs>
-                  <PolarGrid 
-                    stroke="hsl(var(--border))" 
-                    strokeWidth={1}
-                  />
-                  <PolarAngleAxis 
-                    dataKey="dimension" 
-                    tick={{ 
-                      fill: 'hsl(var(--foreground))', 
-                      fontSize: 13,
-                      fontWeight: 500
-                    }}
-                  />
-                  <PolarRadiusAxis 
-                    angle={90} 
-                    domain={[0, 100]} 
-                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
-                    tickCount={6}
-                  />
-                  
-                  {/* Promedio Municipal - Segunda línea */}
-                  {Object.keys(promedioMunicipal).length > 0 && (
-                    <Radar
-                      name="Promedio Municipal"
-                      dataKey="promedioMunicipal"
-                      stroke="hsl(var(--muted-foreground))"
-                      fill="hsl(var(--muted))"
-                      fillOpacity={0.15}
-                      strokeWidth={2}
-                      strokeDasharray="5 5"
-                    />
-                  )}
-                  
-                  {/* Tu Evaluación - Primera línea */}
-                  <Radar
-                    name="Tu Evaluación"
-                    dataKey="tuEvaluacion"
-                    stroke="hsl(var(--primary))"
-                    fill="url(#colorTuEval)"
-                    fillOpacity={0.4}
-                    strokeWidth={3}
-                  />
-                  
-                  <Tooltip 
-                    content={({ active, payload }) => {
-                      if (active && payload && payload.length) {
-                        const data = payload[0].payload;
-                        return (
-                          <div className="bg-popover border-2 border-primary/20 rounded-lg p-4 shadow-xl">
-                            <p className="font-bold text-base mb-2 text-foreground">{data.dimension}</p>
-                            <div className="space-y-1">
-                              <div className="flex items-center justify-between gap-4">
-                                <span className="text-sm text-muted-foreground">Tu evaluación:</span>
-                                <span className="text-sm font-bold text-primary">{data.tuEvaluacion}%</span>
-                              </div>
-                              {data.promedioMunicipal > 0 && (
-                                <div className="flex items-center justify-between gap-4">
-                                  <span className="text-sm text-muted-foreground">Promedio municipal:</span>
-                                  <span className="text-sm font-semibold text-muted-foreground">{data.promedioMunicipal}%</span>
-                                </div>
-                              )}
-                              <div className="pt-2 mt-2 border-t border-border">
-                                <span className="text-xs text-muted-foreground">
-                                  Puntaje Likert: {data.puntaje.toFixed(1)}/5.0
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
-                  />
-                  
-                  <Legend 
-                    wrapperStyle={{
-                      paddingTop: '20px'
-                    }}
-                    iconType="circle"
-                    formatter={(value) => (
-                      <span style={{ 
-                        color: 'hsl(var(--foreground))', 
-                        fontSize: '14px',
-                        fontWeight: 500
-                      }}>
-                        {value}
-                      </span>
-                    )}
-                  />
-                </RadarChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="mt-6 grid grid-cols-1 gap-4">
-              {radarData.map((data, idx) => {
-                const Icon = getDimensionIcon(data.dimensionData.id);
-                const colorClasses = getDimensionColor(data.dimensionData.id);
-                const interpretation = getScoreInterpretation(data.tuEvaluacion);
-                const isExpanded = expandedDimensions[idx];
-                const examples = getDimensionExamples(data.dimensionData.id);
-
-                return (
-                  <div
-                    key={idx}
-                    className="border border-border rounded-lg overflow-hidden hover:shadow-md transition-all"
-                  >
-                    {/* Header de la tarjeta - clickeable */}
-                    <div
-                      className="flex items-center gap-4 p-4 cursor-pointer hover:bg-muted/30 transition-colors"
-                      onClick={() => toggleDimension(idx)}
-                    >
-                      {/* Ícono de la dimensión */}
-                      <div className={`flex-shrink-0 p-3 rounded-full ${colorClasses}`}>
-                        <Icon className="h-6 w-6" />
-                      </div>
-
-                      {/* Contenido principal */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <p className="text-xs font-medium text-muted-foreground">Área {data.numero}</p>
-                          <Badge className={`text-xs px-2 py-0 ${interpretation.color}`}>
-                            {interpretation.label}
-                          </Badge>
-                        </div>
-                        <p className="text-sm font-semibold text-foreground mb-1">
-                          {data.nombreCompleto}
-                        </p>
-                        <p className="text-xs text-muted-foreground line-clamp-1">
-                          {data.dimensionData.descripcion}
-                        </p>
-                      </div>
-
-                      {/* Puntaje y chevron */}
-                      <div className="flex items-center gap-3">
-                        <div className="text-right">
-                          <p className="text-2xl font-bold text-primary">{data.tuEvaluacion}%</p>
-                          <p className="text-xs text-muted-foreground">{data.puntaje.toFixed(1)}/5.0</p>
-                        </div>
-                        {isExpanded ? (
-                          <ChevronUp className="h-5 w-5 text-muted-foreground" />
-                        ) : (
-                          <ChevronDown className="h-5 w-5 text-muted-foreground" />
-                        )}
-                      </div>
+          <CardContent className="p-6">
+            <div className="grid lg:grid-cols-[1fr,400px] gap-8">
+              {/* Panel Izquierdo: Gráfico de Radar */}
+              <div className="flex flex-col">
+                <div className="mb-4">
+                  <h3 className="text-xl font-bold flex items-center gap-2 mb-1">
+                    <div className="p-2 rounded-lg bg-primary/10">
+                      <TrendingUp className="h-5 w-5 text-primary" />
                     </div>
+                    Panorama de Competencias
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Vista integral de tu desempeño por dimensión comparado con el promedio municipal
+                  </p>
+                </div>
 
-                    {/* Contenido expandible */}
-                    {isExpanded && (
-                      <div className="px-4 pb-4 pt-2 bg-muted/20 border-t border-border">
-                        <div className="space-y-3">
-                          {/* Descripción completa */}
-                          <div>
-                            <p className="text-xs font-semibold text-foreground mb-1">¿Qué se evalúa?</p>
-                            <p className="text-xs text-muted-foreground">
-                              {data.dimensionData.descripcion}
-                            </p>
-                          </div>
+                <div className="flex-1 min-h-[450px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RadarChart data={radarData}>
+                      <defs>
+                        <linearGradient id="colorTuEval" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.8}/>
+                          <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
+                        </linearGradient>
+                      </defs>
+                      <PolarGrid 
+                        stroke="hsl(var(--border))" 
+                        strokeWidth={1}
+                      />
+                      <PolarAngleAxis 
+                        dataKey="dimension" 
+                        tick={{ 
+                          fill: 'hsl(var(--foreground))', 
+                          fontSize: 13,
+                          fontWeight: 500
+                        }}
+                      />
+                      <PolarRadiusAxis 
+                        angle={90} 
+                        domain={[0, 100]} 
+                        tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
+                        tickCount={6}
+                      />
+                      
+                      {/* Promedio Municipal - Segunda línea */}
+                      {Object.keys(promedioMunicipal).length > 0 && (
+                        <Radar
+                          name="Promedio Municipal"
+                          dataKey="promedioMunicipal"
+                          stroke="hsl(var(--muted-foreground))"
+                          fill="hsl(var(--muted))"
+                          fillOpacity={0.15}
+                          strokeWidth={2}
+                          strokeDasharray="5 5"
+                        />
+                      )}
+                      
+                      {/* Tu Evaluación - Primera línea */}
+                      <Radar
+                        name="Tu Evaluación"
+                        dataKey="tuEvaluacion"
+                        stroke="hsl(var(--primary))"
+                        fill="url(#colorTuEval)"
+                        fillOpacity={0.4}
+                        strokeWidth={3}
+                      />
+                      
+                      <Tooltip 
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            const data = payload[0].payload;
+                            return (
+                              <div className="bg-popover border-2 border-primary/20 rounded-lg p-4 shadow-xl">
+                                <p className="font-bold text-base mb-2 text-foreground">{data.dimension}</p>
+                                <div className="space-y-1">
+                                  <div className="flex items-center justify-between gap-4">
+                                    <span className="text-sm text-muted-foreground">Tu evaluación:</span>
+                                    <span className="text-sm font-bold text-primary">{data.tuEvaluacion}%</span>
+                                  </div>
+                                  {data.promedioMunicipal > 0 && (
+                                    <div className="flex items-center justify-between gap-4">
+                                      <span className="text-sm text-muted-foreground">Promedio municipal:</span>
+                                      <span className="text-sm font-semibold text-muted-foreground">{data.promedioMunicipal}%</span>
+                                    </div>
+                                  )}
+                                  <div className="pt-2 mt-2 border-t border-border">
+                                    <span className="text-xs text-muted-foreground">
+                                      Puntaje Likert: {data.puntaje.toFixed(1)}/5.0
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                      
+                      <Legend 
+                        wrapperStyle={{
+                          paddingTop: '20px'
+                        }}
+                        iconType="circle"
+                        formatter={(value) => (
+                          <span style={{ 
+                            color: 'hsl(var(--foreground))', 
+                            fontSize: '14px',
+                            fontWeight: 500
+                          }}>
+                            {value}
+                          </span>
+                        )}
+                      />
+                    </RadarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
 
-                          {/* Ejemplos concretos */}
-                          {examples.length > 0 && (
-                            <div>
-                              <p className="text-xs font-semibold text-foreground mb-2">Ejemplos de lo que incluye:</p>
-                              <ul className="space-y-1">
-                                {examples.map((example, exIdx) => (
-                                  <li key={exIdx} className="flex items-start gap-2 text-xs text-muted-foreground">
-                                    <CheckCircle2 className="h-3 w-3 text-primary mt-0.5 flex-shrink-0" />
-                                    <span>{example}</span>
-                                  </li>
-                                ))}
-                              </ul>
+              {/* Panel Derecho: Lista de Dimensiones */}
+              <div className="flex flex-col">
+                <div className="mb-4">
+                  <h3 className="text-xl font-bold flex items-center gap-2 mb-1">
+                    <div className="p-2 rounded-lg bg-secondary/50">
+                      <Target className="h-5 w-5 text-secondary-foreground" />
+                    </div>
+                    Por Dimensión
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Resultados detallados
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  {radarData.map((data, idx) => {
+                    const interpretation = getScoreInterpretation(data.tuEvaluacion);
+                    
+                    return (
+                      <div 
+                        key={idx}
+                        className="flex items-center gap-3 p-3 rounded-lg border border-border bg-card hover:shadow-md transition-all"
+                      >
+                        {/* Número */}
+                        <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-lg bg-primary text-primary-foreground font-bold text-lg">
+                          {data.numero}
+                        </div>
+
+                        {/* Contenido */}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-sm mb-2">{data.dimension}</p>
+                          
+                          {/* Barra de progreso */}
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 h-2.5 bg-muted rounded-full overflow-hidden">
+                              <div 
+                                className="h-full bg-gradient-to-r from-primary to-primary/70 transition-all duration-500"
+                                style={{ width: `${data.tuEvaluacion}%` }}
+                              />
                             </div>
-                          )}
-
-                          {/* Peso de la dimensión */}
-                          <div className="pt-2 border-t border-border/50">
-                            <p className="text-xs text-muted-foreground">
-                              <span className="font-medium">Peso en evaluación: </span>
-                              {Math.round(data.dimensionData.peso * 100)}% del total
-                            </p>
+                            <span className="text-lg font-bold text-primary min-w-[48px] text-right">
+                              {data.tuEvaluacion}%
+                            </span>
                           </div>
                         </div>
                       </div>
-                    )}
-                  </div>
-                );
-              })}
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
