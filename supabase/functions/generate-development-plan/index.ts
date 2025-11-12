@@ -572,27 +572,18 @@ Deno.serve(async (req: Request): Promise<Response> => {
     if (!geminiResponse || !geminiResponse.ok) {
       const errorMessage = lastError || "Todos los modelos de Gemini fallaron";
       console.error("❌ Todos los modelos fallaron. Último error:", errorMessage);
+      let parsedError = errorMessage;
+      try {
+        const errorJson = JSON.parse(errorMessage);
+        parsedError = errorJson.error?.message || errorJson.message || errorMessage;
+      } catch {
+        parsedError = errorMessage.substring(0, 500);
+      }
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: `Error en Gemini API: ${errorMessage.substring(0, 500)}` 
+          error: `Error en Gemini API: ${parsedError}` 
         }),
-        { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
-      );
-    }
-
-    if (!geminiResponse.ok) {
-      const errorText = await geminiResponse.text();
-      console.error(`Error en Gemini API (${modelUsed}):`, errorText);
-      let errorMessage = `Error en Gemini API (${modelUsed})`;
-      try {
-        const errorJson = JSON.parse(errorText);
-        errorMessage = errorJson.error?.message || errorJson.message || errorText;
-      } catch {
-        errorMessage = errorText.substring(0, 500);
-      }
-      return new Response(
-        JSON.stringify({ success: false, error: errorMessage }),
         { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
       );
     }
