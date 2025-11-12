@@ -395,67 +395,6 @@ const MiAutoevaluacion = () => {
           </CardContent>
         </Card>
 
-        <div className="grid gap-6 mb-6 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-primary" />
-                Puntaje Global de Autoevaluación
-              </CardTitle>
-              <CardDescription>
-                Resultado ponderado de sus respuestas
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-center gap-6">
-                <div className="text-center">
-                  <div className="text-6xl font-bold text-primary">
-                    {performancePercentage}%
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Desempeño global
-                  </p>
-                </div>
-                <div className="h-20 w-px bg-border" />
-                <div className="text-center">
-                  <div className="text-3xl font-semibold text-foreground">
-                    {performanceScore.toFixed(1)}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    de 5.0
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    escala Likert
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-primary" />
-                Análisis Personalizado con IA
-              </CardTitle>
-              <CardDescription>
-                Insights basados en sus resultados
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col items-center justify-center h-full text-center py-4">
-                <Sparkles className="h-12 w-12 text-muted-foreground/50 mb-3" />
-                <p className="text-sm text-muted-foreground">
-                  El análisis personalizado con IA estará disponible próximamente.
-                </p>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Recibirá recomendaciones específicas basadas en sus fortalezas y áreas de mejora.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
         <Card className="mb-6">
           <CardHeader>
             <CardTitle>Resultados por Áreas Evaluadas</CardTitle>
