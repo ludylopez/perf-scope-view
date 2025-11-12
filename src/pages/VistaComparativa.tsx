@@ -170,17 +170,17 @@ const VistaComparativa = () => {
         setAutoevaluacion(auto);
         setEvaluacionJefe(jefe);
 
-        // Calcular resultado final y comparativo
+        // Calcular resultado final y comparativo (usar userInstrument directamente, no el estado)
         const resultado = calculateCompleteFinalScore(
           auto,
           jefe,
-          instrument.dimensionesDesempeno,
-          instrument.dimensionesPotencial
+          userInstrument.dimensionesDesempeno,
+          userInstrument.dimensionesPotencial
         );
         setResultadoFinal(resultado);
 
         // Calcular comparativo por dimensión
-        const comparativoData = instrument.dimensionesDesempeno.map((dim) => {
+        const comparativoData = userInstrument.dimensionesDesempeno.map((dim) => {
           const autoItems = dim.items.map(item => auto.responses[item.id]).filter(v => v !== undefined);
           const jefeItems = dim.items.map(item => jefe.responses[item.id]).filter(v => v !== undefined);
           
