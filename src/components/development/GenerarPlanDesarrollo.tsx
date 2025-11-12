@@ -38,50 +38,57 @@ export const GenerarPlanDesarrollo = ({
   const generarPlan = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('generate-development-plan', {
-        body: {
+      // Usar fetch directamente para poder capturar el body del error
+      const { data: { session } } = await supabase.auth.getSession();
+      // Obtener URL y key desde las variables de entorno o el cliente
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://oxadpbdlpvwyapuondei.supabase.co";
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im94YWRwYmRscHZ3eWFwdW9uZGVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIzMjU5MzcsImV4cCI6MjA3NzkwMTkzN30.HjIoMaw20qx7DscE-XWCaz88EWa0Jv_aCDcMtv6eadw";
+      
+      const response = await fetch(`${supabaseUrl}/functions/v1/generate-development-plan`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token || supabaseKey}`,
+          'apikey': supabaseKey,
+        },
+        body: JSON.stringify({
           colaborador_id: colaboradorId,
           periodo_id: periodoId,
-        },
+        }),
       });
 
-      // Si hay error, intentar extraer el mensaje del body
-      if (error) {
-        console.error("Error from Supabase function:", error);
-        
-        // Intentar obtener el mensaje del error
-        let errorMessage = error.message || "Error desconocido";
-        
-        // Si el error tiene contexto, intentar extraer el mensaje del body
-        if (error.context && error.context.body) {
-          try {
-            const errorBody = typeof error.context.body === 'string' 
-              ? JSON.parse(error.context.body) 
-              : error.context.body;
-            if (errorBody?.error) {
-              errorMessage = errorBody.error;
-            }
-          } catch (e) {
-            console.warn("No se pudo parsear el body del error:", e);
-          }
-        }
-        
+      let responseData;
+      try {
+        responseData = await response.json();
+      } catch (parseError) {
+        const text = await response.text();
+        console.error("Error parseando respuesta:", parseError, "Response text:", text);
+        throw new Error(`Error en la respuesta del servidor: ${text.substring(0, 200)}`);
+      }
+
+      if (!response.ok) {
+        console.error("Error from function:", {
+          status: response.status,
+          statusText: response.statusText,
+          body: responseData,
+        });
+        const errorMessage = responseData?.error || responseData?.message || `Error ${response.status}: ${response.statusText}`;
         throw new Error(errorMessage);
       }
 
-      if (data && !data.success) {
-        console.error("Error from function response:", data);
-        throw new Error(data.error || "Error generando plan");
+      if (responseData && !responseData.success) {
+        console.error("Error from function response:", responseData);
+        throw new Error(responseData.error || "Error generando plan");
       }
 
-      if (data?.success && data.plan) {
-        setPlan(data.plan);
-        setEditedFeedback(data.plan.feedback_individual || "");
-        setEditedFeedbackGrupal(data.plan.feedback_grupal || "");
+      if (responseData?.success && responseData.plan) {
+        setPlan(responseData.plan);
+        setEditedFeedback(responseData.plan.feedback_individual || "");
+        setEditedFeedbackGrupal(responseData.plan.feedback_grupal || "");
         setShowModal(true);
         toast.success("Plan de desarrollo generado exitosamente");
       } else {
-        throw new Error(data?.error || "Error generando plan: respuesta inválida");
+        throw new Error(responseData?.error || "Error generando plan: respuesta inválida");
       }
     } catch (error: any) {
       console.error("Error generating plan:", error);
@@ -89,7 +96,6 @@ export const GenerarPlanDesarrollo = ({
       console.error("Error details:", {
         message: errorMessage,
         error: error,
-        context: error?.context,
         stack: error?.stack,
       });
       toast.error(`Error al generar plan: ${errorMessage}`);
