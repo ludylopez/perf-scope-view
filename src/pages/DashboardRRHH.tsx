@@ -105,16 +105,9 @@ const DashboardRRHH = () => {
       const distribucion9Box = statsData.distribucion9Box || {};
       const evaluacionesPorArea = (statsData.evaluacionesPorArea || []) as Array<{ area: string; completadas: number; total: number }>;
       const evaluacionesPorNivel = (statsData.evaluacionesPorNivel || []) as Array<{ nivel: string; completadas: number; total: number }>;
-
-      // Tendencia semanal (simulada por ahora)
-      const completadas = statsData.evaluacionesCompletadas || 0;
-      const tendenciaSemanal = [
-        { semana: "Sem 1", completadas: Math.floor(completadas * 0.1) },
-        { semana: "Sem 2", completadas: Math.floor(completadas * 0.25) },
-        { semana: "Sem 3", completadas: Math.floor(completadas * 0.5) },
-        { semana: "Sem 4", completadas: Math.floor(completadas * 0.75) },
-        { semana: "Actual", completadas },
-      ];
+      
+      // Tendencia semanal REAL desde la base de datos
+      const tendenciaSemanal = (statsData.tendenciaSemanal || []) as Array<{ semana: string; completadas: number }>;
 
       // Cargar métricas avanzadas
       const { data: advancedStatsData, error: advancedError } = await supabase
@@ -305,14 +298,11 @@ const DashboardRRHH = () => {
         npsDetractors = scores.filter(s => s < 7).length;
       }
 
-      // Tendencia semanal
-      const tendenciaSemanal = [
-        { semana: "Sem 1", completadas: Math.floor(completadas * 0.1) },
-        { semana: "Sem 2", completadas: Math.floor(completadas * 0.25) },
-        { semana: "Sem 3", completadas: Math.floor(completadas * 0.5) },
-        { semana: "Sem 4", completadas: Math.floor(completadas * 0.75) },
-        { semana: "Actual", completadas },
-      ];
+      // Tendencia semanal REAL - obtener desde la base de datos
+      const { data: tendenciaData, error: tendenciaError } = await supabase
+        .rpc("get_tendencia_semanal", { periodo_id_param: activePeriodId });
+      
+      const tendenciaSemanal = (tendenciaData || []) as Array<{ semana: string; completadas: number }>;
 
       setStats({
         totalUsuarios: usuariosData?.length || 0,

@@ -7,6 +7,7 @@ const corsHeaders = {
 };
 
 Deno.serve(async (req: Request): Promise<Response> => {
+  // Manejar CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, {
       status: 204,
@@ -14,8 +15,25 @@ Deno.serve(async (req: Request): Promise<Response> => {
     });
   }
 
+  // Solo permitir POST
+  if (req.method !== "POST") {
+    return new Response(
+      JSON.stringify({ success: false, error: "Method not allowed" }),
+      { status: 405, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
   try {
-    const { colaborador_id, periodo_id } = await req.json();
+    // Verificar que el body no esté vacío
+    const body = await req.text();
+    if (!body || body.trim() === "") {
+      return new Response(
+        JSON.stringify({ success: false, error: "Request body is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { colaborador_id, periodo_id } = JSON.parse(body);
 
     if (!colaborador_id || !periodo_id) {
       return new Response(
