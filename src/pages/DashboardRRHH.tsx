@@ -57,8 +57,11 @@ const DashboardRRHH = () => {
   const [advancedStats, setAdvancedStats] = useState<any>(null);
   const [executiveKPIs, setExecutiveKPIs] = useState<any>(null);
   const [desarrolloStats, setDesarrolloStats] = useState<any>(null);
+  const [seguimientoData, setSeguimientoData] = useState<any[]>([]);
+  const [resumenSeguimiento, setResumenSeguimiento] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [periodoId, setPeriodoId] = useState<string>("2025-1");
+  const [activePeriodId, setActivePeriodId] = useState<string>("");
   const [selectedArea, setSelectedArea] = useState<string>("all");
   const [apiUsageStats, setApiUsageStats] = useState(getAPIUsageStats());
 
@@ -82,22 +85,23 @@ const DashboardRRHH = () => {
         .eq("estado", "en_curso")
         .single();
       
-      const activePeriodId = periodData?.id || periodoId;
+      const currentPeriodId = periodData?.id || periodoId;
+      setActivePeriodId(currentPeriodId);
 
       // OPTIMIZACIÓN: Usar función SQL para obtener todas las estadísticas de una vez
       // Esto reduce significativamente la carga de datos al cliente (de ~1200 registros a 1 JSONB)
       const { data: statsData, error: statsError } = await supabase
-        .rpc("get_dashboard_stats", { periodo_id_param: activePeriodId });
+        .rpc("get_dashboard_stats", { periodo_id_param: currentPeriodId });
 
       if (statsError) {
         console.error("Error loading stats:", statsError);
         // Fallback a método anterior si la función no existe aún
-        await loadStatsFallback(activePeriodId);
+        await loadStatsFallback(currentPeriodId);
         return;
       }
 
       if (!statsData) {
-        await loadStatsFallback(activePeriodId);
+        await loadStatsFallback(currentPeriodId);
         return;
       }
 
@@ -111,7 +115,7 @@ const DashboardRRHH = () => {
 
       // Cargar métricas avanzadas
       const { data: advancedStatsData, error: advancedError } = await supabase
-        .rpc("get_advanced_dashboard_stats", { periodo_id_param: activePeriodId });
+        .rpc("get_advanced_dashboard_stats", { periodo_id_param: currentPeriodId });
 
       if (!advancedError && advancedStatsData) {
         setAdvancedStats(advancedStatsData);
@@ -119,7 +123,7 @@ const DashboardRRHH = () => {
 
       // Cargar KPIs ejecutivos
       const { data: executiveKPIsData, error: executiveError } = await supabase
-        .rpc("get_executive_kpis", { periodo_id_param: activePeriodId });
+        .rpc("get_executive_kpis", { periodo_id_param: currentPeriodId });
 
       if (!executiveError && executiveKPIsData) {
         setExecutiveKPIs(executiveKPIsData);
@@ -136,13 +140,29 @@ const DashboardRRHH = () => {
         const periodoAnteriorId = periodosData[1].id;
         const { data: desarrolloData, error: desarrolloError } = await supabase
           .rpc("get_desarrollo_metrics", { 
-            periodo_actual_id: activePeriodId,
+            periodo_actual_id: currentPeriodId,
             periodo_anterior_id: periodoAnteriorId
           });
 
         if (!desarrolloError && desarrolloData) {
           setDesarrolloStats(desarrolloData);
         }
+      }
+
+      // Cargar seguimiento de evaluaciones
+      const { data: seguimientoData, error: seguimientoError } = await supabase
+        .rpc("get_seguimiento_evaluaciones", { periodo_id_param: currentPeriodId });
+
+      if (!seguimientoError && seguimientoData) {
+        setSeguimientoData(seguimientoData || []);
+      }
+
+      // Cargar resumen de seguimiento
+      const { data: resumenData, error: resumenError } = await supabase
+        .rpc("get_resumen_seguimiento", { periodo_id_param: currentPeriodId });
+
+      if (!resumenError && resumenData) {
+        setResumenSeguimiento(resumenData);
       }
 
       setStats({
@@ -847,6 +867,156 @@ const DashboardRRHH = () => {
                 </CardContent>
               </Card>
             )}
+
+            {/* Estadísticas de Retención */}
+            {advancedStats?.antiguedadCompleta?.retencion && (
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium">Tasa Retención General</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-3xl font-bold text-primary">
+                      {Math.round(advancedStats.antiguedadCompleta.retencion.tasaRetencionGeneral)}%
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">≥12 meses</p>
+                    <Progress value={advancedStats.antiguedadCompleta.retencion.tasaRetencionGeneral} className="mt-2 h-2" />
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium">Tasa Retención 3+ Años</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-3xl font-bold text-success">
+                      {Math.round(advancedStats.antiguedadCompleta.retencion.tasaRetencion3Anos)}%
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">≥36 meses</p>
+                    <Progress value={advancedStats.antiguedadCompleta.retencion.tasaRetencion3Anos} className="mt-2 h-2" />
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium">Nuevos</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-3xl font-bold text-info">
+                      {advancedStats.antiguedadCompleta.retencion.colaboradoresNuevos}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">&lt;6 meses</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium">Estables</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-3xl font-bold text-success">
+                      {advancedStats.antiguedadCompleta.retencion.colaboradoresEstables}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">≥12 meses</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium">Veteranos</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-3xl font-bold text-accent">
+                      {advancedStats.antiguedadCompleta.retencion.colaboradoresVeteranos}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">≥36 meses</p>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {/* Distribución de Antigüedad por Área */}
+            {advancedStats?.antiguedadCompleta?.distribucionPorArea && advancedStats.antiguedadCompleta.distribucionPorArea.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Distribución de Antigüedad por Área</CardTitle>
+                  <CardDescription>
+                    Análisis detallado de antigüedad por área organizacional
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Área</TableHead>
+                        <TableHead>Total</TableHead>
+                        <TableHead>Promedio (meses)</TableHead>
+                        <TableHead>0-3m</TableHead>
+                        <TableHead>3-6m</TableHead>
+                        <TableHead>6-12m</TableHead>
+                        <TableHead>1-3a</TableHead>
+                        <TableHead>3-5a</TableHead>
+                        <TableHead>5+a</TableHead>
+                        <TableHead>Tasa Retención</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {advancedStats.antiguedadCompleta.distribucionPorArea.map((area: any, idx: number) => (
+                        <TableRow key={idx}>
+                          <TableCell className="font-medium">{area.area}</TableCell>
+                          <TableCell>{area.totalColaboradores}</TableCell>
+                          <TableCell>{Math.round(area.promedioAntiguedad)}</TableCell>
+                          <TableCell>{area.rango0_3}</TableCell>
+                          <TableCell>{area.rango3_6}</TableCell>
+                          <TableCell>{area.rango6_12}</TableCell>
+                          <TableCell>{area.rango1_3}</TableCell>
+                          <TableCell>{area.rango3_5}</TableCell>
+                          <TableCell>{area.rango5_plus}</TableCell>
+                          <TableCell>
+                            <Badge variant={area.tasaRetencion >= 70 ? "default" : area.tasaRetencion >= 50 ? "secondary" : "destructive"}>
+                              {area.tasaRetencion}%
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Distribución de Antigüedad por Nivel */}
+            {advancedStats?.antiguedadCompleta?.distribucionPorNivel && advancedStats.antiguedadCompleta.distribucionPorNivel.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Distribución de Antigüedad por Nivel</CardTitle>
+                  <CardDescription>
+                    Análisis de antigüedad por nivel organizacional
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={advancedStats.antiguedadCompleta.distribucionPorNivel.map((nivel: any) => ({
+                      nivel: nivel.nivel,
+                      promedio: Math.round(nivel.promedioAntiguedad),
+                      rango0_3: nivel.rango0_3,
+                      rango3_6: nivel.rango3_6,
+                      rango6_12: nivel.rango6_12,
+                      rango1_3: nivel.rango1_3,
+                      rango3_5: nivel.rango3_5,
+                      rango5_plus: nivel.rango5_plus,
+                    }))}>
+                      <XAxis dataKey="nivel" />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Bar dataKey="rango0_3" stackId="a" fill="#ff6b6b" name="0-3 meses" />
+                      <Bar dataKey="rango3_6" stackId="a" fill="#ffd93d" name="3-6 meses" />
+                      <Bar dataKey="rango6_12" stackId="a" fill="#6bcf7f" name="6-12 meses" />
+                      <Bar dataKey="rango1_3" stackId="a" fill="#4d96ff" name="1-3 años" />
+                      <Bar dataKey="rango3_5" stackId="a" fill="#9b59b6" name="3-5 años" />
+                      <Bar dataKey="rango5_plus" stackId="a" fill="#34495e" name="5+ años" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           <TabsContent value="genero" className="space-y-6">
@@ -904,6 +1074,210 @@ const DashboardRRHH = () => {
                     </ResponsiveContainer>
                   </CardContent>
                 </Card>
+
+                {/* Índices de Equidad */}
+                {advancedStats?.equidadCompleta?.indicesEquidad && (
+                  <div className="grid gap-6 md:grid-cols-3">
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-medium">Índice de Paridad General</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-3xl font-bold text-primary">
+                          {Math.round(advancedStats.equidadCompleta.indicesEquidad.indiceParidadGeneral)}%
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Balance de género en la organización
+                        </p>
+                        <Progress value={advancedStats.equidadCompleta.indicesEquidad.indiceParidadGeneral} className="mt-2 h-2" />
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-medium">Distribución General</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span>Masculino:</span>
+                            <span className="font-semibold">
+                              {advancedStats.equidadCompleta.indicesEquidad.distribucionGeneral.porcentajeMasculino}%
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span>Femenino:</span>
+                            <span className="font-semibold">
+                              {advancedStats.equidadCompleta.indicesEquidad.distribucionGeneral.porcentajeFemenino}%
+                            </span>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-medium">Brecha de Desempeño</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-3xl font-bold text-warning">
+                          {Math.abs(Math.round(advancedStats.equidadCompleta.brechasDesempeno?.brechaDesempeno || 0))}%
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {advancedStats.equidadCompleta.brechasDesempeno?.brechaDesempeno > 0 
+                            ? 'A favor masculino' 
+                            : advancedStats.equidadCompleta.brechasDesempeno?.brechaDesempeno < 0 
+                            ? 'A favor femenino' 
+                            : 'Equilibrado'}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
+
+                {/* Liderazgo por Género */}
+                {advancedStats?.equidadCompleta?.liderazgoPorGenero && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Liderazgo por Género</CardTitle>
+                      <CardDescription>
+                        Distribución de jefes y líderes por género
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid gap-4 md:grid-cols-4 mb-4">
+                        <div className="p-4 rounded-lg border">
+                          <p className="text-sm text-muted-foreground mb-1">Total Jefes</p>
+                          <p className="text-2xl font-bold">{advancedStats.equidadCompleta.liderazgoPorGenero.totalJefes}</p>
+                        </div>
+                        <div className="p-4 rounded-lg border">
+                          <p className="text-sm text-muted-foreground mb-1">Masculino</p>
+                          <p className="text-2xl font-bold text-primary">
+                            {advancedStats.equidadCompleta.liderazgoPorGenero.jefesMasculino}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {advancedStats.equidadCompleta.liderazgoPorGenero.porcentajeJefesMasculino}%
+                          </p>
+                        </div>
+                        <div className="p-4 rounded-lg border">
+                          <p className="text-sm text-muted-foreground mb-1">Femenino</p>
+                          <p className="text-2xl font-bold text-accent">
+                            {advancedStats.equidadCompleta.liderazgoPorGenero.jefesFemenino}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {advancedStats.equidadCompleta.liderazgoPorGenero.porcentajeJefesFemenino}%
+                          </p>
+                        </div>
+                        <div className="p-4 rounded-lg border">
+                          <p className="text-sm text-muted-foreground mb-1">Índice Paridad Liderazgo</p>
+                          <p className="text-2xl font-bold text-success">
+                            {Math.round(advancedStats.equidadCompleta.liderazgoPorGenero.indiceParidadLiderazgo)}%
+                          </p>
+                        </div>
+                      </div>
+                      <ResponsiveContainer width="100%" height={200}>
+                        <BarChart data={[
+                          {
+                            categoria: 'Liderazgo',
+                            masculino: advancedStats.equidadCompleta.liderazgoPorGenero.jefesMasculino,
+                            femenino: advancedStats.equidadCompleta.liderazgoPorGenero.jefesFemenino,
+                          }
+                        ]}>
+                          <XAxis dataKey="categoria" />
+                          <YAxis />
+                          <Tooltip />
+                          <Legend />
+                          <Bar dataKey="masculino" fill="#8884d8" name="Masculino" />
+                          <Bar dataKey="femenino" fill="#82ca9d" name="Femenino" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Distribución por Género en Áreas */}
+                {advancedStats?.equidadCompleta?.distribucionPorArea && advancedStats.equidadCompleta.distribucionPorArea.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Distribución por Género en Áreas</CardTitle>
+                      <CardDescription>
+                        Análisis de equidad de género por área organizacional
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Área</TableHead>
+                            <TableHead>Total</TableHead>
+                            <TableHead>Masculino</TableHead>
+                            <TableHead>Femenino</TableHead>
+                            <TableHead>% M</TableHead>
+                            <TableHead>% F</TableHead>
+                            <TableHead>Índice Paridad</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {advancedStats.equidadCompleta.distribucionPorArea.map((area: any, idx: number) => (
+                            <TableRow key={idx}>
+                              <TableCell className="font-medium">{area.area}</TableCell>
+                              <TableCell>{area.totalColaboradores}</TableCell>
+                              <TableCell>{area.masculino}</TableCell>
+                              <TableCell>{area.femenino}</TableCell>
+                              <TableCell>{area.porcentajeMasculino}%</TableCell>
+                              <TableCell>{area.porcentajeFemenino}%</TableCell>
+                              <TableCell>
+                                <Badge variant={area.indiceParidad >= 80 ? "default" : area.indiceParidad >= 60 ? "secondary" : "destructive"}>
+                                  {area.indiceParidad}%
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Desempeño por Género y Área */}
+                {advancedStats?.equidadCompleta?.desempenoPorGeneroArea && advancedStats.equidadCompleta.desempenoPorGeneroArea.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Desempeño por Género y Área</CardTitle>
+                      <CardDescription>
+                        Comparación de desempeño entre géneros por área
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <ResponsiveContainer width="100%" height={400}>
+                        <BarChart 
+                          data={advancedStats.equidadCompleta.desempenoPorGeneroArea
+                            .filter((d: any) => d.promedioDesempeno != null)
+                            .reduce((acc: any[], item: any) => {
+                              const existing = acc.find(a => a.area === item.area);
+                              if (existing) {
+                                existing[item.genero] = Math.round(item.promedioDesempeno || 0);
+                              } else {
+                                acc.push({
+                                  area: item.area,
+                                  [item.genero]: Math.round(item.promedioDesempeno || 0)
+                                });
+                              }
+                              return acc;
+                            }, [])}
+                          layout="vertical"
+                        >
+                          <XAxis type="number" />
+                          <YAxis dataKey="area" type="category" width={150} />
+                          <Tooltip />
+                          <Legend />
+                          <Bar dataKey="masculino" fill="#8884d8" name="Masculino" />
+                          <Bar dataKey="femenino" fill="#82ca9d" name="Femenino" />
+                          <Bar dataKey="otro" fill="#ffc658" name="Otro" />
+                          <Bar dataKey="no_especificado" fill="#ff7300" name="No especificado" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+                )}
               </>
             )}
           </TabsContent>
@@ -1253,6 +1627,60 @@ const DashboardRRHH = () => {
           </TabsContent>
         </Tabs>
 
+        {/* Resumen de Seguimiento */}
+        {resumenSeguimiento && (
+          <div className="grid gap-6 mb-6 md:grid-cols-2 lg:grid-cols-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium">Jefes Completados</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold text-success">{resumenSeguimiento.jefesCompletados}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  de {resumenSeguimiento.totalJefes} jefes
+                </p>
+                <Progress 
+                  value={resumenSeguimiento.totalJefes > 0 ? (resumenSeguimiento.jefesCompletados / resumenSeguimiento.totalJefes) * 100 : 0} 
+                  className="mt-2 h-2" 
+                />
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium">Jefes en Progreso</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold text-info">{resumenSeguimiento.jefesEnProgreso}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Requieren seguimiento
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium">Jefes Pendientes</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold text-warning">{resumenSeguimiento.jefesPendientes}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Sin iniciar evaluaciones
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium">Con Retraso</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold text-destructive">{resumenSeguimiento.jefesConRetraso}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  &gt;7 días sin actividad
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
         {/* Lista de Pendientes */}
         <Card>
           <CardHeader>
@@ -1262,24 +1690,120 @@ const DashboardRRHH = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Jefe Evaluador</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead>Colaboradores Pendientes</TableHead>
-                  <TableHead>Última Actividad</TableHead>
-                  <TableHead>Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground">
-                    Funcionalidad en desarrollo - Se mostrará lista de jefes con evaluaciones pendientes
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
+            {seguimientoData.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <CheckCircle2 className="h-12 w-12 mx-auto mb-4 text-success opacity-50" />
+                <p>No hay jefes con evaluaciones pendientes</p>
+                <p className="text-sm mt-2">Todas las evaluaciones están completadas</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Jefe Evaluador</TableHead>
+                    <TableHead>Área</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead>Completadas</TableHead>
+                    <TableHead>En Progreso</TableHead>
+                    <TableHead>Pendientes</TableHead>
+                    <TableHead>Última Actividad</TableHead>
+                    <TableHead>Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {seguimientoData.map((jefe: any) => (
+                    <TableRow key={jefe.jefeId}>
+                      <TableCell className="font-medium">
+                        <div>
+                          <p>{jefe.jefeNombre}</p>
+                          <p className="text-xs text-muted-foreground">{jefe.jefeCargo}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell>{jefe.jefeArea}</TableCell>
+                      <TableCell>
+                        <Badge 
+                          variant={
+                            jefe.estadoGeneral === 'completado' ? 'default' :
+                            jefe.estadoGeneral === 'en_progreso' ? 'secondary' :
+                            jefe.diasSinActividad > 7 ? 'destructive' : 'outline'
+                          }
+                        >
+                          {jefe.estadoGeneral === 'completado' && <CheckCircle2 className="mr-1 h-3 w-3" />}
+                          {jefe.estadoGeneral === 'en_progreso' && <Clock className="mr-1 h-3 w-3" />}
+                          {jefe.estadoGeneral === 'pendiente' && <AlertCircle className="mr-1 h-3 w-3" />}
+                          {jefe.estadoGeneral === 'completado' ? 'Completado' :
+                           jefe.estadoGeneral === 'en_progreso' ? 'En Progreso' :
+                           jefe.diasSinActividad > 7 ? 'Con Retraso' : 'Pendiente'}
+                        </Badge>
+                        {jefe.diasSinActividad > 0 && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {jefe.diasSinActividad} días sin actividad
+                          </p>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-success">{jefe.evaluacionesCompletadas}</span>
+                          <span className="text-xs text-muted-foreground">
+                            ({Math.round(jefe.porcentajeCompletitud)}%)
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <span className="font-semibold text-info">{jefe.evaluacionesEnProgreso}</span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="font-semibold text-warning">{jefe.evaluacionesPendientes}</span>
+                      </TableCell>
+                      <TableCell>
+                        {jefe.ultimaActividad ? (
+                          <div>
+                            <p className="text-sm">
+                              {format(new Date(jefe.ultimaActividad), "dd/MM/yyyy", { locale: es })}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {format(new Date(jefe.ultimaActividad), "HH:mm", { locale: es })}
+                            </p>
+                          </div>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">Sin actividad</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              // Navegar a vista de detalles del jefe
+                              const periodo = activePeriodId || periodoId;
+                              navigate(`/admin/evaluaciones/jefe/${jefe.jefeId}?periodo=${periodo}`);
+                            }}
+                          >
+                            <FileText className="h-4 w-4 mr-1" />
+                            Ver Detalles
+                          </Button>
+                          {jefe.jefeCorreo && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                // Enviar recordatorio por correo
+                                window.location.href = `mailto:${jefe.jefeCorreo}?subject=Recordatorio: Evaluaciones Pendientes&body=Estimado/a ${jefe.jefeNombre},%0D%0A%0D%0ATiene ${jefe.evaluacionesPendientes} evaluaciones pendientes y ${jefe.evaluacionesEnProgreso} en progreso.%0D%0A%0D%0APor favor complete las evaluaciones pendientes.`;
+                                toast.info("Abriendo cliente de correo para enviar recordatorio");
+                              }}
+                            >
+                              <AlertCircle className="h-4 w-4 mr-1" />
+                              Recordatorio
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
       </main>
