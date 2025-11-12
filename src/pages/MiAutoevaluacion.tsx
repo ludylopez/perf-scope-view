@@ -31,6 +31,7 @@ import { ArrowLeft, CheckCircle2, FileDown, Sparkles, TrendingUp, Target, Award,
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import {
   RadarChart,
   PolarGrid,
@@ -38,7 +39,8 @@ import {
   PolarRadiusAxis,
   Radar,
   ResponsiveContainer,
-  Tooltip
+  Tooltip,
+  Legend
 } from "recharts";
 
 // Helper para obtener el ícono de cada dimensión
@@ -196,6 +198,7 @@ const MiAutoevaluacion = () => {
   const [evaluation, setEvaluation] = useState<any>(null);
   const [currentDimension, setCurrentDimension] = useState(0);
   const [expandedDimensions, setExpandedDimensions] = useState<Record<number, boolean>>({});
+  const [promedioMunicipal, setPromedioMunicipal] = useState<Record<string, number>>({});
 
   const toggleDimension = (idx: number) => {
     setExpandedDimensions(prev => ({
@@ -226,6 +229,40 @@ const MiAutoevaluacion = () => {
       }
 
       setEvaluation(submitted);
+
+      // Calcular promedio municipal
+      try {
+        const { data: allEvaluations } = await supabase
+          .from('evaluations')
+          .select('responses')
+          .eq('periodo_id', activePeriodId)
+          .eq('tipo_evaluacion', 'autoevaluacion')
+          .eq('enviada', true);
+
+        if (allEvaluations && allEvaluations.length > 0) {
+          // Calcular promedio por dimensión
+          const promedios: Record<string, number> = {};
+          
+          userInstrument.dimensionesDesempeno.forEach((dim) => {
+            let sumaPorcentajes = 0;
+            let contador = 0;
+
+            allEvaluations.forEach((evaluacion) => {
+              const porcentaje = calculateDimensionPercentage(evaluacion.responses || {}, dim);
+              if (porcentaje > 0) {
+                sumaPorcentajes += porcentaje;
+                contador++;
+              }
+            });
+
+            promedios[dim.id] = contador > 0 ? Math.round(sumaPorcentajes / contador) : 0;
+          });
+
+          setPromedioMunicipal(promedios);
+        }
+      } catch (error) {
+        console.error('Error calculando promedio municipal:', error);
+      }
     };
 
     loadData();
@@ -254,16 +291,17 @@ const MiAutoevaluacion = () => {
 
   // Preparar datos para el gráfico de radar
   const radarData = dimensions.map((dim, idx) => ({
-    dimension: dim.nombre.length > 25 ? dim.nombre.substring(0, 25) + "..." : dim.nombre,
+    dimension: getDimensionFriendlyTitle(dim), // Usar título simplificado
     nombreCompleto: dim.nombre,
     numero: idx + 1,
-    porcentaje: calculateDimensionPercentage(evaluation.responses, dim),
+    tuEvaluacion: calculateDimensionPercentage(evaluation.responses, dim),
+    promedioMunicipal: promedioMunicipal[dim.id] || 0,
     puntaje: calculateDimensionAverage(evaluation.responses, dim),
     dimensionData: dim // Incluir toda la dimensión
   }));
 
   // Identificar fortalezas (top 3) y áreas de mejora (bottom 3)
-  const sortedDimensions = [...radarData].sort((a, b) => b.porcentaje - a.porcentaje);
+  const sortedDimensions = [...radarData].sort((a, b) => b.tuEvaluacion - a.tuEvaluacion);
   const fortalezas = sortedDimensions.slice(0, 3);
   const areasDeOportunidad = sortedDimensions.slice(-3).reverse();
 
@@ -365,7 +403,7 @@ const MiAutoevaluacion = () => {
                         {getDimensionFriendlyTitle(fortalezas[0].dimensionData)}
                       </h4>
                       <p className="text-sm text-muted-foreground">
-                        {getDimensionFriendlyDescription(fortalezas[0].dimensionData, fortalezas[0].porcentaje)}
+                        {getDimensionFriendlyDescription(fortalezas[0].dimensionData, fortalezas[0].tuEvaluacion)}
                       </p>
                     </div>
                   </div>
@@ -383,7 +421,7 @@ const MiAutoevaluacion = () => {
                       </h4>
                       <p className="text-sm text-muted-foreground">
                         <strong>{getDimensionFriendlyTitle(areasDeOportunidad[0].dimensionData)}:</strong>{" "}
-                        {getDimensionFriendlyDescription(areasDeOportunidad[0].dimensionData, areasDeOportunidad[0].porcentaje)}
+                        {getDimensionFriendlyDescription(areasDeOportunidad[0].dimensionData, areasDeOportunidad[0].tuEvaluacion)}
                       </p>
                     </div>
                   </div>
@@ -397,50 +435,108 @@ const MiAutoevaluacion = () => {
 
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle>Resultados por Áreas Evaluadas</CardTitle>
+            <CardTitle>Panorama de Competencias</CardTitle>
             <CardDescription>
-              Cada área representa aspectos clave de tu trabajo. Haz clic en cada tarjeta para ver más detalles.
+              Vista integral de tu desempeño por dimensión comparado con el promedio municipal
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-[400px] w-full">
+            <div className="h-[500px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <RadarChart data={radarData}>
-                  <PolarGrid stroke="hsl(var(--border))" />
+                  <defs>
+                    <linearGradient id="colorTuEval" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
+                    </linearGradient>
+                  </defs>
+                  <PolarGrid 
+                    stroke="hsl(var(--border))" 
+                    strokeWidth={1}
+                  />
                   <PolarAngleAxis 
                     dataKey="dimension" 
-                    tick={{ fill: 'hsl(var(--foreground))', fontSize: 11 }}
+                    tick={{ 
+                      fill: 'hsl(var(--foreground))', 
+                      fontSize: 13,
+                      fontWeight: 500
+                    }}
                   />
                   <PolarRadiusAxis 
                     angle={90} 
                     domain={[0, 100]} 
-                    tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
+                    tickCount={6}
                   />
+                  
+                  {/* Promedio Municipal - Segunda línea */}
+                  {Object.keys(promedioMunicipal).length > 0 && (
+                    <Radar
+                      name="Promedio Municipal"
+                      dataKey="promedioMunicipal"
+                      stroke="hsl(var(--muted-foreground))"
+                      fill="hsl(var(--muted))"
+                      fillOpacity={0.15}
+                      strokeWidth={2}
+                      strokeDasharray="5 5"
+                    />
+                  )}
+                  
+                  {/* Tu Evaluación - Primera línea */}
                   <Radar
-                    name="Porcentaje"
-                    dataKey="porcentaje"
+                    name="Tu Evaluación"
+                    dataKey="tuEvaluacion"
                     stroke="hsl(var(--primary))"
-                    fill="hsl(var(--primary))"
-                    fillOpacity={0.3}
+                    fill="url(#colorTuEval)"
+                    fillOpacity={0.4}
+                    strokeWidth={3}
                   />
+                  
                   <Tooltip 
                     content={({ active, payload }) => {
                       if (active && payload && payload.length) {
                         const data = payload[0].payload;
                         return (
-                          <div className="bg-popover border border-border rounded-lg p-3 shadow-lg max-w-xs">
-                            <p className="font-semibold text-sm mb-1">{data.nombreCompleto}</p>
-                            <p className="text-xs text-muted-foreground">
-                              Puntaje: {data.puntaje.toFixed(2)}/5.0
-                            </p>
-                            <p className="text-sm font-medium text-primary">
-                              {data.porcentaje}%
-                            </p>
+                          <div className="bg-popover border-2 border-primary/20 rounded-lg p-4 shadow-xl">
+                            <p className="font-bold text-base mb-2 text-foreground">{data.dimension}</p>
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between gap-4">
+                                <span className="text-sm text-muted-foreground">Tu evaluación:</span>
+                                <span className="text-sm font-bold text-primary">{data.tuEvaluacion}%</span>
+                              </div>
+                              {data.promedioMunicipal > 0 && (
+                                <div className="flex items-center justify-between gap-4">
+                                  <span className="text-sm text-muted-foreground">Promedio municipal:</span>
+                                  <span className="text-sm font-semibold text-muted-foreground">{data.promedioMunicipal}%</span>
+                                </div>
+                              )}
+                              <div className="pt-2 mt-2 border-t border-border">
+                                <span className="text-xs text-muted-foreground">
+                                  Puntaje Likert: {data.puntaje.toFixed(1)}/5.0
+                                </span>
+                              </div>
+                            </div>
                           </div>
                         );
                       }
                       return null;
                     }}
+                  />
+                  
+                  <Legend 
+                    wrapperStyle={{
+                      paddingTop: '20px'
+                    }}
+                    iconType="circle"
+                    formatter={(value) => (
+                      <span style={{ 
+                        color: 'hsl(var(--foreground))', 
+                        fontSize: '14px',
+                        fontWeight: 500
+                      }}>
+                        {value}
+                      </span>
+                    )}
                   />
                 </RadarChart>
               </ResponsiveContainer>
@@ -449,7 +545,7 @@ const MiAutoevaluacion = () => {
               {radarData.map((data, idx) => {
                 const Icon = getDimensionIcon(data.dimensionData.id);
                 const colorClasses = getDimensionColor(data.dimensionData.id);
-                const interpretation = getScoreInterpretation(data.porcentaje);
+                const interpretation = getScoreInterpretation(data.tuEvaluacion);
                 const isExpanded = expandedDimensions[idx];
                 const examples = getDimensionExamples(data.dimensionData.id);
 
@@ -487,7 +583,7 @@ const MiAutoevaluacion = () => {
                       {/* Puntaje y chevron */}
                       <div className="flex items-center gap-3">
                         <div className="text-right">
-                          <p className="text-2xl font-bold text-primary">{data.porcentaje}%</p>
+                          <p className="text-2xl font-bold text-primary">{data.tuEvaluacion}%</p>
                           <p className="text-xs text-muted-foreground">{data.puntaje.toFixed(1)}/5.0</p>
                         </div>
                         {isExpanded ? (
@@ -569,10 +665,10 @@ const MiAutoevaluacion = () => {
                         <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
                           <div 
                             className="h-full bg-success transition-all" 
-                            style={{ width: `${dim.porcentaje}%` }}
+                            style={{ width: `${dim.tuEvaluacion}%` }}
                           />
                         </div>
-                        <span className="text-sm font-bold text-success">{dim.porcentaje}%</span>
+                        <span className="text-sm font-bold text-success">{dim.tuEvaluacion}%</span>
                       </div>
                     </div>
                   </div>
@@ -607,10 +703,10 @@ const MiAutoevaluacion = () => {
                         <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
                           <div 
                             className="h-full bg-warning transition-all" 
-                            style={{ width: `${dim.porcentaje}%` }}
+                            style={{ width: `${dim.tuEvaluacion}%` }}
                           />
                         </div>
-                        <span className="text-sm font-bold text-warning">{dim.porcentaje}%</span>
+                        <span className="text-sm font-bold text-warning">{dim.tuEvaluacion}%</span>
                       </div>
                     </div>
                   </div>
