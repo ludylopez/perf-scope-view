@@ -342,13 +342,19 @@ export const saveEvaluationToSupabase = async (draft: EvaluationDraft): Promise<
     }
     
     // Buscar si ya existe
-    const { data: existing, error: existingError } = await supabase
+    // Para evaluaciones de tipo 'jefe', también necesitamos filtrar por evaluador_id
+    let query = supabase
       .from('evaluations')
       .select('id')
       .eq('usuario_id', draft.usuarioId)
       .eq('periodo_id', draft.periodoId)
-      .eq('tipo', draft.tipo)
-      .maybeSingle();
+      .eq('tipo', draft.tipo);
+    
+    if (draft.tipo === 'jefe' && draft.evaluadorId) {
+      query = query.eq('evaluador_id', draft.evaluadorId);
+    }
+    
+    const { data: existing, error: existingError } = await query.maybeSingle();
     
     if (existingError) {
       console.error('[Supabase] ❌ Error buscando evaluación existente', {
@@ -373,7 +379,17 @@ export const saveEvaluationToSupabase = async (draft: EvaluationDraft): Promise<
         .select('id')
         .single();
       
-      if (error) return null;
+      if (error) {
+        console.error('[Supabase] ❌ Error actualizando evaluación', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+          payload: evaluationData,
+          evaluationId: existing.id,
+        });
+        return null;
+      }
       return data.id;
     } else {
       const { data, error } = await supabase
@@ -382,7 +398,16 @@ export const saveEvaluationToSupabase = async (draft: EvaluationDraft): Promise<
         .select('id')
         .single();
       
-      if (error) return null;
+      if (error) {
+        console.error('[Supabase] ❌ Error insertando evaluación', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+          payload: evaluationData,
+        });
+        return null;
+      }
       return data.id;
     }
   } catch {
