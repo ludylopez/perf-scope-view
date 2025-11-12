@@ -45,20 +45,36 @@ export const GenerarPlanDesarrollo = ({
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error from Supabase function:", error);
+        // Intentar extraer el mensaje de error del response
+        const errorMessage = error.message || error.toString() || "Error desconocido";
+        throw new Error(errorMessage);
+      }
 
-      if (data.success && data.plan) {
+      if (data && !data.success) {
+        console.error("Error from function response:", data);
+        throw new Error(data.error || "Error generando plan");
+      }
+
+      if (data?.success && data.plan) {
         setPlan(data.plan);
         setEditedFeedback(data.plan.feedback_individual || "");
         setEditedFeedbackGrupal(data.plan.feedback_grupal || "");
         setShowModal(true);
         toast.success("Plan de desarrollo generado exitosamente");
       } else {
-        throw new Error(data.error || "Error generando plan");
+        throw new Error(data?.error || "Error generando plan: respuesta inválida");
       }
     } catch (error: any) {
       console.error("Error generating plan:", error);
-      toast.error(`Error al generar plan: ${error.message}`);
+      const errorMessage = error?.message || error?.toString() || "Error desconocido al generar plan";
+      console.error("Error details:", {
+        message: errorMessage,
+        error: error,
+        data: error?.response?.data,
+      });
+      toast.error(`Error al generar plan: ${errorMessage}`);
     } finally {
       setLoading(false);
     }

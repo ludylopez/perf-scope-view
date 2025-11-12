@@ -328,27 +328,68 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     const grupos = gruposData?.map((g: any) => ({ nombre: g.groups?.nombre, tipo: g.groups?.tipo })) || [];
 
+    // Validar que instrumentConfig tenga la estructura esperada
+    if (!instrumentConfig.dimensionesDesempeno || !Array.isArray(instrumentConfig.dimensionesDesempeno)) {
+      console.error("instrumentConfig no tiene dimensionesDesempeno válidas:", instrumentConfig);
+      return new Response(
+        JSON.stringify({ success: false, error: "Configuración de instrumento inválida: falta dimensionesDesempeno" }),
+        { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
+      );
+    }
+
     // Calcular resultado final
     const calcularPromedioDesempeno = (responses: any, dimensions: any) => {
+      if (!responses || !dimensions || !Array.isArray(dimensions)) {
+        console.error("Error en calcularPromedioDesempeno:", { responses, dimensions });
+        return 0;
+      }
       let total = 0;
       dimensions.forEach((dim: any) => {
-        const items = dim.items.map((item: any) => responses[item.id] || 0);
+        if (!dim.items || !Array.isArray(dim.items)) {
+          console.warn("Dimensión sin items válidos:", dim);
+          return;
+        }
+        const items = dim.items.map((item: any) => {
+          const value = responses?.[item.id];
+          return typeof value === 'number' ? value : 0;
+        });
+        if (items.length === 0) {
+          console.warn("Dimensión sin items:", dim);
+          return;
+        }
         const avg = items.reduce((a: number, b: number) => a + b, 0) / items.length;
-        total += avg * dim.peso;
+        total += avg * (dim.peso || 0);
       });
       return total;
     };
 
     const calcularPromedioPotencial = (responses: any, dimensions: any) => {
-      if (!responses || !dimensions) return null;
+      if (!responses || !dimensions || !Array.isArray(dimensions)) return null;
       let total = 0;
       dimensions.forEach((dim: any) => {
-        const items = dim.items.map((item: any) => responses[item.id] || 0);
+        if (!dim.items || !Array.isArray(dim.items)) {
+          console.warn("Dimensión de potencial sin items válidos:", dim);
+          return;
+        }
+        const items = dim.items.map((item: any) => {
+          const value = responses?.[item.id];
+          return typeof value === 'number' ? value : 0;
+        });
+        if (items.length === 0) {
+          console.warn("Dimensión de potencial sin items:", dim);
+          return;
+        }
         const avg = items.reduce((a: number, b: number) => a + b, 0) / items.length;
-        total += avg * dim.peso;
+        total += avg * (dim.peso || 0);
       });
       return total;
     };
+
+    console.log("Calculando desempeño con:", {
+      autoResponses: autoevaluacion.responses,
+      jefeResponses: evaluacionJefe.responses,
+      dimensionsCount: instrumentConfig.dimensionesDesempeno?.length,
+    });
 
     const desempenoAuto = calcularPromedioDesempeno(autoevaluacion.responses, instrumentConfig.dimensionesDesempeno);
     const desempenoJefe = calcularPromedioDesempeno(evaluacionJefe.responses, instrumentConfig.dimensionesDesempeno);
