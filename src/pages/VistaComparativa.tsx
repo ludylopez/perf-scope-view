@@ -18,6 +18,7 @@ import { scoreToPercentage } from "@/lib/calculations";
 import { perteneceACuadrilla, getGruposDelColaborador, getEquipoStats } from "@/lib/jerarquias";
 import { supabase } from "@/integrations/supabase/client";
 import { getActivePeriod } from "@/lib/supabase";
+import { getFinalResultFromSupabase } from "@/lib/finalResultSupabase";
 import { GenerarPlanDesarrollo } from "@/components/development/GenerarPlanDesarrollo";
 import { GenerarGuiaRetroalimentacion } from "@/components/development/GuiaRetroalimentacion";
 
@@ -170,13 +171,23 @@ const VistaComparativa = () => {
         setAutoevaluacion(auto);
         setEvaluacionJefe(jefe);
 
-        // Calcular resultado final y comparativo (usar userInstrument directamente, no el estado)
-        const resultado = calculateCompleteFinalScore(
-          auto,
-          jefe,
-          userInstrument.dimensionesDesempeno,
-          userInstrument.dimensionesPotencial
-        );
+        // Intentar cargar resultado final desde Supabase primero (calculado por trigger)
+        let resultado = await getFinalResultFromSupabase(colaboradorFormatted.dpi, currentPeriodoId);
+        
+        // Si no existe en Supabase, calcularlo localmente
+        if (!resultado) {
+          console.log('📊 Resultado final no encontrado en Supabase, calculando localmente...');
+          // IMPORTANTE: calculateCompleteFinalScore es async, necesitamos await
+          resultado = await calculateCompleteFinalScore(
+            auto,
+            jefe,
+            userInstrument.dimensionesDesempeno,
+            userInstrument.dimensionesPotencial
+          );
+        } else {
+          console.log('✅ Resultado final cargado desde Supabase:', resultado);
+        }
+        
         setResultadoFinal(resultado);
 
         // Calcular comparativo por dimensión
