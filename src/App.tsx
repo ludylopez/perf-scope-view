@@ -9,6 +9,7 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Autoevaluacion from "./pages/Autoevaluacion";
 import MiAutoevaluacion from "./pages/MiAutoevaluacion";
+import MisRespuestasDetalle from "./pages/MisRespuestasDetalle";
 import EvaluacionEquipo from "./pages/EvaluacionEquipo";
 import EvaluacionColaborador from "./pages/EvaluacionColaborador";
 import VistaComparativa from "./pages/VistaComparativa";
@@ -82,6 +83,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <MiAutoevaluacion />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/mis-respuestas-detalle"
+              element={
+                <ProtectedRoute>
+                  <MisRespuestasDetalle />
                 </ProtectedRoute>
               }
             />
