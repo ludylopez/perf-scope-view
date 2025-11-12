@@ -349,7 +349,7 @@ export const saveEvaluationToSupabase = async (draft: EvaluationDraft): Promise<
       .eq('periodo_id', draft.periodoId)
       .eq('tipo', draft.tipo)
       .maybeSingle();
-
+    
     if (existingError) {
       console.error('[Supabase] ❌ Error buscando evaluación existente', {
         message: existingError.message,
@@ -362,6 +362,7 @@ export const saveEvaluationToSupabase = async (draft: EvaluationDraft): Promise<
           tipo: draft.tipo,
         },
       });
+      return null;
     }
     
     if (existing) {
@@ -371,18 +372,8 @@ export const saveEvaluationToSupabase = async (draft: EvaluationDraft): Promise<
         .eq('id', existing.id)
         .select('id')
         .single();
-
-      if (error) {
-        console.error('[Supabase] ❌ Error actualizando evaluación', {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code,
-          payload: evaluationData,
-          id: existing.id,
-        });
-        return null;
-      }
+      
+      if (error) return null;
       return data.id;
     } else {
       const { data, error } = await supabase
@@ -390,21 +381,11 @@ export const saveEvaluationToSupabase = async (draft: EvaluationDraft): Promise<
         .insert(evaluationData)
         .select('id')
         .single();
-
-      if (error) {
-        console.error('[Supabase] ❌ Error insertando evaluación', {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code,
-          payload: evaluationData,
-        });
-        return null;
-      }
+      
+      if (error) return null;
       return data.id;
     }
-  } catch (err) {
-    console.error('[Supabase] ❌ Excepción guardando evaluación', err, draft);
+  } catch {
     return null;
   }
 };
@@ -462,4 +443,3 @@ export const getEvaluationFromSupabase = async (
     return null;
   }
 };
-
