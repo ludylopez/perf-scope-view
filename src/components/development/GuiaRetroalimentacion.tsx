@@ -39,28 +39,67 @@ export const GenerarGuiaRetroalimentacion = ({
   const generarGuia = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('generate-feedback-guide', {
-        body: {
+      // Usar fetch directamente para poder capturar el body del error
+      const { data: { session } } = await supabase.auth.getSession();
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://oxadpbdlpvwyapuondei.supabase.co";
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im94YWRwYmRscHZ3eWFwdW9uZGVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIzMjU5MzcsImV4cCI6MjA3NzkwMTkzN30.HjIoMaw20qx7DscE-XWCaz88EWa0Jv_aCDcMtv6eadw";
+      
+      const response = await fetch(`${supabaseUrl}/functions/v1/generate-feedback-guide`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token || supabaseKey}`,
+          'apikey': supabaseKey,
+        },
+        body: JSON.stringify({
           colaborador_id: colaboradorId,
           periodo_id: periodoId,
-        },
+        }),
       });
 
-      if (error) throw error;
+      let responseData;
+      try {
+        responseData = await response.json();
+      } catch (parseError) {
+        const text = await response.text();
+        console.error("Error parseando respuesta:", parseError, "Response text:", text);
+        throw new Error(`Error en la respuesta del servidor: ${text.substring(0, 200)}`);
+      }
 
-      if (data.success && data.guia) {
-        setGuia(data.guia);
-        setEditedPreparacion(data.guia.preparacion || "");
-        setEditedApertura(data.guia.apertura || "");
-        setEditedCierre(data.guia.cierre || "");
+      if (!response.ok) {
+        console.error("Error from function:", {
+          status: response.status,
+          statusText: response.statusText,
+          body: responseData,
+        });
+        const errorMessage = responseData?.error || responseData?.message || `Error ${response.status}: ${response.statusText}`;
+        throw new Error(errorMessage);
+      }
+
+      if (responseData && !responseData.success) {
+        console.error("Error from function response:", responseData);
+        throw new Error(responseData.error || "Error generando guía");
+      }
+
+      if (responseData?.success && responseData.guia) {
+        setGuia(responseData.guia);
+        setEditedPreparacion(responseData.guia.preparacion || "");
+        setEditedApertura(responseData.guia.apertura || "");
+        setEditedCierre(responseData.guia.cierre || "");
         setShowModal(true);
         toast.success("Guía de retroalimentación generada exitosamente");
       } else {
-        throw new Error(data.error || "Error generando guía");
+        throw new Error(responseData?.error || "Error generando guía: respuesta inválida");
       }
     } catch (error: any) {
       console.error("Error generating guide:", error);
-      toast.error(`Error al generar guía: ${error.message}`);
+      const errorMessage = error?.message || error?.toString() || "Error desconocido al generar guía";
+      console.error("Error details:", {
+        message: errorMessage,
+        error: error,
+        stack: error?.stack,
+      });
+      toast.error(`Error al generar guía: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
