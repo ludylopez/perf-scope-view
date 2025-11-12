@@ -716,58 +716,6 @@ const MiAutoevaluacion = () => {
           </Card>
         </div>
 
-        <div className="grid gap-6 mb-6 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Award className="h-5 w-5 text-primary" />
-                Logros Destacados del Periodo
-              </CardTitle>
-              <CardDescription>
-                Principales logros y resultados obtenidos
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="p-4 rounded-lg border border-dashed border-muted-foreground/30 bg-muted/30">
-                  <p className="text-sm text-muted-foreground text-center">
-                    No se han documentado logros para este periodo
-                  </p>
-                </div>
-                <Button variant="outline" className="w-full" disabled>
-                  <Lightbulb className="mr-2 h-4 w-4" />
-                  Agregar Logro
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Target className="h-5 w-5 text-primary" />
-                Plan de Desarrollo Individual
-              </CardTitle>
-              <CardDescription>
-                Objetivos y áreas de mejora para el próximo periodo
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="p-4 rounded-lg border border-dashed border-muted-foreground/30 bg-muted/30">
-                  <p className="text-sm text-muted-foreground text-center">
-                    No se han establecido objetivos para el siguiente periodo
-                  </p>
-                </div>
-                <Button variant="outline" className="w-full" disabled>
-                  <Target className="mr-2 h-4 w-4" />
-                  Establecer Objetivos
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
         <Card>
           <CardHeader>
             <CardTitle>Mis Respuestas por Dimensión</CardTitle>
