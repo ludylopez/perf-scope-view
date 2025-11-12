@@ -112,6 +112,81 @@ const getDimensionExamples = (dimensionId: string) => {
   return examples[dimensionId] || [];
 };
 
+// Helper para obtener descripción amigable de la dimensión
+const getDimensionFriendlyDescription = (dimension: any, percentage: number): string => {
+  const nombre = dimension.nombre.toLowerCase();
+  
+  // Analizar el contenido para generar descripciones contextuales
+  if (nombre.includes("técnica") || nombre.includes("competencia") || nombre.includes("conocimiento")) {
+    if (percentage >= 85) {
+      return `con ${percentage}%. Tus habilidades técnicas son tu diferenciador más fuerte.`;
+    } else if (percentage >= 70) {
+      return `con ${percentage}%. Tienes buenos conocimientos en tu área de trabajo.`;
+    } else {
+      return `con ${percentage}%. Hay oportunidad de fortalecer tus conocimientos técnicos.`;
+    }
+  }
+  
+  if (nombre.includes("comportamiento") || nombre.includes("actitud") || nombre.includes("valor")) {
+    if (percentage >= 70) {
+      return `con ${percentage}%. Tus valores y actitud son un buen soporte.`;
+    } else {
+      return `con ${percentage}%. Enfócate en alinear mejor con la cultura y valores.`;
+    }
+  }
+  
+  if (nombre.includes("liderazgo") || nombre.includes("dirección") || nombre.includes("gestión")) {
+    if (percentage >= 75) {
+      return `con ${percentage}%. Tu capacidad de liderazgo es notable.`;
+    } else {
+      return `con ${percentage}%. Puedes mejorar tus habilidades de gestión de equipo.`;
+    }
+  }
+  
+  if (nombre.includes("ciudadano") || nombre.includes("servicio") || nombre.includes("orientación")) {
+    if (percentage >= 70) {
+      return `con ${percentage}%. Tu compromiso con el servicio es evidente.`;
+    } else {
+      return `con ${percentage}%. Fortalece tu enfoque en las necesidades ciudadanas.`;
+    }
+  }
+  
+  // Default genérico
+  if (percentage >= 75) {
+    return `con ${percentage}%. Esta es una de tus áreas más fuertes.`;
+  } else {
+    return `con ${percentage}%. Aquí hay espacio para crecer y mejorar.`;
+  }
+};
+
+// Helper para obtener título amigable
+const getDimensionFriendlyTitle = (dimension: any): string => {
+  const nombre = dimension.nombre;
+  
+  // Simplificar nombres técnicos a algo más comprensible
+  if (nombre.toLowerCase().includes("competencias laborales") && nombre.toLowerCase().includes("técnica")) {
+    return "Tus Habilidades Técnicas";
+  }
+  if (nombre.toLowerCase().includes("comportamiento") && nombre.toLowerCase().includes("organizacional")) {
+    return "Tu Actitud y Valores";
+  }
+  if (nombre.toLowerCase().includes("liderazgo") || nombre.toLowerCase().includes("dirección")) {
+    return "Tu Liderazgo";
+  }
+  if (nombre.toLowerCase().includes("ciudadan") || nombre.toLowerCase().includes("servicio")) {
+    return "Tu Servicio al Ciudadano";
+  }
+  if (nombre.toLowerCase().includes("gestión") && nombre.toLowerCase().includes("resultado")) {
+    return "Tus Resultados";
+  }
+  if (nombre.toLowerCase().includes("transparencia") || nombre.toLowerCase().includes("ética")) {
+    return "Tu Ética y Transparencia";
+  }
+  
+  // Si no hay match, usar el nombre original pero más corto
+  return nombre.length > 40 ? nombre.substring(0, 40) + "..." : nombre;
+};
+
 const MiAutoevaluacion = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -286,12 +361,11 @@ const MiAutoevaluacion = () => {
                       <Award className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
                     </div>
                     <div className="flex-1">
-                      <h4 className="font-semibold text-sm mb-1 text-foreground">Tu Mayor Fortaleza</h4>
+                      <h4 className="font-semibold text-sm mb-1 text-foreground">
+                        {getDimensionFriendlyTitle(fortalezas[0].dimensionData)}
+                      </h4>
                       <p className="text-sm text-muted-foreground">
-                        <strong>{fortalezas[0].nombreCompleto}</strong> con {fortalezas[0].porcentaje}%. 
-                        {fortalezas[0].porcentaje >= 85 
-                          ? " Tus habilidades técnicas son tu diferenciador más fuerte." 
-                          : " Esta es tu área más destacada."}
+                        {getDimensionFriendlyDescription(fortalezas[0].dimensionData, fortalezas[0].porcentaje)}
                       </p>
                     </div>
                   </div>
@@ -304,27 +378,18 @@ const MiAutoevaluacion = () => {
                       <Lightbulb className="h-5 w-5 text-orange-600 dark:text-orange-400" />
                     </div>
                     <div className="flex-1">
-                      <h4 className="font-semibold text-sm mb-1 text-foreground">Área Prioritaria de Mejora</h4>
+                      <h4 className="font-semibold text-sm mb-1 text-foreground">
+                        Área para Fortalecer
+                      </h4>
                       <p className="text-sm text-muted-foreground">
-                        <strong>{areasDeOportunidad[0].nombreCompleto}</strong> con {areasDeOportunidad[0].porcentaje}%. 
-                        Enfócate en alinear mejor con la cultura y valores.
+                        <strong>{getDimensionFriendlyTitle(areasDeOportunidad[0].dimensionData)}:</strong>{" "}
+                        {getDimensionFriendlyDescription(areasDeOportunidad[0].dimensionData, areasDeOportunidad[0].porcentaje)}
                       </p>
                     </div>
                   </div>
                 )}
 
-                {/* Progreso vs. Periodo Anterior */}
-                <div className="flex items-start gap-3 p-4 rounded-lg bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800">
-                  <div className="flex-shrink-0 p-2 rounded-lg bg-purple-100 dark:bg-purple-900/30">
-                    <TrendingUp className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                  </div>
-                  <div className="flex-1">
-                    <h4 className="font-semibold text-sm mb-1 text-foreground">Progreso vs. Periodo Anterior</h4>
-                    <p className="text-sm text-muted-foreground">
-                      <strong>+5% de mejora</strong> respecto al último período. ¡Vas en la dirección correcta!
-                    </p>
-                  </div>
-                </div>
+                {/* Nota: Progreso vs. Periodo Anterior se mostrará solo cuando haya datos reales del período anterior */}
               </div>
             </div>
           </CardContent>
