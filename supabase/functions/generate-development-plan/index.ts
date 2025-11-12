@@ -253,14 +253,15 @@ Deno.serve(async (req: Request): Promise<Response> => {
       .single();
 
     if (colaboradorError || !colaborador) {
+      console.error("Error obteniendo colaborador:", colaboradorError);
       return new Response(
-        JSON.stringify({ success: false, error: "Colaborador no encontrado" }),
+        JSON.stringify({ success: false, error: `Colaborador no encontrado: ${colaboradorError?.message || "No encontrado"}` }),
         { status: 404, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
       );
     }
 
     // Obtener evaluaciones completas
-    const { data: autoevaluacion } = await supabase
+    const { data: autoevaluacion, error: autoError } = await supabase
       .from("evaluations")
       .select("*")
       .eq("usuario_id", colaborador_id)
@@ -269,7 +270,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       .eq("estado", "enviado")
       .single();
 
-    const { data: evaluacionJefe } = await supabase
+    const { data: evaluacionJefe, error: jefeError } = await supabase
       .from("evaluations")
       .select("*")
       .eq("colaborador_id", colaborador_id)
@@ -278,22 +279,42 @@ Deno.serve(async (req: Request): Promise<Response> => {
       .eq("estado", "enviado")
       .single();
 
-    if (!autoevaluacion || !evaluacionJefe) {
+    if (autoError || !autoevaluacion) {
+      console.error("Error obteniendo autoevaluación:", autoError);
       return new Response(
-        JSON.stringify({ success: false, error: "No se encontraron evaluaciones completas" }),
+        JSON.stringify({ success: false, error: `Autoevaluación no encontrada: ${autoError?.message || "No encontrada"}` }),
+        { status: 404, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
+      );
+    }
+
+    if (jefeError || !evaluacionJefe) {
+      console.error("Error obteniendo evaluación jefe:", jefeError);
+      return new Response(
+        JSON.stringify({ success: false, error: `Evaluación del jefe no encontrada: ${jefeError?.message || "No encontrada"}` }),
         { status: 404, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
       );
     }
 
     // Obtener instrumento
-    const instrumentId = colaborador.nivel || "A1";
-    const { data: instrumentConfig } = await supabase.rpc("get_instrument_config", {
+    const instrumentId = colaborador.nivel || colaborador.instrumento_id || "A1";
+    console.log(`Buscando instrumento con ID: ${instrumentId}`);
+    
+    const { data: instrumentConfig, error: instrumentError } = await supabase.rpc("get_instrument_config", {
       instrument_id: instrumentId,
     });
 
-    if (!instrumentConfig) {
+    if (instrumentError) {
+      console.error("Error obteniendo configuración de instrumento:", instrumentError);
       return new Response(
-        JSON.stringify({ success: false, error: "No se encontró configuración de instrumento" }),
+        JSON.stringify({ success: false, error: `Error obteniendo instrumento: ${instrumentError.message}` }),
+        { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
+      );
+    }
+
+    if (!instrumentConfig) {
+      console.error(`No se encontró configuración para instrumento: ${instrumentId}`);
+      return new Response(
+        JSON.stringify({ success: false, error: `No se encontró configuración de instrumento para nivel: ${instrumentId}` }),
         { status: 404, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
       );
     }
@@ -458,8 +479,15 @@ Deno.serve(async (req: Request): Promise<Response> => {
       { status: 200, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
     );
   } catch (error: any) {
+    console.error("Error en generate-development-plan:", error);
+    const errorMessage = error?.message || error?.toString() || "Error desconocido";
+    const errorStack = error?.stack || "";
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ 
+        success: false, 
+        error: `Error interno: ${errorMessage}`,
+        details: process.env.NODE_ENV === "development" ? errorStack : undefined
+      }),
       { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
     );
   }
