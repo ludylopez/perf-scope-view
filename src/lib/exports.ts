@@ -376,6 +376,108 @@ const drawColoredCard = (doc: jsPDF, x: number, y: number, width: number, height
   doc.roundedRect(x, y, width, height, 3, 3, 'D');
 };
 
+// Función helper para dibujar gráfico de radar
+const drawRadarChart = (doc: jsPDF, x: number, y: number, radius: number, data: Array<{dimension: string, tuResultado: number}>) => {
+  const numDimensions = data.length;
+  if (numDimensions === 0) return;
+  
+  const centerX = x + radius;
+  const centerY = y + radius;
+  const maxValue = 100;
+  
+  // Dibujar círculos concéntricos (grid)
+  doc.setDrawColor(200, 200, 200);
+  doc.setLineWidth(0.3);
+  for (let i = 1; i <= 5; i++) {
+    const r = (radius * i) / 5;
+    doc.circle(centerX, centerY, r, 'D');
+  }
+  
+  // Dibujar líneas radiales
+  for (let i = 0; i < numDimensions; i++) {
+    const angle = (i * 2 * Math.PI) / numDimensions - Math.PI / 2;
+    const endX = centerX + radius * Math.cos(angle);
+    const endY = centerY + radius * Math.sin(angle);
+    doc.line(centerX, centerY, endX, endY);
+    
+    // Etiquetas de dimensiones
+    const labelRadius = radius + 15;
+    const labelX = centerX + labelRadius * Math.cos(angle);
+    const labelY = centerY + labelRadius * Math.sin(angle);
+    
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(0, 0, 0);
+    
+    // Acortar nombres largos
+    let label = data[i].dimension;
+    if (label.length > 15) {
+      label = label.substring(0, 12) + "...";
+    }
+    
+    // Ajustar posición del texto según el ángulo
+    let align: "left" | "center" | "right" = "center";
+    if (Math.cos(angle) > 0.3) align = "left";
+    else if (Math.cos(angle) < -0.3) align = "right";
+    
+    doc.text(label, labelX, labelY, { align });
+  }
+  
+  // Dibujar polígono de datos
+  const points: [number, number][] = [];
+  for (let i = 0; i < numDimensions; i++) {
+    const angle = (i * 2 * Math.PI) / numDimensions - Math.PI / 2;
+    const value = data[i].tuResultado;
+    const r = (radius * value) / maxValue;
+    const px = centerX + r * Math.cos(angle);
+    const py = centerY + r * Math.sin(angle);
+    points.push([px, py]);
+  }
+  
+  // Dibujar polígono de datos
+  if (points.length > 0) {
+    // Rellenar el polígono con líneas radiales desde el centro (efecto de relleno más eficiente)
+    doc.setDrawColor(59, 130, 246);
+    doc.setLineWidth(0.3);
+    const fillSteps = 10; // Reducir pasos para mejor rendimiento
+    for (let step = 1; step < fillSteps; step++) {
+      const factor = step / fillSteps;
+      for (let i = 0; i < numDimensions; i++) {
+        const angle = (i * 2 * Math.PI) / numDimensions - Math.PI / 2;
+        const value = data[i].tuResultado;
+        const r = (radius * value * factor) / maxValue;
+        const px = centerX + r * Math.cos(angle);
+        const py = centerY + r * Math.sin(angle);
+        doc.line(centerX, centerY, px, py);
+      }
+    }
+    
+    // Dibujar líneas del polígono (borde)
+    doc.setDrawColor(59, 130, 246);
+    doc.setLineWidth(2);
+    for (let i = 0; i < points.length; i++) {
+      const current = points[i];
+      const next = points[(i + 1) % points.length];
+      doc.line(current[0], current[1], next[0], next[1]);
+    }
+    
+    // Dibujar puntos en los vértices
+    doc.setFillColor(59, 130, 246);
+    points.forEach(([px, py]) => {
+      doc.circle(px, py, 2.5, 'F');
+    });
+  }
+  
+  // Etiquetas de valores en los ejes
+  doc.setFontSize(7);
+  doc.setTextColor(100, 100, 100);
+  for (let i = 1; i <= 5; i++) {
+    const value = (i * 20);
+    const labelY = centerY - (radius * i) / 5;
+    doc.text(value.toString(), centerX - radius - 8, labelY, { align: "right" });
+  }
+};
+
 // Exportar evaluación completa del colaborador a PDF
 export const exportEvaluacionCompletaPDF = (
   empleado: {
@@ -540,9 +642,10 @@ export const exportEvaluacionCompletaPDF = (
       );
 
       // Icono de trofeo (simulado con texto)
-      doc.setFontSize(16);
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
       doc.setTextColor(234, 179, 8);
-      doc.text("🏆", cardX + 10, yPosition + 12);
+      doc.text("★", cardX + 10, yPosition + 12);
 
       doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
@@ -598,9 +701,10 @@ export const exportEvaluacionCompletaPDF = (
       );
 
       // Icono de bombilla (simulado con texto)
-      doc.setFontSize(16);
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
       doc.setTextColor(249, 115, 22);
-      doc.text("💡", cardX + 10, yPosition + 12);
+      doc.text("●", cardX + 10, yPosition + 12);
 
       doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
@@ -624,56 +728,41 @@ export const exportEvaluacionCompletaPDF = (
     yPosition += 5;
   }
 
-  // Desglose por Dimensión
+  // Gráfico de Radar (Telaraña)
   if (resultadoData.radarData.length > 0) {
-    if (yPosition > pageHeight - 100) {
+    if (yPosition > pageHeight - 120) {
       doc.addPage();
       yPosition = 20;
     }
 
-    doc.setFontSize(14);
+    doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
-    doc.text("Desglose por Dimensión", 14, yPosition);
-    yPosition += 10;
+    doc.setTextColor(0, 0, 0);
+    doc.text("Panorama de Competencias", 14, yPosition);
+    yPosition += 8;
+    
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(100, 100, 100);
+    const descRadar = resultadoData.jefeCompleto 
+      ? "Vista integral de tu desempeño por dimensión"
+      : "Vista de tu autoevaluación por dimensión";
+    doc.text(descRadar, 14, yPosition);
+    yPosition += 15;
 
-    // Preparar datos para la tabla
-    const tableHeaders = ["Dimensión", "Tu Resultado (%)", "Promedio Municipal (%)"];
-    const tableRows = resultadoData.radarData.map(d => {
-      // Obtener promedio municipal del objeto o del record
-      const promedioValue = d.promedioMunicipal || (d.dimensionData?.id ? resultadoData.promedioMunicipal[d.dimensionData.id] : 0);
-      const promedio = promedioValue && promedioValue > 0 
-        ? promedioValue.toFixed(1) 
-        : "N/A";
-      return [
-        d.dimension.length > 30 ? d.dimension.substring(0, 30) + "..." : d.dimension,
-        d.tuEvaluacion.toFixed(1),
-        promedio
-      ];
-    });
-
-    autoTable(doc, {
-      head: [tableHeaders],
-      body: tableRows,
-      startY: yPosition,
-      theme: "striped",
-      headStyles: { 
-        fillColor: [66, 139, 202], 
-        textColor: 255,
-        fontStyle: "bold"
-      },
-      styles: { 
-        fontSize: 9,
-        cellPadding: 3
-      },
-      columnStyles: {
-        0: { cellWidth: 80 },
-        1: { cellWidth: 50, halign: "center" },
-        2: { cellWidth: 50, halign: "center" }
-      },
-      margin: { left: 14, right: 14 },
-    });
-
-    yPosition = (doc as any).lastAutoTable.finalY + 10;
+    // Dibujar gráfico de radar
+    const radarSize = 70;
+    const radarX = pageWidth / 2 - radarSize;
+    const radarY = yPosition;
+    
+    const radarChartData = resultadoData.radarData.map(d => ({
+      dimension: d.dimension,
+      tuResultado: d.tuEvaluacion
+    }));
+    
+    drawRadarChart(doc, radarX, radarY, radarSize, radarChartData);
+    
+    yPosition += radarSize * 2 + 20;
   }
 
   // Footer en todas las páginas

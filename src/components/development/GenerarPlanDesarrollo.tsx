@@ -21,6 +21,7 @@ interface GenerarPlanDesarrolloProps {
   periodoId: string;
   colaboradorNombre: string;
   onPlanGenerado?: (plan: DevelopmentPlan) => void;
+  planExistente?: DevelopmentPlan | null;
 }
 
 export const GenerarPlanDesarrollo = ({
@@ -28,6 +29,7 @@ export const GenerarPlanDesarrollo = ({
   periodoId,
   colaboradorNombre,
   onPlanGenerado,
+  planExistente,
 }: GenerarPlanDesarrolloProps) => {
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -191,11 +193,17 @@ export const GenerarPlanDesarrollo = ({
         disabled={loading}
         size="lg"
         className="gap-2"
+        variant={planExistente ? "outline" : "default"}
       >
         {loading ? (
           <>
             <Loader2 className="h-4 w-4 animate-spin" />
             Generando plan con IA...
+          </>
+        ) : planExistente ? (
+          <>
+            <Sparkles className="h-4 w-4" />
+            Regenerar Plan de Desarrollo con IA
           </>
         ) : (
           <>
