@@ -6,6 +6,7 @@ import { Header } from "@/components/layout/Header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
 import { 
   ClipboardCheck, 
@@ -674,7 +675,7 @@ const Dashboard = () => {
                       </Card>
                     )}
 
-                    {/* Acciones Priorizadas */}
+                    {/* Acciones Priorizadas en formato tabla */}
                     {planDesarrollo.planEstructurado.acciones && Array.isArray(planDesarrollo.planEstructurado.acciones) && planDesarrollo.planEstructurado.acciones.length > 0 && (
                       <Card>
                         <CardHeader>
@@ -684,42 +685,60 @@ const Dashboard = () => {
                           </CardDescription>
                         </CardHeader>
                         <CardContent>
-                          <div className="space-y-4">
-                            {planDesarrollo.planEstructurado.acciones
-                              .sort((a: any, b: any) => {
-                                const prioridadOrder = { alta: 1, media: 2, baja: 3 };
-                                return (prioridadOrder[a.prioridad] || 99) - (prioridadOrder[b.prioridad] || 99);
-                              })
-                              .map((accion: any, idx: number) => (
-                                <div key={idx} className="border rounded-lg p-4 hover:bg-accent/5 transition-colors">
-                                  <div className="flex items-start justify-between gap-4 mb-3">
-                                    <p className="font-medium flex-1">{accion.descripcion}</p>
-                                    <Badge variant={accion.prioridad === "alta" ? "destructive" : accion.prioridad === "media" ? "default" : "secondary"}>
-                                      {accion.prioridad === "alta" ? "🔴 Alta" : accion.prioridad === "media" ? "🟡 Media" : "🟢 Baja"}
-                                    </Badge>
-                                  </div>
-                                  <div className="grid grid-cols-2 gap-4 text-sm">
-                                    <div>
-                                      <span className="text-muted-foreground">Responsable:</span>{" "}
-                                      <span className="font-medium">{accion.responsable}</span>
-                                    </div>
-                                    <div>
-                                      <span className="text-muted-foreground">Fecha:</span>{" "}
-                                      <span className="font-medium">{accion.fecha}</span>
-                                    </div>
-                                    <div className="col-span-2">
-                                      <span className="text-muted-foreground">Indicador:</span>{" "}
-                                      <span className="font-medium">{accion.indicador}</span>
-                                    </div>
-                                    {accion.recursos && accion.recursos.length > 0 && (
-                                      <div className="col-span-2">
-                                        <span className="text-muted-foreground">Recursos:</span>{" "}
-                                        <span>{accion.recursos.join(", ")}</span>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              ))}
+                          <div className="rounded-md border">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead className="w-[50px]">#</TableHead>
+                                  <TableHead className="min-w-[300px]">Acción</TableHead>
+                                  <TableHead className="w-[120px]">Prioridad</TableHead>
+                                  <TableHead className="w-[140px]">Responsable</TableHead>
+                                  <TableHead className="w-[140px]">Fecha</TableHead>
+                                  <TableHead className="min-w-[250px]">Indicador</TableHead>
+                                  <TableHead className="min-w-[200px]">Recursos</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {planDesarrollo.planEstructurado.acciones
+                                  .sort((a: any, b: any) => {
+                                    const prioridadOrder = { alta: 1, media: 2, baja: 3 };
+                                    return (prioridadOrder[a.prioridad] || 99) - (prioridadOrder[b.prioridad] || 99);
+                                  })
+                                  .map((accion: any, idx: number) => (
+                                    <TableRow key={idx}>
+                                      <TableCell className="font-medium text-center">
+                                        {idx + 1}
+                                      </TableCell>
+                                      <TableCell className="font-medium">
+                                        {accion.descripcion}
+                                      </TableCell>
+                                      <TableCell>
+                                        <Badge 
+                                          variant={accion.prioridad === "alta" ? "destructive" : accion.prioridad === "media" ? "default" : "secondary"}
+                                          className="text-xs"
+                                        >
+                                          {accion.prioridad === "alta" ? "🔴 Alta" : accion.prioridad === "media" ? "🟡 Media" : "🟢 Baja"}
+                                        </Badge>
+                                      </TableCell>
+                                      <TableCell className="text-sm">
+                                        {accion.responsable}
+                                      </TableCell>
+                                      <TableCell className="text-sm">
+                                        {accion.fecha}
+                                      </TableCell>
+                                      <TableCell className="text-sm text-muted-foreground">
+                                        {accion.indicador}
+                                      </TableCell>
+                                      <TableCell className="text-sm text-muted-foreground">
+                                        {accion.recursos && accion.recursos.length > 0 
+                                          ? accion.recursos.join(", ")
+                                          : "N/A"
+                                        }
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                              </TableBody>
+                            </Table>
                           </div>
                         </CardContent>
                       </Card>
