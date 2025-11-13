@@ -171,7 +171,7 @@ const Dashboard = () => {
             variant="outline"
             onClick={() => navigate("/mi-autoevaluacion")}
           >
-            Ver Mi Autoevaluación
+            Ver Mis Resultados
           </Button>
         );
       case "in_progress":

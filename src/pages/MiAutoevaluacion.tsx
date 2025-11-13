@@ -15,13 +15,16 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Instrument } from "@/types/evaluation";
 import { getInstrumentForUser } from "@/lib/instruments";
-import { getSubmittedEvaluation } from "@/lib/storage";
+import { getSubmittedEvaluation, hasJefeEvaluation, getJefeEvaluationDraft } from "@/lib/storage";
 import {
   calculatePerformanceScore,
   scoreToPercentage,
   calculateDimensionPercentage,
   calculateDimensionAverage
 } from "@/lib/calculations";
+import { getColaboradorJefe } from "@/lib/supabase";
+import { getFinalResultFromSupabase } from "@/lib/finalResultSupabase";
+import { calculateFinalScore } from "@/lib/finalScore";
 import { ArrowLeft, CheckCircle2, FileDown, Sparkles, TrendingUp, Target, Award, AlertCircle, Lightbulb } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -159,6 +162,38 @@ const getDimensionShortDescription = (dimension: any): string => {
   return "Desempeño evaluado";
 };
 
+// Helper para calcular respuestas consolidadas (70% jefe + 30% auto)
+const calculateConsolidatedResponses = (
+  autoResponses: Record<string, number>,
+  jefeResponses: Record<string, number>
+): Record<string, number> => {
+  const consolidated: Record<string, number> = {};
+  
+  // Obtener todos los ítems únicos de ambas evaluaciones
+  const allItemIds = new Set([
+    ...Object.keys(autoResponses),
+    ...Object.keys(jefeResponses)
+  ]);
+  
+  allItemIds.forEach((itemId) => {
+    const autoValue = autoResponses[itemId] || 0;
+    const jefeValue = jefeResponses[itemId] || 0;
+    
+    // Si ambos tienen valor, calcular consolidado
+    if (autoResponses[itemId] !== undefined && jefeResponses[itemId] !== undefined) {
+      consolidated[itemId] = Math.round((jefeValue * 0.7 + autoValue * 0.3) * 100) / 100;
+    } else if (autoResponses[itemId] !== undefined) {
+      // Si solo auto tiene valor, usar auto (fallback)
+      consolidated[itemId] = autoValue;
+    } else if (jefeResponses[itemId] !== undefined) {
+      // Si solo jefe tiene valor, usar jefe (fallback)
+      consolidated[itemId] = jefeValue;
+    }
+  });
+  
+  return consolidated;
+};
+
 const MiAutoevaluacion = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -166,6 +201,9 @@ const MiAutoevaluacion = () => {
   const [instrument, setInstrument] = useState<Instrument | null>(null);
 
   const [evaluation, setEvaluation] = useState<any>(null);
+  const [evaluacionJefe, setEvaluacionJefe] = useState<any>(null);
+  const [jefeCompleto, setJefeCompleto] = useState<boolean>(false);
+  const [responsesConsolidadas, setResponsesConsolidadas] = useState<Record<string, number>>({});
   const [promedioMunicipal, setPromedioMunicipal] = useState<Record<string, number>>({});
 
   useEffect(() => {
@@ -191,25 +229,94 @@ const MiAutoevaluacion = () => {
 
       setEvaluation(submitted);
 
-      // Calcular promedio municipal
-      try {
-        const { data: allEvaluations } = await supabase
-          .from('evaluations')
-          .select('responses')
-          .eq('periodo_id', activePeriodId)
-          .eq('tipo_evaluacion', 'autoevaluacion')
-          .eq('enviada', true);
+      // Obtener jefe del colaborador
+      const jefeId = await getColaboradorJefe(user.dpi);
+      
+      if (!jefeId) {
+        // Si no tiene jefe, usar solo autoevaluación
+        setJefeCompleto(false);
+        setResponsesConsolidadas(submitted.responses);
+      } else {
+        // Verificar si el jefe completó la evaluación
+        const jefeCompletoEvaluacion = await hasJefeEvaluation(jefeId, user.dpi, activePeriodId);
+        setJefeCompleto(jefeCompletoEvaluacion);
 
-        if (allEvaluations && allEvaluations.length > 0) {
-          // Calcular promedio por dimensión
+        if (jefeCompletoEvaluacion) {
+          // Obtener evaluación del jefe
+          const jefeEval = await getJefeEvaluationDraft(jefeId, user.dpi, activePeriodId);
+          
+          if (jefeEval) {
+            setEvaluacionJefe(jefeEval);
+            
+            // Calcular respuestas consolidadas
+            const consolidadas = calculateConsolidatedResponses(
+              submitted.responses,
+              jefeEval.responses
+            );
+            setResponsesConsolidadas(consolidadas);
+          } else {
+            // Fallback a autoevaluación si no se puede obtener evaluación del jefe
+            setResponsesConsolidadas(submitted.responses);
+          }
+        } else {
+          // Jefe no ha completado, usar solo autoevaluación
+          setResponsesConsolidadas(submitted.responses);
+        }
+      }
+
+      // Calcular promedio municipal de resultados finales consolidados
+      try {
+        // Obtener todos los resultados finales del período
+        const { data: finalResults, error: finalResultsError } = await supabase
+          .from('final_evaluation_results')
+          .select('colaborador_id, resultado_final, autoevaluacion_id, evaluacion_jefe_id')
+          .eq('periodo_id', activePeriodId);
+
+        if (finalResultsError) {
+          console.error('Error obteniendo resultados finales:', finalResultsError);
+        }
+
+        if (finalResults && finalResults.length > 0) {
+          // Para cada resultado final, necesitamos obtener las evaluaciones para calcular porcentajes por dimensión
           const promedios: Record<string, number> = {};
           
+          // Obtener todas las evaluaciones necesarias
+          const colaboradorIds = finalResults.map(r => r.colaborador_id);
+          const autoevaluacionIds = finalResults.map(r => r.autoevaluacion_id).filter(id => id);
+          const jefeEvaluacionIds = finalResults.map(r => r.evaluacion_jefe_id).filter(id => id);
+          
+          // Obtener autoevaluaciones
+          const { data: autoEvals } = await supabase
+            .from('evaluations')
+            .select('id, responses')
+            .in('id', autoevaluacionIds)
+            .eq('tipo', 'auto');
+
+          // Obtener evaluaciones del jefe
+          const { data: jefeEvals } = await supabase
+            .from('evaluations')
+            .select('id, responses')
+            .in('id', jefeEvaluacionIds)
+            .eq('tipo', 'jefe');
+
+          // Crear mapas para acceso rápido
+          const autoEvalMap = new Map((autoEvals || []).map(e => [e.id, (e.responses as Record<string, number>) || {}]));
+          const jefeEvalMap = new Map((jefeEvals || []).map(e => [e.id, (e.responses as Record<string, number>) || {}]));
+
+          // Calcular promedio por dimensión usando respuestas consolidadas
           userInstrument.dimensionesDesempeno.forEach((dim) => {
             let sumaPorcentajes = 0;
             let contador = 0;
 
-            allEvaluations.forEach((evaluacion) => {
-              const porcentaje = calculateDimensionPercentage(evaluacion.responses || {}, dim);
+            finalResults.forEach((resultado) => {
+              const autoResponses = autoEvalMap.get(resultado.autoevaluacion_id) || {};
+              const jefeResponses = jefeEvalMap.get(resultado.evaluacion_jefe_id) || {};
+              
+              // Calcular respuestas consolidadas para este colaborador
+              const consolidadas = calculateConsolidatedResponses(autoResponses, jefeResponses);
+              
+              // Calcular porcentaje por dimensión
+              const porcentaje = calculateDimensionPercentage(consolidadas, dim);
               if (porcentaje > 0) {
                 sumaPorcentajes += porcentaje;
                 contador++;
@@ -220,6 +327,35 @@ const MiAutoevaluacion = () => {
           });
 
           setPromedioMunicipal(promedios);
+        } else {
+          // Si no hay resultados finales, calcular promedio de autoevaluaciones como fallback
+          const { data: allEvaluations } = await supabase
+            .from('evaluations')
+            .select('responses')
+            .eq('periodo_id', activePeriodId)
+            .eq('tipo', 'auto')
+            .eq('estado', 'enviado');
+
+          if (allEvaluations && allEvaluations.length > 0) {
+            const promedios: Record<string, number> = {};
+            
+            userInstrument.dimensionesDesempeno.forEach((dim) => {
+              let sumaPorcentajes = 0;
+              let contador = 0;
+
+              allEvaluations.forEach((evaluacion) => {
+                const porcentaje = calculateDimensionPercentage((evaluacion.responses as Record<string, number>) || {}, dim);
+                if (porcentaje > 0) {
+                  sumaPorcentajes += porcentaje;
+                  contador++;
+                }
+              });
+
+              promedios[dim.id] = contador > 0 ? Math.round(sumaPorcentajes / contador) : 0;
+            });
+
+            setPromedioMunicipal(promedios);
+          }
         }
       } catch (error) {
         console.error('Error calculando promedio municipal:', error);
@@ -241,8 +377,14 @@ const MiAutoevaluacion = () => {
   }
 
   const dimensions = instrument.dimensionesDesempeno;
+  
+  // Usar respuestas consolidadas si están disponibles, sino usar autoevaluación
+  const responsesToUse = Object.keys(responsesConsolidadas).length > 0 
+    ? responsesConsolidadas 
+    : evaluation.responses;
+  
   const performanceScore = calculatePerformanceScore(
-    evaluation.responses,
+    responsesToUse,
     dimensions
   );
   const performancePercentage = scoreToPercentage(performanceScore);
@@ -252,13 +394,13 @@ const MiAutoevaluacion = () => {
     dimension: getDimensionFriendlyTitle(dim), // Usar título simplificado
     nombreCompleto: dim.nombre,
     numero: idx + 1,
-    tuEvaluacion: calculateDimensionPercentage(evaluation.responses, dim),
+    tuEvaluacion: calculateDimensionPercentage(responsesToUse, dim),
     promedioMunicipal: promedioMunicipal[dim.id] || 0,
-    puntaje: calculateDimensionAverage(evaluation.responses, dim),
+    puntaje: calculateDimensionAverage(responsesToUse, dim),
     dimensionData: dim // Incluir toda la dimensión
   }));
 
-  // Identificar fortalezas (top 3) y áreas de mejora (bottom 3)
+  // Identificar fortalezas (top 3) y áreas de mejora (bottom 3) basadas en resultado consolidado
   const sortedDimensions = [...radarData].sort((a, b) => b.tuEvaluacion - a.tuEvaluacion);
   const fortalezas = sortedDimensions.slice(0, 3);
   const areasDeOportunidad = sortedDimensions.slice(-3).reverse();
@@ -282,20 +424,29 @@ const MiAutoevaluacion = () => {
         <div className="mb-6">
           <div className="flex items-center gap-3 mb-2">
             <h1 className="text-3xl font-bold text-foreground">
-              Mi Autoevaluación
+              Mis Resultados
             </h1>
             <Badge className="bg-success text-success-foreground">
               <CheckCircle2 className="mr-1 h-3 w-3" />
-              Enviada
+              {jefeCompleto ? "Resultado Consolidado" : "Autoevaluación Enviada"}
             </Badge>
           </div>
           <p className="text-muted-foreground">
-            Enviada el{" "}
-            {format(new Date(evaluation.fechaEnvio), "d 'de' MMMM, yyyy", {
-              locale: es,
-            })}
+            {jefeCompleto 
+              ? "Resultado consolidado de tu evaluación de desempeño"
+              : `Autoevaluación enviada el ${format(new Date(evaluation.fechaEnvio), "d 'de' MMMM, yyyy", { locale: es })}`}
           </p>
         </div>
+
+        {/* Mensaje informativo si el jefe no ha completado */}
+        {!jefeCompleto && (
+          <Alert className="mb-6 border-blue-200 bg-blue-50 dark:bg-blue-950/20">
+            <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            <AlertDescription className="text-blue-800 dark:text-blue-200">
+              Su autoevaluación fue recibida. Cuando su jefe complete la evaluación, aquí aparecerá su resultado consolidado.
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Resumen visual mejorado */}
         <Card className="mb-6 border-2 border-primary/20">
@@ -449,9 +600,9 @@ const MiAutoevaluacion = () => {
                         />
                       )}
                       
-                      {/* Tu Evaluación - Primera línea */}
+                      {/* Tu Resultado - Primera línea */}
                       <Radar
-                        name="Tu Evaluación"
+                        name={jefeCompleto ? "Tu Resultado" : "Tu Autoevaluación"}
                         dataKey="tuEvaluacion"
                         stroke="hsl(var(--primary))"
                         fill="url(#colorTuEval)"
@@ -468,7 +619,9 @@ const MiAutoevaluacion = () => {
                                 <p className="font-bold text-base mb-2 text-foreground">{data.dimension}</p>
                                 <div className="space-y-1">
                                   <div className="flex items-center justify-between gap-4">
-                                    <span className="text-sm text-muted-foreground">Tu evaluación:</span>
+                                    <span className="text-sm text-muted-foreground">
+                                      {jefeCompleto ? "Tu resultado:" : "Tu autoevaluación:"}
+                                    </span>
                                     <span className="text-sm font-bold text-primary">{data.tuEvaluacion}%</span>
                                   </div>
                                   {data.promedioMunicipal > 0 && (
