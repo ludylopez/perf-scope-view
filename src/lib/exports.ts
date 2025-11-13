@@ -785,15 +785,21 @@ export const exportEvaluacionCompletaPDF = (
   doc.save(filename);
 };
 
-// Exportar evaluación completa capturando la pantalla (réplica exacta)
+// Exportar evaluación completa capturando la pantalla (solución híbrida: texto seleccionable + imagen)
 export const exportEvaluacionCompletaPDFFromElement = async (
   elementId: string,
   empleado: {
     nombre: string;
+    apellidos?: string;
     dpi?: string;
     cargo?: string;
     area?: string;
     nivel?: string;
+    direccionUnidad?: string;
+    departamentoDependencia?: string;
+    profesion?: string;
+    correo?: string;
+    telefono?: string;
   },
   periodo: string,
   fechaGeneracion: Date
@@ -811,7 +817,7 @@ export const exportEvaluacionCompletaPDFFromElement = async (
       description: "Capturando la vista actual, por favor espere"
     });
 
-    // Capturar el elemento como imagen
+    // Capturar el elemento como imagen (solo el contenido, sin encabezado)
     const canvas = await html2canvas(element, {
       scale: 2, // Mayor resolución
       useCORS: true,
@@ -834,7 +840,6 @@ export const exportEvaluacionCompletaPDFFromElement = async (
       format: "a4"
     });
 
-    // Agregar encabezado con información del empleado
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
     
@@ -843,30 +848,92 @@ export const exportEvaluacionCompletaPDFFromElement = async (
     const imgWidthMm = imgWidth * pxToMm;
     const imgHeightMm = imgHeight * pxToMm;
     
-    // Calcular dimensiones para la imagen
+    // Calcular dimensiones
     const margin = 10; // mm
-    const headerHeight = 20; // mm
     const footerHeight = 15; // mm
     
-    // Encabezado con fondo de color
+    // Determinar altura del header según información disponible
+    let headerHeight = 35; // mm (altura base)
+    if (empleado.departamentoDependencia || empleado.profesion) {
+      headerHeight = 40; // mm (más alto si hay info extra)
+    }
+    
+    // ===== ENCABEZADO CON TEXTO SELECCIONABLE =====
+    // Fondo azul
     doc.setFillColor(59, 130, 246);
     doc.rect(0, 0, pageWidth, headerHeight, 'F');
     
-    doc.setFontSize(14);
+    // Título principal (texto seleccionable)
+    doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(255, 255, 255);
-    doc.text("Evaluación de Desempeño", pageWidth / 2, 10, { align: "center" });
+    doc.text("Evaluación de Desempeño", pageWidth / 2, 8, { align: "center" });
     
-    doc.setFontSize(9);
+    // Información del empleado (TEXTO SELECCIONABLE)
+    doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
-    doc.text(`Empleado: ${empleado.nombre}`, 10, 16);
-    if (empleado.cargo) {
-      doc.text(`Cargo: ${empleado.cargo}`, pageWidth / 2, 16, { align: "center" });
+    doc.setTextColor(255, 255, 255);
+    
+    // Primera fila: Nombre completo y DPI
+    const nombreCompleto = empleado.apellidos 
+      ? `${empleado.nombre} ${empleado.apellidos}` 
+      : empleado.nombre;
+    doc.text(`Empleado: ${nombreCompleto}`, 10, 16);
+    if (empleado.dpi) {
+      doc.text(`DPI: ${empleado.dpi}`, pageWidth - 10, 16, { align: "right" });
     }
-    doc.text(`Período: ${periodo}`, pageWidth - 10, 16, { align: "right" });
+    
+    // Segunda fila: Cargo y Área
+    if (empleado.cargo) {
+      doc.text(`Cargo: ${empleado.cargo}`, 10, 22);
+    }
+    if (empleado.area) {
+      doc.text(`Área: ${empleado.area}`, pageWidth / 2, 22, { align: "center" });
+    }
+    
+    // Tercera fila: Nivel y Período
+    if (empleado.nivel) {
+      doc.text(`Nivel: ${empleado.nivel}`, 10, 28);
+    }
+    if (empleado.direccionUnidad) {
+      doc.text(`Dirección/Unidad: ${empleado.direccionUnidad}`, pageWidth / 2, 28, { align: "center" });
+    }
+    doc.text(`Período: ${periodo}`, pageWidth - 10, 28, { align: "right" });
+    
+    // Cuarta fila: Información adicional si está disponible
+    if (empleado.departamentoDependencia || empleado.profesion) {
+      doc.setFontSize(7);
+      if (empleado.departamentoDependencia) {
+        doc.text(`Depto/Dependencia: ${empleado.departamentoDependencia}`, 10, 34);
+      }
+      if (empleado.profesion) {
+        doc.text(`Profesión: ${empleado.profesion}`, pageWidth - 10, 34, { align: "right" });
+      }
+    }
+    
+    // Agregar información adicional como texto seleccionable debajo del header
+    // (antes de la imagen)
+    let yTextInfo = headerHeight + 5;
+    const textInfoLines: string[] = [];
+    
+    if (empleado.correo) {
+      textInfoLines.push(`Correo: ${empleado.correo}`);
+    }
+    if (empleado.telefono) {
+      textInfoLines.push(`Teléfono: ${empleado.telefono}`);
+    }
+    
+    if (textInfoLines.length > 0) {
+      doc.setFontSize(8);
+      doc.setTextColor(0, 0, 0); // Negro para texto seleccionable
+      textInfoLines.forEach((line, index) => {
+        doc.text(line, 10, yTextInfo + (index * 5));
+      });
+      yTextInfo += textInfoLines.length * 5 + 3;
+    }
     
     const availableWidth = pageWidth - (margin * 2);
-    const availableHeight = pageHeight - headerHeight - footerHeight - margin;
+    const availableHeight = pageHeight - yTextInfo - footerHeight - margin;
     
     // Calcular escala para que la imagen quepa
     const scaleX = availableWidth / imgWidthMm;
@@ -876,18 +943,22 @@ export const exportEvaluacionCompletaPDFFromElement = async (
     const scaledWidth = imgWidthMm * scale;
     const scaledHeight = imgHeightMm * scale;
     
-    // Centrar la imagen
+    // Centrar la imagen (después del header y texto adicional)
     const x = (pageWidth - scaledWidth) / 2;
-    const y = headerHeight + 5;
+    const y = yTextInfo;
 
     // Dividir la imagen en páginas si es necesario
     let remainingHeight = scaledHeight;
     let sourceY = 0;
     let currentY = y;
     let pageNum = 1;
+    // Altura disponible en páginas siguientes (solo header, sin texto adicional)
+    const availableHeightNextPages = pageHeight - headerHeight - footerHeight - margin - 5;
 
     while (remainingHeight > 0 && pageNum <= 10) { // Límite de 10 páginas
-      const heightOnPage = Math.min(remainingHeight, availableHeight);
+      // Usar altura disponible según la página
+      const availableHeightForPage = pageNum === 1 ? availableHeight : availableHeightNextPages;
+      const heightOnPage = Math.min(remainingHeight, availableHeightForPage);
       const sourceHeightPx = (heightOnPage / scale) / pxToMm; // Convertir de mm a px
       
       // Crear un canvas temporal con la porción de la imagen
@@ -912,7 +983,15 @@ export const exportEvaluacionCompletaPDFFromElement = async (
       if (remainingHeight > 0) {
         doc.addPage();
         pageNum++;
-        currentY = headerHeight + 5;
+        // En páginas siguientes, solo agregar header (sin texto adicional)
+        // Dibujar header en la nueva página
+        doc.setFillColor(59, 130, 246);
+        doc.rect(0, 0, pageWidth, headerHeight, 'F');
+        doc.setFontSize(16);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(255, 255, 255);
+        doc.text("Evaluación de Desempeño", pageWidth / 2, 8, { align: "center" });
+        currentY = headerHeight + 5; // mm después del header
       }
     }
 

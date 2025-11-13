@@ -646,10 +646,16 @@ const Dashboard = () => {
                                 "resultados-evaluacion-container",
                                 {
                                   nombre: user?.nombre || "N/A",
+                                  apellidos: user?.apellidos,
                                   dpi: user?.dpi,
                                   cargo: user?.cargo,
                                   area: user?.area,
-                                  nivel: user?.nivel
+                                  nivel: user?.nivel,
+                                  direccionUnidad: user?.direccionUnidad,
+                                  departamentoDependencia: user?.departamentoDependencia,
+                                  profesion: user?.profesion,
+                                  correo: user?.correo,
+                                  telefono: user?.telefono
                                 },
                                 activePeriod?.nombre || "N/A",
                                 new Date()
