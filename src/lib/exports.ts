@@ -322,6 +322,247 @@ export const exportResultadoIndividualPDF = (
   doc.save(filename);
 };
 
+// Exportar evaluación completa del colaborador a PDF
+export const exportEvaluacionCompletaPDF = (
+  empleado: {
+    nombre: string;
+    dpi?: string;
+    cargo?: string;
+    area?: string;
+    nivel?: string;
+  },
+  periodo: string,
+  fechaGeneracion: Date,
+  resultadoData: {
+    performancePercentage: number;
+    jefeCompleto: boolean;
+    fortalezas: any[];
+    areasOportunidad: any[];
+    radarData: any[];
+    promedioMunicipal: Record<string, number>;
+  }
+) => {
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  let yPosition = 20;
+
+  // Encabezado
+  doc.setFontSize(20);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(0, 0, 0);
+  doc.text("Evaluación de Desempeño", pageWidth / 2, yPosition, { align: "center" });
+  yPosition += 10;
+
+  // Datos del empleado
+  doc.setFontSize(12);
+  doc.setFont("helvetica", "normal");
+  doc.text(`Empleado: ${empleado.nombre}`, 14, yPosition);
+  yPosition += 7;
+  
+  if (empleado.dpi) {
+    doc.text(`DPI: ${empleado.dpi}`, 14, yPosition);
+    yPosition += 7;
+  }
+  
+  if (empleado.cargo) {
+    doc.text(`Cargo: ${empleado.cargo}`, 14, yPosition);
+    yPosition += 7;
+  }
+  
+  if (empleado.area) {
+    doc.text(`Área: ${empleado.area}`, 14, yPosition);
+    yPosition += 7;
+  }
+  
+  if (empleado.nivel) {
+    doc.text(`Nivel: ${empleado.nivel}`, 14, yPosition);
+    yPosition += 7;
+  }
+
+  doc.text(`Período: ${periodo}`, 14, yPosition);
+  yPosition += 7;
+  
+  doc.text(`Fecha de generación: ${format(fechaGeneracion, "d 'de' MMMM, yyyy 'a las' HH:mm", { locale: es })}`, 14, yPosition);
+  yPosition += 7;
+  
+  doc.text(`Estado: ${resultadoData.jefeCompleto ? "Resultado Consolidado" : "Autoevaluación Enviada"}`, 14, yPosition);
+  yPosition += 15;
+
+  // Línea separadora
+  doc.setDrawColor(200, 200, 200);
+  doc.line(14, yPosition, pageWidth - 14, yPosition);
+  yPosition += 10;
+
+  // Resultado General
+  doc.setFontSize(16);
+  doc.setFont("helvetica", "bold");
+  doc.text("Resultado General", 14, yPosition);
+  yPosition += 10;
+
+  doc.setFontSize(14);
+  doc.setFont("helvetica", "normal");
+  doc.text(`Puntaje Global: ${resultadoData.performancePercentage}%`, 14, yPosition);
+  yPosition += 8;
+
+  // Interpretación
+  let interpretacion = "";
+  if (resultadoData.performancePercentage >= 90) interpretacion = "Excelente";
+  else if (resultadoData.performancePercentage >= 75) interpretacion = "Bueno";
+  else if (resultadoData.performancePercentage >= 60) interpretacion = "Regular";
+  else interpretacion = "Necesita mejorar";
+
+  doc.setFont("helvetica", "bold");
+  doc.text(`Interpretación: ${interpretacion}`, 14, yPosition);
+  yPosition += 15;
+
+  // Fortalezas
+  if (resultadoData.fortalezas.length > 0) {
+    if (yPosition > pageHeight - 80) {
+      doc.addPage();
+      yPosition = 20;
+    }
+
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("Fortalezas Identificadas", 14, yPosition);
+    yPosition += 10;
+
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "normal");
+    resultadoData.fortalezas.forEach((fortaleza, index) => {
+      if (yPosition > pageHeight - 60) {
+        doc.addPage();
+        yPosition = 20;
+      }
+
+      doc.setFont("helvetica", "bold");
+      doc.text(`${index + 1}. ${fortaleza.dimension}`, 20, yPosition);
+      yPosition += 7;
+      
+      doc.setFont("helvetica", "normal");
+      doc.text(`   Puntaje: ${fortaleza.tuEvaluacion.toFixed(1)}%`, 20, yPosition);
+      yPosition += 6;
+      
+      if (fortaleza.promedioMunicipal && fortaleza.promedioMunicipal > 0) {
+        doc.text(`   Promedio Municipal: ${fortaleza.promedioMunicipal.toFixed(1)}%`, 20, yPosition);
+        yPosition += 6;
+      }
+      
+      yPosition += 3;
+    });
+    yPosition += 5;
+  }
+
+  // Áreas de Oportunidad
+  if (resultadoData.areasOportunidad.length > 0) {
+    if (yPosition > pageHeight - 80) {
+      doc.addPage();
+      yPosition = 20;
+    }
+
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("Áreas de Oportunidad", 14, yPosition);
+    yPosition += 10;
+
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "normal");
+    resultadoData.areasOportunidad.forEach((area, index) => {
+      if (yPosition > pageHeight - 60) {
+        doc.addPage();
+        yPosition = 20;
+      }
+
+      doc.setFont("helvetica", "bold");
+      doc.text(`${index + 1}. ${area.dimension}`, 20, yPosition);
+      yPosition += 7;
+      
+      doc.setFont("helvetica", "normal");
+      doc.text(`   Puntaje: ${area.tuEvaluacion.toFixed(1)}%`, 20, yPosition);
+      yPosition += 6;
+      
+      if (area.promedioMunicipal && area.promedioMunicipal > 0) {
+        doc.text(`   Promedio Municipal: ${area.promedioMunicipal.toFixed(1)}%`, 20, yPosition);
+        yPosition += 6;
+      }
+      
+      yPosition += 3;
+    });
+    yPosition += 5;
+  }
+
+  // Desglose por Dimensión
+  if (resultadoData.radarData.length > 0) {
+    if (yPosition > pageHeight - 100) {
+      doc.addPage();
+      yPosition = 20;
+    }
+
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("Desglose por Dimensión", 14, yPosition);
+    yPosition += 10;
+
+    // Preparar datos para la tabla
+    const tableHeaders = ["Dimensión", "Tu Resultado (%)", "Promedio Municipal (%)"];
+    const tableRows = resultadoData.radarData.map(d => {
+      // Obtener promedio municipal del objeto o del record
+      const promedioValue = d.promedioMunicipal || (d.dimensionData?.id ? resultadoData.promedioMunicipal[d.dimensionData.id] : 0);
+      const promedio = promedioValue && promedioValue > 0 
+        ? promedioValue.toFixed(1) 
+        : "N/A";
+      return [
+        d.dimension.length > 30 ? d.dimension.substring(0, 30) + "..." : d.dimension,
+        d.tuEvaluacion.toFixed(1),
+        promedio
+      ];
+    });
+
+    autoTable(doc, {
+      head: [tableHeaders],
+      body: tableRows,
+      startY: yPosition,
+      theme: "striped",
+      headStyles: { 
+        fillColor: [66, 139, 202], 
+        textColor: 255,
+        fontStyle: "bold"
+      },
+      styles: { 
+        fontSize: 9,
+        cellPadding: 3
+      },
+      columnStyles: {
+        0: { cellWidth: 80 },
+        1: { cellWidth: 50, halign: "center" },
+        2: { cellWidth: 50, halign: "center" }
+      },
+      margin: { left: 14, right: 14 },
+    });
+
+    yPosition = (doc as any).lastAutoTable.finalY + 10;
+  }
+
+  // Footer en todas las páginas
+  const totalPages = doc.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8);
+    doc.setTextColor(100, 100, 100);
+    doc.text(
+      `Página ${i} de ${totalPages}`,
+      pageWidth / 2,
+      pageHeight - 10,
+      { align: "center" }
+    );
+  }
+
+  // Descargar
+  const filename = `evaluacion_${empleado.nombre.replace(/\s+/g, "_")}_${periodo.replace(/\s+/g, "_")}_${format(fechaGeneracion, "yyyy-MM-dd")}.pdf`;
+  doc.save(filename);
+};
+
 // Exportar plan de desarrollo a PDF (versión imprimible)
 export const exportPlanDesarrolloPDF = (
   colaboradorNombre: string,

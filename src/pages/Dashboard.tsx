@@ -31,6 +31,8 @@ import { TrendingUp, Award, Lightbulb, FileDown, Target } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PerformanceRadarAnalysis } from "@/components/evaluation/PerformanceRadarAnalysis";
 import { supabase } from "@/integrations/supabase/client";
+import { exportEvaluacionCompletaPDF } from "@/lib/exports";
+import { toast } from "@/hooks/use-toast";
 
 // Helper para calcular respuestas consolidadas (70% jefe + 30% auto)
 const calculateConsolidatedResponses = (
@@ -589,13 +591,14 @@ const Dashboard = () => {
                   />
                 </div>
 
-                {/* Botón para ver detalle de respuestas */}
-                <Card className="border-primary/20">
-                  <CardContent className="pt-6">
-                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                      <div className="flex items-start gap-3">
+                {/* Botones de acción */}
+                <div className="grid gap-4 md:grid-cols-2">
+                  {/* Botón para ver detalle de respuestas */}
+                  <Card className="border-primary/20">
+                    <CardContent className="pt-6">
+                      <div className="flex flex-col items-center gap-4 text-center">
                         <div className="p-3 rounded-xl bg-primary/10">
-                          <FileDown className="h-6 w-6 text-primary" />
+                          <Target className="h-6 w-6 text-primary" />
                         </div>
                         <div>
                           <h3 className="font-semibold text-lg mb-1">Ver Detalle de Respuestas</h3>
@@ -603,17 +606,76 @@ const Dashboard = () => {
                             Revisa todas tus respuestas por cada dimensión evaluada
                           </p>
                         </div>
+                        <Button 
+                          onClick={() => navigate("/mis-respuestas-detalle")}
+                          className="w-full"
+                          variant="outline"
+                        >
+                          Ver Detalle Completo
+                          <Target className="ml-2 h-4 w-4" />
+                        </Button>
                       </div>
-                      <Button 
-                        onClick={() => navigate("/mis-respuestas-detalle")}
-                        className="w-full sm:w-auto"
-                      >
-                        Ver Detalle Completo
-                        <Target className="ml-2 h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                    </CardContent>
+                  </Card>
+
+                  {/* Botón para exportar a PDF */}
+                  <Card className="border-green-200 dark:border-green-800">
+                    <CardContent className="pt-6">
+                      <div className="flex flex-col items-center gap-4 text-center">
+                        <div className="p-3 rounded-xl bg-green-50 dark:bg-green-950/20">
+                          <FileDown className="h-6 w-6 text-green-600 dark:text-green-400" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-lg mb-1">Exportar Evaluación</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Descarga tu evaluación completa en formato PDF
+                          </p>
+                        </div>
+                        <Button 
+                          onClick={() => {
+                            if (!resultadoData) {
+                              toast({
+                                title: "Error",
+                                description: "No hay datos disponibles para exportar",
+                                variant: "destructive"
+                              });
+                              return;
+                            }
+                            try {
+                              exportEvaluacionCompletaPDF(
+                                {
+                                  nombre: user?.nombre || "N/A",
+                                  dpi: user?.dpi,
+                                  cargo: user?.cargo,
+                                  area: user?.area,
+                                  nivel: user?.nivel
+                                },
+                                activePeriod?.nombre || "N/A",
+                                new Date(),
+                                resultadoData
+                              );
+                              toast({
+                                title: "Éxito",
+                                description: "Evaluación exportada a PDF exitosamente"
+                              });
+                            } catch (error) {
+                              console.error("Error al exportar:", error);
+                              toast({
+                                title: "Error",
+                                description: "Error al exportar la evaluación",
+                                variant: "destructive"
+                              });
+                            }
+                          }}
+                          className="w-full bg-green-600 hover:bg-green-700"
+                        >
+                          <FileDown className="mr-2 h-4 w-4" />
+                          Exportar a PDF
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
               </>
             )}
 

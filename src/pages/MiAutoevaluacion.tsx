@@ -29,6 +29,7 @@ import { ArrowLeft, CheckCircle2, FileDown, Sparkles, TrendingUp, Target, Award,
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
+import { exportEvaluacionCompletaPDF } from "@/lib/exports";
 import { supabase } from "@/integrations/supabase/client";
 import {
   RadarChart,
@@ -583,6 +584,61 @@ const MiAutoevaluacion = () => {
               >
                 Ver Detalle Completo
                 <ArrowLeft className="ml-2 h-4 w-4 rotate-180" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Botón para exportar a PDF */}
+        <Card className="border-primary/20">
+          <CardContent className="pt-6">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="p-3 rounded-xl bg-green-50 dark:bg-green-950/20">
+                  <FileDown className="h-6 w-6 text-green-600 dark:text-green-400" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-lg mb-1">Exportar Evaluación</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Descarga tu evaluación completa en formato PDF para guardar o imprimir
+                  </p>
+                </div>
+              </div>
+              <Button 
+                onClick={() => {
+                  try {
+                    exportEvaluacionCompletaPDF(
+                      {
+                        nombre: user?.nombre || "N/A",
+                        dpi: user?.dpi,
+                        cargo: user?.cargo,
+                        area: user?.area,
+                        nivel: user?.nivel
+                      },
+                      activePeriod?.nombre || "N/A",
+                      new Date(),
+                      {
+                        performancePercentage,
+                        jefeCompleto,
+                        fortalezas,
+                        areasOportunidad,
+                        radarData: radarData.map(d => ({
+                          ...d,
+                          promedioMunicipal: promedioMunicipal[d.dimensionData.id] || 0
+                        })),
+                        promedioMunicipal
+                      }
+                    );
+                    toast.success("Evaluación exportada a PDF exitosamente");
+                  } catch (error) {
+                    console.error("Error al exportar:", error);
+                    toast.error("Error al exportar la evaluación");
+                  }
+                }}
+                className="w-full sm:w-auto bg-green-600 hover:bg-green-700"
+              >
+                <FileDown className="mr-2 h-4 w-4" />
+                Exportar a PDF
               </Button>
             </div>
           </CardContent>
