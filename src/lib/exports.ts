@@ -1000,32 +1000,30 @@ export const exportEvaluacionCompletaPDFFromElement = async (
     const availableWidth = pageWidth - (margin * 2);
     const availableHeight = pageHeight - yAfterHeader - footerHeight - margin;
     
-    // Calcular escala para que la imagen se vea bien (no forzar en una sola página)
-    // Usar una escala razonable que mantenga buena legibilidad
-    const scaleX = availableWidth / imgWidthMm;
-    const scaleY = availableHeight / imgHeightMm;
+    // Calcular altura disponible en 2 páginas
+    const availableHeightFirstPage = availableHeight;
+    const availableHeightNextPages = pageHeight - headerHeight - footerHeight - margin - 5;
+    const totalAvailableHeight = availableHeightFirstPage + availableHeightNextPages; // Altura total en 2 páginas
     
-    // Usar una escala que permita buena legibilidad
-    // Priorizar el ancho para que el contenido se vea bien, permitir múltiples páginas
-    const optimalScale = Math.min(scaleX * 0.95, 1); // Usar 95% del ancho disponible, máximo 1:1
-    const scale = Math.max(optimalScale, 0.5); // Mínimo 50% para mantener buena legibilidad
+    // Calcular escala para que el contenido quepa en máximo 2 páginas
+    const scaleX = availableWidth / imgWidthMm;
+    const scaleY = totalAvailableHeight / imgHeightMm; // Usar altura total de 2 páginas
+    
+    // Calcular escala óptima: debe caber en 2 páginas
+    // Priorizar que quepa en el ancho disponible y en 2 páginas de altura
+    const optimalScale = Math.min(scaleX * 0.98, scaleY * 0.98, 1); // Usar 98% del espacio disponible
+    const scale = Math.max(optimalScale, 0.4); // Mínimo 40% para mantener legibilidad básica
     
     const scaledWidth = imgWidthMm * scale;
     const scaledHeight = imgHeightMm * scale;
     
     // Centrar la imagen (después del header)
     const x = (pageWidth - scaledWidth) / 2;
-    let imageY = yAfterHeader;
     let sourceY = 0;
     let pageNum = 1;
     
-    // Dividir la imagen en páginas si es necesario, manteniendo buena calidad
-    // En la primera página, el espacio disponible es después del header completo
-    // En páginas siguientes, el espacio es después del header compacto
-    const availableHeightFirstPage = availableHeight;
-    const availableHeightNextPages = pageHeight - headerHeight - footerHeight - margin - 5;
-    
-    while (sourceY < imgHeight && pageNum <= 20) { // Límite de 20 páginas
+    // Dividir la imagen en máximo 2 páginas
+    while (sourceY < imgHeight && pageNum <= 2) {
       // Calcular cuánto de la imagen cabe en esta página
       const remainingImgHeight = imgHeight - sourceY;
       const availableHeightForThisPage = pageNum === 1 ? availableHeightFirstPage : availableHeightNextPages;
@@ -1046,14 +1044,17 @@ export const exportEvaluacionCompletaPDFFromElement = async (
         // Calcular altura en mm para esta porción
         const heightMm = (heightToUse * pxToMm) * scale;
         
+        // Posición Y en la página
+        const currentY = pageNum === 1 ? yAfterHeader : (headerHeight + 3);
+        
         // Agregar la porción al PDF
         doc.addImage(tempImgData, "PNG", x, currentY, scaledWidth, heightMm);
       }
       
       sourceY += heightToUse;
       
-      // Si aún queda contenido, agregar una nueva página
-      if (sourceY < imgHeight) {
+      // Si aún queda contenido y no hemos alcanzado el límite de 2 páginas, agregar una nueva página
+      if (sourceY < imgHeight && pageNum < 2) {
         doc.addPage();
         pageNum++;
         
@@ -1123,8 +1124,6 @@ export const exportEvaluacionCompletaPDFFromElement = async (
         doc.setFont("helvetica", "normal");
         doc.setTextColor(0, 0, 0);
         doc.text(periodo, col2X + 18, infoY);
-        
-        currentY = yAfterHeader;
       }
     }
 
