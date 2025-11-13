@@ -31,7 +31,7 @@ import { TrendingUp, Award, Lightbulb, FileDown, Target } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PerformanceRadarAnalysis } from "@/components/evaluation/PerformanceRadarAnalysis";
 import { supabase } from "@/integrations/supabase/client";
-import { exportEvaluacionCompletaPDF } from "@/lib/exports";
+import { exportEvaluacionCompletaPDF, exportEvaluacionCompletaPDFFromElement } from "@/lib/exports";
 import { toast } from "@/hooks/use-toast";
 
 // Helper para calcular respuestas consolidadas (70% jefe + 30% auto)
@@ -452,7 +452,7 @@ const Dashboard = () => {
           <div className="space-y-6">
             {/* Mostrar resultados si están disponibles */}
             {evaluationStatus === "submitted" && resultadoData && (
-              <>
+              <div id="resultados-evaluacion-container">
                 {/* Título y Badge */}
                 <div className="mb-6">
                   <div className="flex items-center gap-3 mb-2">
@@ -632,7 +632,7 @@ const Dashboard = () => {
                           </p>
                         </div>
                         <Button 
-                          onClick={() => {
+                          onClick={async () => {
                             if (!resultadoData) {
                               toast({
                                 title: "Error",
@@ -642,7 +642,8 @@ const Dashboard = () => {
                               return;
                             }
                             try {
-                              exportEvaluacionCompletaPDF(
+                              await exportEvaluacionCompletaPDFFromElement(
+                                "resultados-evaluacion-container",
                                 {
                                   nombre: user?.nombre || "N/A",
                                   dpi: user?.dpi,
@@ -651,20 +652,11 @@ const Dashboard = () => {
                                   nivel: user?.nivel
                                 },
                                 activePeriod?.nombre || "N/A",
-                                new Date(),
-                                resultadoData
+                                new Date()
                               );
-                              toast({
-                                title: "Éxito",
-                                description: "Evaluación exportada a PDF exitosamente"
-                              });
                             } catch (error) {
                               console.error("Error al exportar:", error);
-                              toast({
-                                title: "Error",
-                                description: "Error al exportar la evaluación",
-                                variant: "destructive"
-                              });
+                              // El toast de error ya se maneja en la función
                             }
                           }}
                           className="w-full bg-green-600 hover:bg-green-700"
@@ -676,7 +668,7 @@ const Dashboard = () => {
                     </CardContent>
                   </Card>
                 </div>
-              </>
+              </div>
             )}
 
             {/* Mostrar formulario o mensaje si no está completada */}

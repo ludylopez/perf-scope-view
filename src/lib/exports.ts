@@ -2,6 +2,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { format } from "date-fns";
+import html2canvas from "html2canvas";
 import { es } from "date-fns/locale";
 import { scoreToPercentage } from "./calculations";
 
@@ -782,6 +783,171 @@ export const exportEvaluacionCompletaPDF = (
   // Descargar
   const filename = `evaluacion_${empleado.nombre.replace(/\s+/g, "_")}_${periodo.replace(/\s+/g, "_")}_${format(fechaGeneracion, "yyyy-MM-dd")}.pdf`;
   doc.save(filename);
+};
+
+// Exportar evaluación completa capturando la pantalla (réplica exacta)
+export const exportEvaluacionCompletaPDFFromElement = async (
+  elementId: string,
+  empleado: {
+    nombre: string;
+    dpi?: string;
+    cargo?: string;
+    area?: string;
+    nivel?: string;
+  },
+  periodo: string,
+  fechaGeneracion: Date
+) => {
+  try {
+    const element = document.getElementById(elementId);
+    if (!element) {
+      throw new Error(`Elemento con ID "${elementId}" no encontrado`);
+    }
+
+    // Mostrar mensaje de carga
+    const toast = (await import("@/hooks/use-toast")).toast;
+    toast({
+      title: "Generando PDF...",
+      description: "Capturando la vista actual, por favor espere"
+    });
+
+    // Capturar el elemento como imagen
+    const canvas = await html2canvas(element, {
+      scale: 2, // Mayor resolución
+      useCORS: true,
+      logging: false,
+      backgroundColor: "#ffffff",
+      width: element.scrollWidth,
+      height: element.scrollHeight,
+      windowWidth: element.scrollWidth,
+      windowHeight: element.scrollHeight
+    });
+
+    const imgData = canvas.toDataURL("image/png");
+    const imgWidth = canvas.width;
+    const imgHeight = canvas.height;
+
+    // Crear PDF en formato A4
+    const doc = new jsPDF({
+      orientation: imgWidth > imgHeight ? "landscape" : "portrait",
+      unit: "mm",
+      format: "a4"
+    });
+
+    // Agregar encabezado con información del empleado
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    
+    // Convertir píxeles a mm (asumiendo 96 DPI: 1px = 0.264583mm)
+    const pxToMm = 0.264583;
+    const imgWidthMm = imgWidth * pxToMm;
+    const imgHeightMm = imgHeight * pxToMm;
+    
+    // Calcular dimensiones para la imagen
+    const margin = 10; // mm
+    const headerHeight = 20; // mm
+    const footerHeight = 15; // mm
+    
+    // Encabezado con fondo de color
+    doc.setFillColor(59, 130, 246);
+    doc.rect(0, 0, pageWidth, headerHeight, 'F');
+    
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(255, 255, 255);
+    doc.text("Evaluación de Desempeño", pageWidth / 2, 10, { align: "center" });
+    
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Empleado: ${empleado.nombre}`, 10, 16);
+    if (empleado.cargo) {
+      doc.text(`Cargo: ${empleado.cargo}`, pageWidth / 2, 16, { align: "center" });
+    }
+    doc.text(`Período: ${periodo}`, pageWidth - 10, 16, { align: "right" });
+    
+    const availableWidth = pageWidth - (margin * 2);
+    const availableHeight = pageHeight - headerHeight - footerHeight - margin;
+    
+    // Calcular escala para que la imagen quepa
+    const scaleX = availableWidth / imgWidthMm;
+    const scaleY = availableHeight / imgHeightMm;
+    const scale = Math.min(scaleX, scaleY, 1); // No ampliar, solo reducir si es necesario
+    
+    const scaledWidth = imgWidthMm * scale;
+    const scaledHeight = imgHeightMm * scale;
+    
+    // Centrar la imagen
+    const x = (pageWidth - scaledWidth) / 2;
+    const y = headerHeight + 5;
+
+    // Dividir la imagen en páginas si es necesario
+    let remainingHeight = scaledHeight;
+    let sourceY = 0;
+    let currentY = y;
+    let pageNum = 1;
+
+    while (remainingHeight > 0 && pageNum <= 10) { // Límite de 10 páginas
+      const heightOnPage = Math.min(remainingHeight, availableHeight);
+      const sourceHeightPx = (heightOnPage / scale) / pxToMm; // Convertir de mm a px
+      
+      // Crear un canvas temporal con la porción de la imagen
+      const tempCanvas = document.createElement("canvas");
+      tempCanvas.width = imgWidth;
+      tempCanvas.height = sourceHeightPx;
+      const tempCtx = tempCanvas.getContext("2d");
+      
+      if (tempCtx) {
+        // Dibujar la porción de la imagen original en el canvas temporal
+        tempCtx.drawImage(canvas, 0, sourceY, imgWidth, sourceHeightPx, 0, 0, imgWidth, sourceHeightPx);
+        const tempImgData = tempCanvas.toDataURL("image/png");
+        
+        // Agregar la porción al PDF
+        doc.addImage(tempImgData, "PNG", x, currentY, scaledWidth, heightOnPage);
+      }
+      
+      remainingHeight -= heightOnPage;
+      sourceY += sourceHeightPx;
+      
+      // Si aún queda contenido, agregar una nueva página
+      if (remainingHeight > 0) {
+        doc.addPage();
+        pageNum++;
+        currentY = headerHeight + 5;
+      }
+    }
+
+    // Footer en todas las páginas
+    const totalPages = doc.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(100, 100, 100);
+      doc.text(
+        `Página ${i} de ${totalPages} • Generado el ${format(fechaGeneracion, "dd/MM/yyyy HH:mm")}`,
+        pageWidth / 2,
+        pageHeight - 10,
+        { align: "center" }
+      );
+    }
+
+    // Descargar
+    const filename = `evaluacion_${empleado.nombre.replace(/\s+/g, "_")}_${periodo.replace(/\s+/g, "_")}_${format(fechaGeneracion, "yyyy-MM-dd")}.pdf`;
+    doc.save(filename);
+
+    toast({
+      title: "Éxito",
+      description: "PDF generado exitosamente"
+    });
+  } catch (error) {
+    console.error("Error al exportar PDF:", error);
+    const toast = (await import("@/hooks/use-toast")).toast;
+    toast({
+      title: "Error",
+      description: "Error al generar el PDF. Por favor, intente nuevamente.",
+      variant: "destructive"
+    });
+    throw error;
+  }
 };
 
 // Exportar plan de desarrollo a PDF (versión imprimible)
