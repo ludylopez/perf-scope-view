@@ -24,10 +24,62 @@ import {
   Database
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { getEvaluationDraft, hasSubmittedEvaluation, saveEvaluationDraft, submitEvaluation, EvaluationDraft } from "@/lib/storage";
+import { getEvaluationDraft, hasSubmittedEvaluation, saveEvaluationDraft, submitEvaluation, EvaluationDraft, getSubmittedEvaluation, hasJefeEvaluation, getJefeEvaluationDraft } from "@/lib/storage";
 import { getInstrumentForUser } from "@/lib/instruments";
 import { toast } from "@/hooks/use-toast";
 import { getJerarquiaInfo } from "@/lib/jerarquias";
+import { getColaboradorJefe } from "@/lib/supabase";
+import { calculatePerformanceScore, scoreToPercentage, calculateDimensionPercentage, calculateDimensionAverage } from "@/lib/calculations";
+import { TrendingUp, Award, Lightbulb } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+
+// Helper para calcular respuestas consolidadas (70% jefe + 30% auto)
+const calculateConsolidatedResponses = (
+  autoResponses: Record<string, number>,
+  jefeResponses: Record<string, number>
+): Record<string, number> => {
+  const consolidated: Record<string, number> = {};
+  
+  const allItemIds = new Set([
+    ...Object.keys(autoResponses),
+    ...Object.keys(jefeResponses)
+  ]);
+  
+  allItemIds.forEach((itemId) => {
+    const autoValue = autoResponses[itemId] || 0;
+    const jefeValue = jefeResponses[itemId] || 0;
+    
+    if (autoResponses[itemId] !== undefined && jefeResponses[itemId] !== undefined) {
+      consolidated[itemId] = Math.round((jefeValue * 0.7 + autoValue * 0.3) * 100) / 100;
+    } else if (autoResponses[itemId] !== undefined) {
+      consolidated[itemId] = autoValue;
+    } else if (jefeResponses[itemId] !== undefined) {
+      consolidated[itemId] = jefeValue;
+    }
+  });
+  
+  return consolidated;
+};
+
+// Helper para interpretar el puntaje
+const getScoreInterpretation = (percentage: number) => {
+  if (percentage >= 90) return { label: "Excelente", color: "text-green-600 bg-green-50 border-green-200" };
+  if (percentage >= 75) return { label: "Bueno", color: "text-blue-600 bg-blue-50 border-blue-200" };
+  if (percentage >= 60) return { label: "Regular", color: "text-yellow-600 bg-yellow-50 border-yellow-200" };
+  return { label: "Necesita mejorar", color: "text-orange-600 bg-orange-50 border-orange-200" };
+};
+
+// Helper para obtener título amigable de dimensión
+const getDimensionFriendlyTitle = (dimension: any): string => {
+  const nombre = dimension.nombre.toLowerCase();
+  if (nombre.includes("competencias laborales") && nombre.includes("técnica")) return "Competencias Laborales";
+  if (nombre.includes("comportamiento") && nombre.includes("organizacional")) return "Comportamiento Organizacional";
+  if (nombre.includes("relaciones interpersonales") || nombre.includes("trabajo en equipo")) return "Relaciones Interpersonales";
+  if (nombre.includes("orientación al servicio") || nombre.includes("atención al usuario")) return "Orientación al Servicio";
+  if (nombre.includes("calidad del trabajo")) return "Calidad del Trabajo";
+  if (nombre.includes("productividad") || nombre.includes("cumplimiento")) return "Productividad";
+  return dimension.nombre.length > 40 ? dimension.nombre.substring(0, 40) + "..." : dimension.nombre;
+};
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -37,6 +89,13 @@ const Dashboard = () => {
   const [evaluationStatus, setEvaluationStatus] = useState<"not_started" | "in_progress" | "submitted">("not_started");
   const [progress, setProgress] = useState(0);
   const [jerarquiaInfo, setJerarquiaInfo] = useState<any>(null);
+  const [resultadoData, setResultadoData] = useState<{
+    performancePercentage: number;
+    jefeCompleto: boolean;
+    fortalezas: any[];
+    areasOportunidad: any[];
+    instrument: any;
+  } | null>(null);
 
   const isColaborador = user?.rol === "colaborador";
   const isJefe = user?.rol === "jefe";
@@ -52,6 +111,11 @@ const Dashboard = () => {
       if (isSubmitted) {
         setEvaluationStatus("submitted");
         setProgress(100);
+        
+        // Cargar datos de resultados si está enviada
+        if (isColaborador) {
+          await loadResultadosData();
+        }
       } else {
         const draft = await getEvaluationDraft(user.dpi, activePeriodId);
         if (draft && Object.keys(draft.responses).length > 0) {
@@ -64,8 +128,57 @@ const Dashboard = () => {
       }
     };
 
+    const loadResultadosData = async () => {
+      try {
+        const instrument = await getInstrumentForUser(user.nivel);
+        if (!instrument) return;
+
+        const submitted = await getSubmittedEvaluation(user.dpi, activePeriodId);
+        if (!submitted) return;
+
+        const jefeId = await getColaboradorJefe(user.dpi);
+        let jefeCompleto = false;
+        let responsesToUse = submitted.responses;
+
+        if (jefeId) {
+          jefeCompleto = await hasJefeEvaluation(jefeId, user.dpi, activePeriodId);
+          if (jefeCompleto) {
+            const jefeEval = await getJefeEvaluationDraft(jefeId, user.dpi, activePeriodId);
+            if (jefeEval) {
+              responsesToUse = calculateConsolidatedResponses(submitted.responses, jefeEval.responses);
+            }
+          }
+        }
+
+        const performanceScore = calculatePerformanceScore(responsesToUse, instrument.dimensionesDesempeno);
+        const performancePercentage = scoreToPercentage(performanceScore);
+
+        const radarData = instrument.dimensionesDesempeno.map((dim, idx) => ({
+          dimension: getDimensionFriendlyTitle(dim),
+          numero: idx + 1,
+          tuEvaluacion: calculateDimensionPercentage(responsesToUse, dim),
+          puntaje: calculateDimensionAverage(responsesToUse, dim),
+          dimensionData: dim
+        }));
+
+        const sortedDimensions = [...radarData].sort((a, b) => b.tuEvaluacion - a.tuEvaluacion);
+        const fortalezas = sortedDimensions.slice(0, 3);
+        const areasOportunidad = sortedDimensions.slice(-3).reverse();
+
+        setResultadoData({
+          performancePercentage,
+          jefeCompleto,
+          fortalezas,
+          areasOportunidad,
+          instrument
+        });
+      } catch (error) {
+        console.error('Error cargando resultados:', error);
+      }
+    };
+
     checkStatus();
-  }, [user, activePeriodId]);
+  }, [user, activePeriodId, isColaborador]);
 
   // Cargar información de jerarquía
   useEffect(() => {
@@ -225,61 +338,167 @@ const Dashboard = () => {
 
         {/* Colaborador Dashboard */}
         {isColaborador && (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            <Card className="md:col-span-2">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <ClipboardCheck className="h-5 w-5 text-primary" />
-                  Mi Autoevaluación
-                </CardTitle>
-                <CardDescription>
-                  Complete su evaluación de desempeño
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">Periodo: {activePeriod?.nombre || 'Cargando...'}</p>
-                    <p className="text-sm text-muted-foreground">
-                      Fecha límite: {activePeriod ? new Date(activePeriod.fechaCierreAutoevaluacion).toLocaleDateString('es-GT', { day: 'numeric', month: 'long', year: 'numeric' }) : ''}
-                    </p>
-                  </div>
-                  {getStatusBadge()}
-                </div>
-                
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span>Progreso</span>
-                    <span className="font-medium">{Math.round(progress)}%</span>
-                  </div>
-                  <Progress value={progress} className="h-2" />
-                </div>
+          <div className="space-y-6">
+            {/* Mostrar resultados si están disponibles */}
+            {evaluationStatus === "submitted" && resultadoData && (
+              <>
+                {/* Resumen de Resultados */}
+                <Card className="border-2 border-primary/20">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="flex items-center gap-2">
+                          <TrendingUp className="h-5 w-5 text-primary" />
+                          Mis Resultados - Periodo {activePeriod?.nombre || 'N/A'}
+                        </CardTitle>
+                        <CardDescription>
+                          {resultadoData.jefeCompleto 
+                            ? "Resultado consolidado de tu evaluación de desempeño"
+                            : "Autoevaluación enviada. Esperando evaluación del jefe para resultado consolidado."}
+                        </CardDescription>
+                      </div>
+                      <Badge className={resultadoData.jefeCompleto ? "bg-success text-success-foreground" : "bg-info text-info-foreground"}>
+                        {resultadoData.jefeCompleto ? "Resultado Consolidado" : "Autoevaluación Enviada"}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid gap-6 md:grid-cols-2">
+                      {/* Puntaje Global */}
+                      <div className="flex flex-col items-center gap-4">
+                        <Badge className={`${getScoreInterpretation(resultadoData.performancePercentage).color} px-4 py-2 text-base font-medium`}>
+                          <TrendingUp className="mr-2 h-4 w-4" />
+                          Tu desempeño es {getScoreInterpretation(resultadoData.performancePercentage).label}
+                        </Badge>
+                        
+                        <div className="relative w-48 h-48">
+                          <svg className="w-full h-full" viewBox="0 0 100 100">
+                            <circle
+                              cx="50"
+                              cy="50"
+                              r="40"
+                              fill="none"
+                              stroke="hsl(var(--muted))"
+                              strokeWidth="8"
+                            />
+                            <circle
+                              cx="50"
+                              cy="50"
+                              r="40"
+                              fill="none"
+                              stroke="hsl(var(--primary))"
+                              strokeWidth="8"
+                              strokeDasharray={`${resultadoData.performancePercentage * 2.513} 251.3`}
+                              strokeLinecap="round"
+                              transform="rotate(-90 50 50)"
+                              className="transition-all duration-1000"
+                            />
+                          </svg>
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="text-center">
+                              <div className="text-4xl font-bold text-primary">{resultadoData.performancePercentage}%</div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
 
-                {getActionButton()}
-              </CardContent>
-            </Card>
+                      {/* Fortalezas y Áreas de Oportunidad */}
+                      <div className="space-y-4">
+                        {resultadoData.fortalezas.length > 0 && (
+                          <div className="flex items-start gap-3 p-4 rounded-lg bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800">
+                            <div className="flex-shrink-0 p-2 rounded-lg bg-yellow-100 dark:bg-yellow-900/30">
+                              <Award className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+                            </div>
+                            <div className="flex-1">
+                              <h4 className="font-semibold text-sm mb-1 text-foreground">
+                                {resultadoData.fortalezas[0].dimension}
+                              </h4>
+                              <p className="text-sm text-muted-foreground">
+                                Tu mayor fortaleza con {resultadoData.fortalezas[0].tuEvaluacion}%
+                              </p>
+                            </div>
+                          </div>
+                        )}
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-accent" />
-                  Mis Resultados
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  Los resultados finales estarán disponibles cuando su jefe complete la
-                  evaluación y el periodo cierre.
-                </p>
-                <Button 
-                  variant="outline" 
-                  className="w-full" 
-                  onClick={() => navigate("/mis-resultados")}
-                >
-                  Ver Resultados
-                </Button>
-              </CardContent>
-            </Card>
+                        {resultadoData.areasOportunidad.length > 0 && (
+                          <div className="flex items-start gap-3 p-4 rounded-lg bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800">
+                            <div className="flex-shrink-0 p-2 rounded-lg bg-orange-100 dark:bg-orange-900/30">
+                              <Lightbulb className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                            </div>
+                            <div className="flex-1">
+                              <h4 className="font-semibold text-sm mb-1 text-foreground">
+                                Área para Fortalecer
+                              </h4>
+                              <p className="text-sm text-muted-foreground">
+                                <strong>{resultadoData.areasOportunidad[0].dimension}:</strong>{" "}
+                                {resultadoData.areasOportunidad[0].tuEvaluacion}%
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {!resultadoData.jefeCompleto && (
+                      <Alert className="mt-4 border-blue-200 bg-blue-50 dark:bg-blue-950/20">
+                        <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                        <AlertDescription className="text-blue-800 dark:text-blue-200">
+                          Su autoevaluación fue recibida. Cuando su jefe complete la evaluación, aquí aparecerá su resultado consolidado.
+                        </AlertDescription>
+                      </Alert>
+                    )}
+
+                    <div className="mt-6 flex gap-3">
+                      <Button 
+                        variant="outline" 
+                        className="flex-1"
+                        onClick={() => navigate("/mi-autoevaluacion")}
+                      >
+                        Ver Detalle Completo
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
+            )}
+
+            {/* Mostrar formulario o mensaje si no está completada */}
+            {evaluationStatus !== "submitted" && (
+              <Card className="md:col-span-2">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <ClipboardCheck className="h-5 w-5 text-primary" />
+                    Mi Autoevaluación
+                  </CardTitle>
+                  <CardDescription>
+                    Complete su evaluación de desempeño
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">Periodo: {activePeriod?.nombre || 'Cargando...'}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Fecha límite: {activePeriod ? new Date(activePeriod.fechaCierreAutoevaluacion).toLocaleDateString('es-GT', { day: 'numeric', month: 'long', year: 'numeric' }) : ''}
+                      </p>
+                    </div>
+                    {getStatusBadge()}
+                  </div>
+                  
+                  {evaluationStatus === "in_progress" && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span>Progreso</span>
+                        <span className="font-medium">{Math.round(progress)}%</span>
+                      </div>
+                      <Progress value={progress} className="h-2" />
+                    </div>
+                  )}
+
+                  {getActionButton()}
+                </CardContent>
+              </Card>
+            )}
 
             <Card className="md:col-span-2 lg:col-span-3">
               <CardHeader>
@@ -319,22 +538,50 @@ const Dashboard = () => {
                   </div>
                   
                   <div className="flex items-center gap-3 rounded-lg border p-4">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
-                      <Clock className="h-5 w-5 text-muted-foreground" />
+                    <div className={`flex h-10 w-10 items-center justify-center rounded-full ${
+                      resultadoData?.jefeCompleto 
+                        ? "bg-success/10" 
+                        : evaluationStatus === "submitted"
+                        ? "bg-info/10"
+                        : "bg-muted"
+                    }`}>
+                      {resultadoData?.jefeCompleto ? (
+                        <CheckCircle2 className="h-5 w-5 text-success" />
+                      ) : (
+                        <Clock className={`h-5 w-5 ${
+                          evaluationStatus === "submitted" ? "text-info" : "text-muted-foreground"
+                        }`} />
+                      )}
                     </div>
                     <div>
                       <p className="text-sm font-medium">Evaluación Jefe</p>
-                      <p className="text-xs text-muted-foreground">En espera</p>
+                      <p className="text-xs text-muted-foreground">
+                        {resultadoData?.jefeCompleto 
+                          ? "Completada" 
+                          : evaluationStatus === "submitted"
+                          ? "En espera"
+                          : "Pendiente"}
+                      </p>
                     </div>
                   </div>
                   
                   <div className="flex items-center gap-3 rounded-lg border p-4">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
-                      <BarChart3 className="h-5 w-5 text-muted-foreground" />
+                    <div className={`flex h-10 w-10 items-center justify-center rounded-full ${
+                      resultadoData?.jefeCompleto 
+                        ? "bg-success/10" 
+                        : "bg-muted"
+                    }`}>
+                      {resultadoData?.jefeCompleto ? (
+                        <CheckCircle2 className="h-5 w-5 text-success" />
+                      ) : (
+                        <BarChart3 className="h-5 w-5 text-muted-foreground" />
+                      )}
                     </div>
                     <div>
                       <p className="text-sm font-medium">Resultados Finales</p>
-                      <p className="text-xs text-muted-foreground">No disponible</p>
+                      <p className="text-xs text-muted-foreground">
+                        {resultadoData?.jefeCompleto ? "Disponible" : "No disponible"}
+                      </p>
                     </div>
                   </div>
                 </div>
