@@ -852,11 +852,57 @@ export const exportEvaluacionCompletaPDFFromElement = async (
     const margin = 10; // mm
     const footerHeight = 15; // mm
     
-    // Determinar altura del header según información disponible
-    let headerHeight = 35; // mm (altura base)
-    if (empleado.departamentoDependencia || empleado.profesion) {
-      headerHeight = 40; // mm (más alto si hay info extra)
+    // Calcular altura necesaria del header primero
+    const nombreCompleto = empleado.apellidos 
+      ? `${empleado.nombre} ${empleado.apellidos}` 
+      : empleado.nombre;
+    
+    const leftColX = 10;
+    const rightColX = pageWidth / 2 + 5;
+    const labelWidth = 35;
+    
+    // Calcular altura necesaria simulando el contenido
+    let yPos = 16; // Inicio después del título
+    doc.setFontSize(8);
+    
+    // Primera fila
+    yPos += 5;
+    
+    // Segunda fila
+    if (empleado.cargo) {
+      const cargoLines = doc.splitTextToSize(empleado.cargo, (pageWidth / 2) - leftColX - labelWidth - 5);
+      yPos += 5 + (cargoLines.length - 1) * 4;
+    } else {
+      yPos += 5;
     }
+    
+    // Tercera fila
+    if (empleado.area) {
+      const areaLines = doc.splitTextToSize(empleado.area, (pageWidth / 2) - leftColX - labelWidth - 5);
+      yPos += 5 + (areaLines.length - 1) * 4;
+    } else {
+      yPos += 5;
+    }
+    
+    // Cuarta fila
+    if (empleado.direccionUnidad) {
+      const dirLines = doc.splitTextToSize(empleado.direccionUnidad, (pageWidth / 2) - leftColX - labelWidth - 5);
+      yPos += 5 + (dirLines.length - 1) * 4;
+    } else if (empleado.departamentoDependencia) {
+      const deptoLines = doc.splitTextToSize(empleado.departamentoDependencia, (pageWidth / 2) - rightColX - labelWidth - 5);
+      yPos += 5 + (deptoLines.length - 1) * 4;
+    } else {
+      yPos += 5;
+    }
+    
+    // Quinta fila - Profesión
+    if (empleado.profesion) {
+      const profLines = doc.splitTextToSize(empleado.profesion, pageWidth - leftColX - labelWidth - 10);
+      yPos += 2 + 5 + (profLines.length - 1) * 4;
+    }
+    
+    // Calcular headerHeight con margen
+    let headerHeight = Math.max(35, yPos + 8);
     
     // ===== ENCABEZADO CON TEXTO SELECCIONABLE =====
     // Fondo azul
@@ -864,51 +910,102 @@ export const exportEvaluacionCompletaPDFFromElement = async (
     doc.rect(0, 0, pageWidth, headerHeight, 'F');
     
     // Título principal (texto seleccionable)
-    doc.setFontSize(16);
+    doc.setFontSize(18);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(255, 255, 255);
-    doc.text("Evaluación de Desempeño", pageWidth / 2, 8, { align: "center" });
+    doc.text("Evaluación de Desempeño", pageWidth / 2, 7, { align: "center" });
     
-    // Información del empleado (TEXTO SELECCIONABLE)
+    // Línea separadora debajo del título
+    doc.setDrawColor(255, 255, 255);
+    doc.setLineWidth(0.3);
+    doc.line(10, 10, pageWidth - 10, 10);
+    
+    // Información del empleado (TEXTO SELECCIONABLE) - Diseño en columnas organizadas
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(255, 255, 255);
     
-    // Primera fila: Nombre completo y DPI
-    const nombreCompleto = empleado.apellidos 
-      ? `${empleado.nombre} ${empleado.apellidos}` 
-      : empleado.nombre;
-    doc.text(`Empleado: ${nombreCompleto}`, 10, 16);
+    // Columna izquierda
+    yPos = 16;
+    
+    // Primera fila - Columna izquierda
+    doc.setFont("helvetica", "bold");
+    doc.text("Empleado:", leftColX, yPos);
+    doc.setFont("helvetica", "normal");
+    doc.text(nombreCompleto, leftColX + labelWidth, yPos);
+    
+    // Primera fila - Columna derecha
     if (empleado.dpi) {
-      doc.text(`DPI: ${empleado.dpi}`, pageWidth - 10, 16, { align: "right" });
+      doc.setFont("helvetica", "bold");
+      doc.text("DPI:", rightColX, yPos);
+      doc.setFont("helvetica", "normal");
+      doc.text(empleado.dpi, rightColX + labelWidth, yPos);
     }
     
-    // Segunda fila: Cargo y Área
+    yPos += 5;
+    
+    // Segunda fila
+    const row2Y = yPos;
+    let cargoLines: string[] = [];
     if (empleado.cargo) {
-      doc.text(`Cargo: ${empleado.cargo}`, 10, 22);
+      doc.setFont("helvetica", "bold");
+      doc.text("Cargo:", leftColX, row2Y);
+      doc.setFont("helvetica", "normal");
+      cargoLines = doc.splitTextToSize(empleado.cargo, (pageWidth / 2) - leftColX - labelWidth - 5);
+      doc.text(cargoLines, leftColX + labelWidth, row2Y);
     }
-    if (empleado.area) {
-      doc.text(`Área: ${empleado.area}`, pageWidth / 2, 22, { align: "center" });
-    }
-    
-    // Tercera fila: Nivel y Período
     if (empleado.nivel) {
-      doc.text(`Nivel: ${empleado.nivel}`, 10, 28);
+      doc.setFont("helvetica", "bold");
+      doc.text("Nivel:", rightColX, row2Y);
+      doc.setFont("helvetica", "normal");
+      doc.text(empleado.nivel, rightColX + labelWidth, row2Y);
     }
-    if (empleado.direccionUnidad) {
-      doc.text(`Dirección/Unidad: ${empleado.direccionUnidad}`, pageWidth / 2, 28, { align: "center" });
-    }
-    doc.text(`Período: ${periodo}`, pageWidth - 10, 28, { align: "right" });
+    yPos += 5 + (cargoLines.length - 1) * 4;
     
-    // Cuarta fila: Información adicional si está disponible
-    if (empleado.departamentoDependencia || empleado.profesion) {
-      doc.setFontSize(7);
-      if (empleado.departamentoDependencia) {
-        doc.text(`Depto/Dependencia: ${empleado.departamentoDependencia}`, 10, 34);
-      }
-      if (empleado.profesion) {
-        doc.text(`Profesión: ${empleado.profesion}`, pageWidth - 10, 34, { align: "right" });
-      }
+    // Tercera fila
+    const row3Y = yPos;
+    let areaLines: string[] = [];
+    if (empleado.area) {
+      doc.setFont("helvetica", "bold");
+      doc.text("Área:", leftColX, row3Y);
+      doc.setFont("helvetica", "normal");
+      areaLines = doc.splitTextToSize(empleado.area, (pageWidth / 2) - leftColX - labelWidth - 5);
+      doc.text(areaLines, leftColX + labelWidth, row3Y);
+    }
+    doc.setFont("helvetica", "bold");
+    doc.text("Período:", rightColX, row3Y);
+    doc.setFont("helvetica", "normal");
+    doc.text(periodo, rightColX + labelWidth, row3Y);
+    yPos += 5 + (areaLines.length - 1) * 4;
+    
+    // Cuarta fila
+    const row4Y = yPos;
+    let dirLines: string[] = [];
+    let deptoLines: string[] = [];
+    if (empleado.direccionUnidad) {
+      doc.setFont("helvetica", "bold");
+      doc.text("Dirección/Unidad:", leftColX, row4Y);
+      doc.setFont("helvetica", "normal");
+      dirLines = doc.splitTextToSize(empleado.direccionUnidad, (pageWidth / 2) - leftColX - labelWidth - 5);
+      doc.text(dirLines, leftColX + labelWidth, row4Y);
+    }
+    if (empleado.departamentoDependencia) {
+      doc.setFont("helvetica", "bold");
+      doc.text("Depto/Dependencia:", rightColX, row4Y);
+      doc.setFont("helvetica", "normal");
+      deptoLines = doc.splitTextToSize(empleado.departamentoDependencia, (pageWidth / 2) - rightColX - labelWidth - 5);
+      doc.text(deptoLines, rightColX + labelWidth, row4Y);
+    }
+    yPos += 5 + Math.max((dirLines.length - 1) * 4, (deptoLines.length - 1) * 4);
+    
+    // Quinta fila - Profesión (puede ocupar ambas columnas si es largo)
+    if (empleado.profesion) {
+      yPos += 2;
+      doc.setFont("helvetica", "bold");
+      doc.text("Profesión:", leftColX, yPos);
+      doc.setFont("helvetica", "normal");
+      const profLines = doc.splitTextToSize(empleado.profesion, pageWidth - leftColX - labelWidth - 10);
+      doc.text(profLines, leftColX + labelWidth, yPos);
     }
     
     // Agregar información adicional como texto seleccionable debajo del header
