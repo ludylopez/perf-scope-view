@@ -40,6 +40,7 @@ import {
   Tooltip,
   Legend
 } from "recharts";
+import { PerformanceRadarAnalysis } from "@/components/evaluation/PerformanceRadarAnalysis";
 
 // Helper para interpretar el puntaje
 const getScoreInterpretation = (percentage: number) => {
@@ -542,276 +543,25 @@ const MiAutoevaluacion = () => {
           </CardContent>
         </Card>
 
-        <Card className="mb-6">
-          <CardContent className="p-6">
-            <div className="grid lg:grid-cols-[1fr,400px] gap-8">
-              {/* Panel Izquierdo: Gráfico de Radar */}
-              <div className="flex flex-col">
-                <div className="mb-4">
-                  <h3 className="text-xl font-bold flex items-center gap-2 mb-1">
-                    <div className="p-2 rounded-lg bg-primary/10">
-                      <TrendingUp className="h-5 w-5 text-primary" />
-                    </div>
-                    Panorama de Competencias
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    Vista integral de tu desempeño por dimensión comparado con el promedio municipal
-                  </p>
-                </div>
+<div className="mb-6">
+  <PerformanceRadarAnalysis
+    radarData={radarData.map(d => ({
+      dimension: d.dimension,
+      tuResultado: d.tuEvaluacion,
+      promedioMunicipal: Object.keys(promedioMunicipal).length > 0 ? d.promedioMunicipal : undefined,
+    }))}
+    dimensionAnalysis={radarData.map(d => ({
+      nombre: d.nombreCompleto || d.dimension,
+      descripcion: d.dimensionData?.descripcion,
+      porcentaje: d.tuEvaluacion,
+      isFortaleza: d.tuEvaluacion >= 80,
+      promedioMunicipal: Object.keys(promedioMunicipal).length > 0 ? d.promedioMunicipal : undefined,
+    }))}
+    title="Panorama de Competencias"
+    description={jefeCompleto ? "Vista integral de tu desempeño por dimensión comparado con el promedio municipal" : "Vista de tu autoevaluación por dimensión comparado con el promedio municipal"}
+  />
+</div>
 
-                <div className="flex-1 min-h-[450px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <RadarChart data={radarData}>
-                      <defs>
-                        <linearGradient id="colorTuEval" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.8}/>
-                          <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
-                        </linearGradient>
-                      </defs>
-                      <PolarGrid 
-                        stroke="hsl(var(--border))" 
-                        strokeWidth={1}
-                      />
-                      <PolarAngleAxis 
-                        dataKey="dimension" 
-                        tick={{ 
-                          fill: 'hsl(var(--foreground))', 
-                          fontSize: 13,
-                          fontWeight: 500
-                        }}
-                      />
-                      <PolarRadiusAxis 
-                        angle={90} 
-                        domain={[0, 100]} 
-                        tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
-                        tickCount={6}
-                      />
-                      
-                      {/* Promedio Municipal - Segunda línea */}
-                      {Object.keys(promedioMunicipal).length > 0 && (
-                        <Radar
-                          name="Promedio Municipal"
-                          dataKey="promedioMunicipal"
-                          stroke="hsl(var(--muted-foreground))"
-                          fill="hsl(var(--muted))"
-                          fillOpacity={0.15}
-                          strokeWidth={2}
-                          strokeDasharray="5 5"
-                        />
-                      )}
-                      
-                      {/* Tu Resultado - Primera línea */}
-                      <Radar
-                        name={jefeCompleto ? "Tu Resultado" : "Tu Autoevaluación"}
-                        dataKey="tuEvaluacion"
-                        stroke="hsl(var(--primary))"
-                        fill="url(#colorTuEval)"
-                        fillOpacity={0.4}
-                        strokeWidth={3}
-                      />
-                      
-                      <Tooltip 
-                        content={({ active, payload }) => {
-                          if (active && payload && payload.length) {
-                            const data = payload[0].payload;
-                            return (
-                              <div className="bg-popover border-2 border-primary/20 rounded-lg p-4 shadow-xl">
-                                <p className="font-bold text-base mb-2 text-foreground">{data.dimension}</p>
-                                <div className="space-y-1">
-                                  <div className="flex items-center justify-between gap-4">
-                                    <span className="text-sm text-muted-foreground">
-                                      {jefeCompleto ? "Tu resultado:" : "Tu autoevaluación:"}
-                                    </span>
-                                    <span className="text-sm font-bold text-primary">{data.tuEvaluacion}%</span>
-                                  </div>
-                                  {data.promedioMunicipal > 0 && (
-                                    <div className="flex items-center justify-between gap-4">
-                                      <span className="text-sm text-muted-foreground">Promedio municipal:</span>
-                                      <span className="text-sm font-semibold text-muted-foreground">{data.promedioMunicipal}%</span>
-                                    </div>
-                                  )}
-                                  <div className="pt-2 mt-2 border-t border-border">
-                                    <span className="text-xs text-muted-foreground">
-                                      Puntaje Likert: {data.puntaje.toFixed(1)}/5.0
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          }
-                          return null;
-                        }}
-                      />
-                      
-                      <Legend 
-                        wrapperStyle={{
-                          paddingTop: '20px'
-                        }}
-                        iconType="circle"
-                        formatter={(value) => (
-                          <span style={{ 
-                            color: 'hsl(var(--foreground))', 
-                            fontSize: '14px',
-                            fontWeight: 500
-                          }}>
-                            {value}
-                          </span>
-                        )}
-                      />
-                    </RadarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              {/* Panel Derecho: Lista de Dimensiones */}
-              <div className="flex flex-col">
-                <div className="mb-4">
-                  <h3 className="text-xl font-bold flex items-center gap-2 mb-1">
-                    <div className="p-2 rounded-lg bg-secondary/50">
-                      <Target className="h-5 w-5 text-secondary-foreground" />
-                    </div>
-                    Por Dimensión
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    Resultados detallados
-                  </p>
-                </div>
-
-                <div className="space-y-4">
-                  {radarData.map((data, idx) => {
-                    const interpretation = getScoreInterpretation(data.tuEvaluacion);
-                    
-                    return (
-                      <div 
-                        key={idx}
-                        className="flex items-center gap-3 p-3 rounded-lg border border-border bg-card hover:shadow-md transition-all"
-                      >
-                        {/* Número */}
-                        <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-lg bg-primary text-primary-foreground font-bold text-lg">
-                          {data.numero}
-                        </div>
-
-                        {/* Contenido */}
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-sm mb-2">{data.dimension}</p>
-                          
-                          {/* Barra de progreso */}
-                          <div className="flex items-center gap-2">
-                            <div className="flex-1 h-2.5 bg-muted rounded-full overflow-hidden">
-                              <div 
-                                className="h-full bg-gradient-to-r from-primary to-primary/70 transition-all duration-500"
-                                style={{ width: `${data.tuEvaluacion}%` }}
-                              />
-                            </div>
-                            <span className="text-lg font-bold text-primary min-w-[48px] text-right">
-                              {data.tuEvaluacion}%
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="grid gap-6 mb-6 md:grid-cols-2">
-          <Card className="border-success/20 bg-gradient-to-br from-success/5 to-transparent">
-            <CardHeader className="pb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-3 rounded-xl bg-success/20">
-                  <Award className="h-6 w-6 text-success" />
-                </div>
-                <div>
-                  <CardTitle className="text-xl">Fortalezas Identificadas</CardTitle>
-                  <CardDescription className="text-xs mt-0.5">
-                    Dimensiones con mejor desempeño
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {fortalezas.map((dim, idx) => (
-                  <div key={idx} className="group flex items-start gap-4 p-4 rounded-xl border-2 border-success/30 bg-card hover:border-success/50 hover:shadow-lg transition-all duration-300">
-                    <div className="flex-shrink-0 flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-br from-success to-success/70 text-white font-bold text-lg shadow-md group-hover:scale-110 transition-transform">
-                      {idx + 1}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <h4 className="font-bold text-base leading-tight">{dim.dimension}</h4>
-                        <span className="text-2xl font-extrabold text-success flex-shrink-0">{dim.tuEvaluacion}%</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground mb-3">
-                        {getDimensionShortDescription(dim.dimensionData)}
-                      </p>
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 h-3 bg-muted rounded-full overflow-hidden shadow-inner">
-                          <div 
-                            className="h-full bg-gradient-to-r from-success to-success/80 transition-all duration-700 ease-out rounded-full shadow-sm" 
-                            style={{ width: `${dim.tuEvaluacion}%` }}
-                          />
-                        </div>
-                        <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">
-                          {dim.puntaje.toFixed(1)}/5.0
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-warning/20 bg-gradient-to-br from-warning/5 to-transparent">
-            <CardHeader className="pb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-3 rounded-xl bg-warning/20">
-                  <Target className="h-6 w-6 text-warning" />
-                </div>
-                <div>
-                  <CardTitle className="text-xl">Áreas de Oportunidad</CardTitle>
-                  <CardDescription className="text-xs mt-0.5">
-                    Dimensiones para enfocarse en mejorar
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {areasDeOportunidad.map((dim, idx) => (
-                  <div key={idx} className="group flex items-start gap-4 p-4 rounded-xl border-2 border-warning/30 bg-card hover:border-warning/50 hover:shadow-lg transition-all duration-300">
-                    <div className="flex-shrink-0 flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-br from-warning to-warning/70 text-white font-bold text-lg shadow-md group-hover:scale-110 transition-transform">
-                      {idx + 1}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <h4 className="font-bold text-base leading-tight">{dim.dimension}</h4>
-                        <span className="text-2xl font-extrabold text-warning flex-shrink-0">{dim.tuEvaluacion}%</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground mb-3">
-                        {getDimensionShortDescription(dim.dimensionData)}
-                      </p>
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 h-3 bg-muted rounded-full overflow-hidden shadow-inner">
-                          <div 
-                            className="h-full bg-gradient-to-r from-warning to-warning/80 transition-all duration-700 ease-out rounded-full shadow-sm" 
-                            style={{ width: `${dim.tuEvaluacion}%` }}
-                          />
-                        </div>
-                        <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">
-                          {dim.puntaje.toFixed(1)}/5.0
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
 
         <Card className="border-primary/20">
           <CardContent className="pt-6">
