@@ -28,7 +28,7 @@ import { toast } from "@/hooks/use-toast";
 import { getJerarquiaInfo } from "@/lib/jerarquias";
 import { getColaboradorJefe } from "@/lib/supabase";
 import { calculatePerformanceScore, scoreToPercentage, calculateDimensionPercentage, calculateDimensionAverage } from "@/lib/calculations";
-import { TrendingUp, Award, Lightbulb, FileDown, Target, CheckCircle2, User } from "lucide-react";
+import { TrendingUp, Award, Lightbulb, FileDown, Target, User } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PerformanceRadarAnalysis } from "@/components/evaluation/PerformanceRadarAnalysis";
 import { supabase } from "@/integrations/supabase/client";
