@@ -27,12 +27,11 @@ import { toast } from "@/hooks/use-toast";
 import { getJerarquiaInfo } from "@/lib/jerarquias";
 import { getColaboradorJefe } from "@/lib/supabase";
 import { calculatePerformanceScore, scoreToPercentage, calculateDimensionPercentage, calculateDimensionAverage } from "@/lib/calculations";
-import { TrendingUp, Award, Lightbulb, FileDown, Target } from "lucide-react";
+import { TrendingUp, Award, Lightbulb, FileDown, Target, CheckCircle2, User } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PerformanceRadarAnalysis } from "@/components/evaluation/PerformanceRadarAnalysis";
 import { supabase } from "@/integrations/supabase/client";
 import { exportEvaluacionCompletaPDF, exportEvaluacionCompletaPDFFromElement } from "@/lib/exports";
-import { toast } from "@/hooks/use-toast";
 
 // Helper para calcular respuestas consolidadas (70% jefe + 30% auto)
 const calculateConsolidatedResponses = (
@@ -149,6 +148,7 @@ const Dashboard = () => {
     radarData: any[];
     promedioMunicipal: Record<string, number>;
   } | null>(null);
+  const [planDesarrollo, setPlanDesarrollo] = useState<any>(null);
 
   const isColaborador = user?.rol === "colaborador";
   const isJefe = user?.rol === "jefe";
@@ -283,6 +283,64 @@ const Dashboard = () => {
           radarData: radarDataWithPromedio,
           promedioMunicipal
         });
+
+        // Cargar plan de desarrollo si existe
+        // IMPORTANTE: Verificar que el plan corresponda al colaborador actual
+        try {
+          const { data: planData, error: planError } = await supabase
+            .from("development_plans")
+            .select("*")
+            .eq("colaborador_id", user.dpi) // Filtrar por el DPI del colaborador autenticado
+            .eq("periodo_id", activePeriodId) // Filtrar por el período activo
+            .maybeSingle();
+
+          if (planError) {
+            console.error('Error al cargar plan de desarrollo:', planError);
+            setPlanDesarrollo(null);
+          } else if (planData) {
+            // Validación adicional: asegurar que el plan pertenece al colaborador correcto
+            if (planData.colaborador_id !== user.dpi) {
+              console.warn('⚠️ Plan de desarrollo no corresponde al colaborador actual. Ignorando plan.');
+              setPlanDesarrollo(null);
+              return;
+            }
+
+            // Procesar el plan de desarrollo
+            const competencias = planData.competencias_desarrollar || planData.plan_estructurado;
+            let planEstructurado = null;
+
+            if (competencias) {
+              if (typeof competencias === 'object' && competencias.acciones) {
+                planEstructurado = competencias;
+              } else if (typeof competencias === 'string') {
+                try {
+                  planEstructurado = JSON.parse(competencias);
+                } catch (e) {
+                  console.error('Error parseando plan estructurado:', e);
+                }
+              }
+            }
+
+            const planCargado = {
+              id: planData.id,
+              evaluacion_id: planData.evaluacion_id,
+              colaborador_id: planData.colaborador_id,
+              periodo_id: planData.periodo_id,
+              planEstructurado: planEstructurado,
+              feedbackIndividual: planData.feedback_individual,
+              feedbackGrupal: planData.feedback_grupal,
+              generado_por_ia: planData.generado_por_ia,
+              editable: planData.editable
+            };
+
+            setPlanDesarrollo(planCargado);
+          } else {
+            setPlanDesarrollo(null);
+          }
+        } catch (error) {
+          console.error('Error cargando plan de desarrollo:', error);
+          setPlanDesarrollo(null);
+        }
       } catch (error) {
         console.error('Error cargando resultados:', error);
       }
@@ -590,6 +648,84 @@ const Dashboard = () => {
                     description={resultadoData.jefeCompleto ? "Vista integral de tu desempeño por dimensión comparado con el promedio municipal" : "Vista de tu autoevaluación por dimensión comparado con el promedio municipal"}
                   />
                 </div>
+
+                {/* Plan de Desarrollo - Acciones y Objetivos */}
+                {planDesarrollo && planDesarrollo.planEstructurado && (
+                  <div className="space-y-6 mb-6">
+                    {/* Objetivos */}
+                    {planDesarrollo.planEstructurado.objetivos && Array.isArray(planDesarrollo.planEstructurado.objetivos) && planDesarrollo.planEstructurado.objetivos.length > 0 && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2">
+                            <Target className="h-5 w-5 text-primary" />
+                            Objetivos de Desarrollo
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <ul className="space-y-2">
+                            {planDesarrollo.planEstructurado.objetivos.map((obj: string, idx: number) => (
+                              <li key={idx} className="flex items-start gap-2">
+                                <CheckCircle2 className="h-5 w-5 text-success mt-0.5 flex-shrink-0" />
+                                <span>{obj}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Acciones Priorizadas */}
+                    {planDesarrollo.planEstructurado.acciones && Array.isArray(planDesarrollo.planEstructurado.acciones) && planDesarrollo.planEstructurado.acciones.length > 0 && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Plan de Acción Detallado</CardTitle>
+                          <CardDescription>
+                            Acciones concretas con responsables, fechas e indicadores
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-4">
+                            {planDesarrollo.planEstructurado.acciones
+                              .sort((a: any, b: any) => {
+                                const prioridadOrder = { alta: 1, media: 2, baja: 3 };
+                                return (prioridadOrder[a.prioridad] || 99) - (prioridadOrder[b.prioridad] || 99);
+                              })
+                              .map((accion: any, idx: number) => (
+                                <div key={idx} className="border rounded-lg p-4 hover:bg-accent/5 transition-colors">
+                                  <div className="flex items-start justify-between gap-4 mb-3">
+                                    <p className="font-medium flex-1">{accion.descripcion}</p>
+                                    <Badge variant={accion.prioridad === "alta" ? "destructive" : accion.prioridad === "media" ? "default" : "secondary"}>
+                                      {accion.prioridad === "alta" ? "🔴 Alta" : accion.prioridad === "media" ? "🟡 Media" : "🟢 Baja"}
+                                    </Badge>
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-4 text-sm">
+                                    <div>
+                                      <span className="text-muted-foreground">Responsable:</span>{" "}
+                                      <span className="font-medium">{accion.responsable}</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-muted-foreground">Fecha:</span>{" "}
+                                      <span className="font-medium">{accion.fecha}</span>
+                                    </div>
+                                    <div className="col-span-2">
+                                      <span className="text-muted-foreground">Indicador:</span>{" "}
+                                      <span className="font-medium">{accion.indicador}</span>
+                                    </div>
+                                    {accion.recursos && accion.recursos.length > 0 && (
+                                      <div className="col-span-2">
+                                        <span className="text-muted-foreground">Recursos:</span>{" "}
+                                        <span>{accion.recursos.join(", ")}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
+                )}
 
                 {/* Botones de acción */}
                 <div className="grid gap-4 md:grid-cols-2">
