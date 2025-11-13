@@ -1,11 +1,12 @@
 import { EvaluationDraft } from "@/lib/storage";
 import { Dimension, FinalScore } from "@/types/evaluation";
 import { DevelopmentPlan } from "@/types/evaluation";
-import { generateAIAnalysis } from "./gemini";
+import { generateAIAnalysis } from "./openai";
 import { scoreToPercentage } from "./calculations";
 
 /**
- * Genera un plan de desarrollo personalizado usando IA (Google Gemini)
+ * Genera un plan de desarrollo personalizado usando IA (OpenAI)
+ * NOTA: Esta función es legacy. El sistema actual usa edge functions directamente.
  */
 export const generateDevelopmentPlan = async (
   colaboradorId: string,
@@ -27,15 +28,40 @@ export const generateDevelopmentPlan = async (
       potencialDimensions
     );
 
-    // Generar prompt para Gemini
-    const prompt = buildDevelopmentPlanPrompt(contexto, generarFeedbackGrupal);
+    // Generar prompts separados (system y user)
+    const systemPrompt = `Eres un experto en Recursos Humanos y Desarrollo Organizacional del sector público guatemalteco, especializado en la gestión municipal. Tu tarea es generar un Plan de Desarrollo Individual CONCRETO, PRÁCTICO y PRIORIZADO para colaboradores de la Municipalidad de Esquipulas, Chiquimula.
 
-    // Llamar a Gemini API usando la función centralizada que registra uso
+Genera un Plan de Desarrollo COMPLETO y ESTRUCTURADO en formato JSON con la siguiente estructura:
+{
+  "competenciasDesarrollar": [
+    {
+      "competencia": "Nombre de la competencia",
+      "nivelActual": número (1-5),
+      "nivelObjetivo": número (1-5),
+      "acciones": ["acción 1", "acción 2", "acción 3"],
+      "plazo": "Descripción del plazo (ej: '3 meses', '6 meses')"
+    }
+  ],
+  "recomendaciones": ["Recomendación general 1", "Recomendación general 2", ...]
+}
+
+⚠️ IMPORTANTE: NO incluyas feedbackIndividual ni feedbackGrupal en el JSON. Solo genera competenciasDesarrollar y recomendaciones.
+
+Responde ÚNICAMENTE con el JSON, sin texto adicional antes o después.`;
+
+    const userPrompt = buildDevelopmentPlanPrompt(contexto, generarFeedbackGrupal);
+
+    // Llamar a OpenAI API usando la función centralizada que registra uso
     // La función generateAIAnalysis maneja internamente la verificación de API key
-    const generatedText = await generateAIAnalysis(prompt);
+    const generatedText = await generateAIAnalysis(systemPrompt, userPrompt, {
+      model: "gpt-4o-mini",
+      temperature: 0.7,
+      maxTokens: 8000,
+      responseFormat: "json_object"
+    });
 
-    // Parsear la respuesta de Gemini
-    const plan = parseGeminiResponse(generatedText, colaboradorId, periodoId, evaluacionJefe.usuarioId || "");
+    // Parsear la respuesta de OpenAI
+    const plan = parseOpenAIResponse(generatedText, colaboradorId, periodoId, evaluacionJefe.usuarioId || "");
 
     return plan;
   } catch (error) {
@@ -106,52 +132,27 @@ const buildEvaluationContext = (
 };
 
 /**
- * Construye el prompt para Gemini
+ * Construye el user prompt con datos específicos de la evaluación
  */
 const buildDevelopmentPlanPrompt = (contexto: string, generarFeedbackGrupal: boolean = false): string => {
-  const instruccionesFeedbackGrupal = generarFeedbackGrupal 
-    ? `\n7. Si el colaborador pertenece a una cuadrilla, genera un feedback grupal adicional que:
-   - Se enfoque en el desempeño colectivo del equipo
-   - Identifique fortalezas y áreas de mejora a nivel grupal
-   - Proponga acciones de desarrollo para toda la cuadrilla
-   - Sea apropiado para ser compartido en una sesión grupal de feedback`
-    : "";
-
-  return `Eres un experto en desarrollo de talento y gestión de recursos humanos en el sector público guatemalteco.
+  return `Datos específicos de la evaluación:
 
 ${contexto}
 
-Genera un PLAN DE DESARROLLO PERSONALIZADO en formato JSON con la siguiente estructura:
+Genera un PLAN DE DESARROLLO PERSONALIZADO basado en estos datos. El plan debe incluir:
+- 3-5 competencias clave para desarrollar basándote en las brechas encontradas
+- Acciones concretas y realistas para cada competencia
+- Recomendaciones generales
 
-{
-  "competenciasDesarrollar": [
-    {
-      "competencia": "Nombre de la competencia",
-      "nivelActual": número (1-5),
-      "nivelObjetivo": número (1-5),
-      "acciones": ["acción 1", "acción 2", "acción 3"],
-      "plazo": "Descripción del plazo (ej: '3 meses', '6 meses')"
-    }
-  ],
-  "feedbackIndividual": "Texto completo de feedback personalizado para el colaborador, máximo 500 palabras, en español, sin tecnicismos ni palabras en inglés",
-  "feedbackGrupal": "${generarFeedbackGrupal ? "Texto de feedback grupal para toda la cuadrilla, máximo 300 palabras, enfocado en el desempeño colectivo" : null}"
-}
+⚠️ IMPORTANTE: NO incluyas feedbackIndividual ni feedbackGrupal. Solo genera competenciasDesarrollar y recomendaciones.
 
-INSTRUCCIONES:
-1. Identifica 3-5 competencias clave para desarrollar basándote en las brechas encontradas
-2. El feedback individual debe ser constructivo, específico y accionable
-3. Usa un lenguaje claro y profesional, sin jerga técnica
-4. Considera el contexto del sector público guatemalteco
-5. Las acciones deben ser concretas y realistas
-6. Todo el texto debe estar en español${instruccionesFeedbackGrupal}
-
-Responde SOLO con el JSON, sin texto adicional.`;
+Usa un lenguaje claro y profesional, sin jerga técnica. Considera el contexto del sector público guatemalteco. Todo el texto debe estar en español.`;
 };
 
 /**
- * Parsea la respuesta de Gemini a un DevelopmentPlan
+ * Parsea la respuesta de OpenAI a un DevelopmentPlan
  */
-const parseGeminiResponse = (
+const parseOpenAIResponse = (
   generatedText: string,
   colaboradorId: string,
   periodoId: string,
@@ -166,19 +167,31 @@ const parseGeminiResponse = (
 
     const parsed = JSON.parse(jsonMatch[0]);
 
+    // El plan puede venir en formato nuevo (objetivos, acciones, dimensionesDebiles, recomendaciones)
+    // o formato legacy (competenciasDesarrollar)
+    const planEstructurado = parsed.objetivos || parsed.acciones || parsed.dimensionesDebiles
+      ? {
+          objetivos: parsed.objetivos || [],
+          acciones: parsed.acciones || [],
+          dimensionesDebiles: parsed.dimensionesDebiles || [],
+        }
+      : undefined;
+
     return {
       id: crypto.randomUUID(),
       evaluacionId,
       colaboradorId,
       periodoId,
-      competenciasDesarrollar: parsed.competenciasDesarrollar || [],
-      feedbackIndividual: parsed.feedbackIndividual || "",
-      feedbackGrupal: parsed.feedbackGrupal,
+      competenciasDesarrollar: parsed.competenciasDesarrollar || parsed.objetivos || [],
+      planEstructurado: planEstructurado,
+      recomendaciones: parsed.recomendaciones || [],
+      feedbackIndividual: "", // No se genera aquí, se genera por separado
+      feedbackGrupal: null, // No se genera aquí, se genera por separado
       editable: true,
       fechaCreacion: new Date().toISOString(),
     };
   } catch (error) {
-    console.error("Error parsing Gemini response:", error);
+    console.error("Error parsing OpenAI response:", error);
     throw error;
   }
 };

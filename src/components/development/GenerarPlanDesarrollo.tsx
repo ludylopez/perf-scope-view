@@ -34,8 +34,6 @@ export const GenerarPlanDesarrollo = ({
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [plan, setPlan] = useState<DevelopmentPlan | null>(null);
-  const [editedFeedback, setEditedFeedback] = useState("");
-  const [editedFeedbackGrupal, setEditedFeedbackGrupal] = useState("");
 
   const generarPlan = async () => {
     setLoading(true);
@@ -123,8 +121,6 @@ export const GenerarPlanDesarrollo = ({
         };
 
         setPlan(planCompleto);
-        setEditedFeedback(planCompleto.feedbackIndividual || "");
-        setEditedFeedbackGrupal(planCompleto.feedbackGrupal || "");
         setShowModal(true);
         toast.success("Plan de desarrollo generado exitosamente");
       } else {
@@ -147,24 +143,12 @@ export const GenerarPlanDesarrollo = ({
   const guardarPlan = async () => {
     if (!plan) return;
 
-    try {
-      const { error } = await supabase
-        .from('development_plans')
-        .update({
-          feedback_individual: editedFeedback,
-          feedback_grupal: editedFeedbackGrupal,
-        })
-        .eq('id', plan.id);
-
-      if (error) throw error;
-
-      toast.success("Plan guardado exitosamente");
-      setShowModal(false);
-      if (onPlanGenerado) {
-        onPlanGenerado({ ...plan, feedbackIndividual: editedFeedback, feedbackGrupal: editedFeedbackGrupal });
-      }
-    } catch (error: any) {
-      toast.error(`Error al guardar: ${error.message}`);
+    // El plan ya está guardado cuando se genera
+    // Esta función solo cierra el modal y notifica
+    toast.success("Plan de desarrollo generado y guardado exitosamente");
+    setShowModal(false);
+    if (onPlanGenerado) {
+      onPlanGenerado(plan);
     }
   };
 
@@ -330,44 +314,6 @@ export const GenerarPlanDesarrollo = ({
                         </div>
                       ))}
                     </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Feedback Individual (Editable) */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Feedback Individual</CardTitle>
-                  <CardDescription>
-                    Retroalimentación personalizada para el colaborador (editable)
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Textarea
-                    value={editedFeedback}
-                    onChange={(e) => setEditedFeedback(e.target.value)}
-                    rows={8}
-                    className="w-full"
-                  />
-                </CardContent>
-              </Card>
-
-              {/* Feedback Grupal (Editable) */}
-              {plan.feedback_grupal && (
-                <Card className="border-info/50 bg-info/5">
-                  <CardHeader>
-                    <CardTitle className="text-lg">Feedback Grupal</CardTitle>
-                    <CardDescription>
-                      Retroalimentación para toda la cuadrilla (editable)
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Textarea
-                      value={editedFeedbackGrupal}
-                      onChange={(e) => setEditedFeedbackGrupal(e.target.value)}
-                      rows={6}
-                      className="w-full"
-                    />
                   </CardContent>
                 </Card>
               )}

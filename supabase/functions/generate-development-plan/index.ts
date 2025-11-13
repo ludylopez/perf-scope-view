@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getSystemPromptForDevelopmentPlan } from "../shared/prompt-templates.ts";
 
 // Inicializar cliente de Supabase
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
@@ -18,9 +19,9 @@ interface DevelopmentPlanResponse {
 }
 
 /**
- * Construye el prompt para Gemini con todo el contexto necesario
+ * Construye el user prompt con datos específicos (sin contexto estático)
  */
-function buildPrompt(data: any): string {
+function buildUserPrompt(data: any): string {
   const { colaborador, autoevaluacion, evaluacionJefe, resultadoFinal, instrumento, grupos } = data;
 
   // Validar que los datos necesarios estén presentes
@@ -134,9 +135,7 @@ function buildPrompt(data: any): string {
 
   const top3Debiles = dimensionesConScore.slice(0, 3);
 
-  return `Eres un experto en Recursos Humanos y Desarrollo Organizacional del sector público guatemalteco, especializado en la gestión municipal. Tu tarea es generar un Plan de Desarrollo Individual CONCRETO, PRÁCTICO y PRIORIZADO para un colaborador de la Municipalidad de Esquipulas, Chiquimula.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  return `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📋 INFORMACIÓN DEL COLABORADOR
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -174,130 +173,7 @@ ${detallePotencial ? `━━━━━━━━━━━━━━━━━━━�
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ${detallePotencial}` : ''}
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🌎 CONTEXTO ESQUIPULAS - RECURSOS DISPONIBLES
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-📍 Ubicación: Municipio de Esquipulas, Chiquimula, Guatemala
-
-💰 RESTRICCIONES PRESUPUESTARIAS:
-- Presupuesto municipal limitado
-- Priorizar recursos internos y alianzas institucionales
-- Buscar opciones gratuitas o de bajo costo
-
-🎓 RECURSOS EXTERNOS DE CAPACITACIÓN:
-1. **FARO de Coosajo**
-   - Capacitaciones técnicas especializadas
-   - Asesorías para puestos clave
-   - Formación en temas específicos según necesidad del puesto
-
-2. **INTECAP (Instituto Técnico de Capacitación y Productividad)**
-   - Modalidad virtual (accesible desde Esquipulas)
-   - Modalidad presencial en Chiquimula (cabecera departamental)
-   - Cursos técnicos, administrativos y de oficios
-
-3. **Instituciones locales y departamentales**
-   - Según el puesto, identificar instituciones afines que puedan proporcionar capacitación
-   - Buscar alianzas con entidades gubernamentales relacionadas al área de trabajo
-   - Coordinación con otras municipalidades para intercambio de experiencias
-
-🔧 TIPOS DE ACOMPAÑAMIENTO APLICABLES:
-1. **Capacitación externa**: FARO, INTECAP, instituciones especializadas
-2. **Mentoría interna**: Acompañamiento con personal experimentado de la municipalidad
-3. **Coaching de jefe inmediato**: Retroalimentación constante y guía directa
-4. **Proyectos especiales**: Asignación a proyectos que desarrollen competencias específicas
-5. **Responsabilidades progresivas**: Incremento gradual de complejidad de tareas
-6. **Proyectos transversales**: Participación en iniciativas inter-áreas
-7. **Rotación de funciones**: Exposición temporal a otras áreas relacionadas
-8. **Shadowing**: Observación y acompañamiento en campo
-9. **Autoaprendizaje dirigido**: Recursos bibliográficos, videos, cursos en línea específicos
-10. **Círculos de aprendizaje**: Grupos de estudio entre pares de la municipalidad
-
-⚠️ IMPORTANTE:
-- Proponer SOLO acciones REALISTAS y APLICABLES al contexto municipal de Esquipulas
-- NO sugerir capacitaciones internacionales, maestrías costosas o recursos inaccesibles
-- Enfocarse en soluciones PRÁCTICAS que se puedan implementar con recursos locales
-- Considerar la realidad del sector público guatemalteco
-- Las acciones deben ser ESPECÍFICAS, no genéricas
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📋 INSTRUCCIONES PARA GENERAR EL PLAN DE DESARROLLO
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-⚠️ **IMPORTANTE**: Estás generando un PLAN DE DESARROLLO, NO una guía de retroalimentación.
-El plan debe enfocarse en ACCIONES CONCRETAS con responsables, fechas, recursos e indicadores.
-El feedback individual es solo un complemento narrativo, pero el NÚCLEO del plan son las ACCIONES.
-
-Genera un Plan de Desarrollo COMPLETO y ESTRUCTURADO en formato JSON con la siguiente estructura EXACTA:
-
-{
-  "objetivos": [
-    "Objetivo 1 de desarrollo (específico, medible, alcanzable)",
-    "Objetivo 2 de desarrollo",
-    "Objetivo 3 de desarrollo"
-  ],
-  "acciones": [
-    {
-      "descripcion": "Descripción detallada y específica de la acción concreta a tomar",
-      "responsable": "Jefe inmediato" | "Colaborador" | "RRHH" | "Gerencia Municipal" | "Otro específico",
-      "fecha": "Fecha tentativa en formato YYYY-MM-DD o período como '2025-02 al 2025-04'",
-      "recursos": ["Recurso 1 necesario", "Recurso 2", ...],
-      "indicador": "Indicador simple y medible de cumplimiento (ej: 'Completar curso', 'Aplicar en 3 casos', 'Reducir errores en 30%')",
-      "prioridad": "alta" | "media" | "baja"
-    }
-    // ⚠️ CRÍTICO: Debes generar AL MENOS 5-8 acciones concretas. Este es el NÚCLEO del plan.
-    // Cada acción debe ser específica, con responsable claro, fecha realista, recursos identificados e indicador medible.
-  ],
-  "dimensionesDebiles": [
-    {
-      "dimension": "Nombre de la dimensión que requiere desarrollo",
-      "score": score_actual_de_0_a_5,
-      "accionesEspecificas": [
-        "Acción específica 1 para mejorar esta dimensión",
-        "Acción específica 2",
-        ...
-      ]
-    }
-  ],
-  "feedbackIndividual": "Feedback personalizado, constructivo y motivador para el colaborador. Debe ser claro, específico y en tono profesional pero cercano. Máximo 600 palabras. Incluir reconocimiento de fortalezas y áreas de oportunidad con sugerencias concretas.",
-  ${grupos.length > 0 ? `"feedbackGrupal": "Feedback para toda la cuadrilla ${grupos.map((g: any) => g.nombre).join(" y ")}. Enfocado en el desempeño colectivo del equipo, dinámicas de trabajo en grupo y acciones de desarrollo para toda la cuadrilla. Máximo 400 palabras.",` : '"feedbackGrupal": null,'}
-  "recomendaciones": [
-    "Recomendación general 1",
-    "Recomendación general 2",
-    ...
-  ]
-}
-
-🎯 CRITERIOS CLAVE:
-1. **PRIORIZACIÓN**: Las acciones de prioridad "alta" deben enfocarse en las 3 dimensiones más débiles
-2. **ESPECIFICIDAD**: Cada acción debe ser CONCRETA y ACCIONABLE (no genérica)
-3. **REALISMO**: Solo proponer lo que ES VIABLE en el contexto de Esquipulas
-4. **FECHAS REALISTAS**: Considerar carga de trabajo y disponibilidad
-5. **INDICADORES SIMPLES**: Que se puedan medir sin sistemas complejos
-6. **BALANCE**: Incluir desarrollo técnico Y conductual según necesidad
-7. **LENGUAJE**: Español profesional, sin tecnicismos innecesarios, sin palabras en inglés
-8. **FEEDBACK CONSTRUCTIVO**: Reconocer fortalezas + identificar oportunidades + proponer caminos concretos
-
-⚠️ **IMPORTANTE SOBRE EL FORMATO Y PRIORIDADES:**
-1. **PRIMERO Y MÁS IMPORTANTE**: El campo "acciones" DEBE contener AL MENOS 5-8 acciones concretas, específicas y accionables
-   - Cada acción debe tener: descripción detallada, responsable claro, fecha realista, recursos identificados, indicador medible, prioridad
-   - Las acciones de prioridad "alta" deben enfocarse en las 3 dimensiones más débiles identificadas
-   - Las acciones deben ser REALISTAS y APLICABLES al contexto de Esquipulas
-   
-2. **SEGUNDO**: El campo "objetivos" debe contener 3-5 objetivos específicos, medibles y alcanzables
-
-3. **TERCERO**: El campo "dimensionesDebiles" debe identificar las dimensiones con menor score y proponer acciones específicas para cada una
-
-4. **CUARTO**: El campo "recomendaciones" debe contener 3-5 recomendaciones generales
-
-5. **ÚLTIMO (complementario)**: El campo "feedbackIndividual" es un texto narrativo de retroalimentación (máximo 600 palabras)
-   - Este es SOLO un complemento, NO es el plan de acción
-   - El plan de acción REAL está en el array "acciones"
-   - El feedback debe ser constructivo pero breve - no debe ser el foco principal
-
-🎯 **RECUERDA**: Estás generando un PLAN DE ACCIÓN, no solo feedback. Las acciones son lo más importante.
-
-Responde ÚNICAMENTE con el JSON, sin texto adicional antes o después.`;
+Genera el Plan de Desarrollo basándote en estos datos específicos de la evaluación.`;
 }
 
 Deno.serve(async (req: Request): Promise<Response> => {
@@ -323,7 +199,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    // Obtener información completa del colaborador (SIN incluir DPI en el payload a Gemini)
+    // Obtener información completa del colaborador (SIN incluir DPI en el payload a OpenAI)
     const { data: colaborador, error: colaboradorError } = await supabase
       .from("users")
       .select("*")
@@ -515,10 +391,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
       evaluacion_potencial: evaluacionJefe.evaluacion_potencial || evaluacionJefe.evaluacionPotencial || null,
     };
 
-    // Construir prompt para Gemini
-    let prompt: string;
+    // Construir prompts separados (system y user)
+    const systemPrompt = getSystemPromptForDevelopmentPlan();
+    let userPrompt: string;
     try {
-      prompt = buildPrompt({
+      userPrompt = buildUserPrompt({
         colaborador, // Incluye todos los campos EXCEPTO que el DPI no se usa en el prompt
         autoevaluacion: autoevaluacionNormalizada,
         evaluacionJefe: evaluacionJefeNormalizada,
@@ -534,96 +411,87 @@ Deno.serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    // Llamar a Gemini
-    const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
-    if (!geminiApiKey) {
+    // Llamar a OpenAI
+    const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
+    if (!openaiApiKey) {
       return new Response(
-        JSON.stringify({ success: false, error: "GEMINI_API_KEY no configurada" }),
+        JSON.stringify({ success: false, error: "OPENAI_API_KEY no configurada" }),
         { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
       );
     }
 
-    // Intentar con diferentes modelos disponibles en v1beta
-    // Orden: gemini-2.5-flash (más reciente), gemini-pro (clásico), gemini-1.5-pro (si está disponible)
-    let geminiResponse;
-    let modelUsed = "gemini-2.5-flash";
-    let lastError: string | null = null;
-    
-    const modelsToTry = [
-      "gemini-2.5-flash",
-      "gemini-pro", 
-      "gemini-1.5-pro"
-    ];
-    
-    for (const model of modelsToTry) {
-      try {
-        modelUsed = model;
-        console.log(`Intentando con modelo: ${modelUsed}`);
-        
-        geminiResponse = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: {
-                temperature: 0.7,
-                maxOutputTokens: 8000,
+    let openaiResponse;
+    try {
+      console.log("Llamando a OpenAI API...");
+      
+      openaiResponse = await fetch(
+        "https://api.openai.com/v1/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${openaiApiKey}`,
+          },
+          body: JSON.stringify({
+            model: "gpt-4o-mini",
+            messages: [
+              {
+                role: "system",
+                content: systemPrompt
               },
-            }),
-          }
-        );
-        
-        if (geminiResponse.ok) {
-          console.log(`✅ Modelo ${modelUsed} funcionó correctamente`);
-          break;
-        } else {
-          const errorText = await geminiResponse.text();
-          lastError = errorText;
-          console.warn(`⚠️ Modelo ${modelUsed} falló:`, errorText.substring(0, 200));
-          // Continuar con el siguiente modelo
-          continue;
+              {
+                role: "user",
+                content: userPrompt
+              }
+            ],
+            temperature: 0.7,
+            max_tokens: 8000,
+            response_format: { type: "json_object" },
+          }),
         }
-      } catch (fetchError: any) {
-        lastError = fetchError.message || String(fetchError);
-        console.warn(`⚠️ Error en fetch con modelo ${modelUsed}:`, lastError);
-        // Continuar con el siguiente modelo
-        continue;
+      );
+      
+      if (!openaiResponse.ok) {
+        const errorText = await openaiResponse.text();
+        console.error("Error en OpenAI API:", errorText);
+        let parsedError = errorText;
+        try {
+          const errorJson = JSON.parse(errorText);
+          parsedError = errorJson.error?.message || errorJson.message || errorText;
+        } catch {
+          parsedError = errorText.substring(0, 500);
+        }
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: `Error en OpenAI API: ${parsedError}` 
+          }),
+          { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
+        );
       }
-    }
-    
-    // Si ninguno funcionó, devolver error
-    if (!geminiResponse || !geminiResponse.ok) {
-      const errorMessage = lastError || "Todos los modelos de Gemini fallaron";
-      console.error("❌ Todos los modelos fallaron. Último error:", errorMessage);
-      let parsedError = errorMessage;
-      try {
-        const errorJson = JSON.parse(errorMessage);
-        parsedError = errorJson.error?.message || errorJson.message || errorMessage;
-      } catch {
-        parsedError = errorMessage.substring(0, 500);
-      }
+
+      console.log("✅ OpenAI API respondió correctamente");
+    } catch (fetchError: any) {
+      console.error("Error en fetch a OpenAI:", fetchError);
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: `Error en Gemini API: ${parsedError}` 
+          error: `Error conectando con OpenAI: ${fetchError.message || String(fetchError)}` 
         }),
         { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
       );
     }
 
-    const geminiData = await geminiResponse.json();
-    const planText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    const openaiData = await openaiResponse.json();
+    const planText = openaiData.choices?.[0]?.message?.content || "";
 
-    // Parsear respuesta de Gemini
+    // Parsear respuesta de OpenAI (ya viene como JSON)
     let planData;
     try {
-      const jsonMatch = planText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        planData = JSON.parse(jsonMatch[0]);
+      if (typeof planText === 'string') {
+        planData = JSON.parse(planText);
       } else {
-        throw new Error("No se encontró JSON en la respuesta");
+        planData = planText;
       }
     } catch (parseError) {
       const errorMessage = parseError instanceof Error ? parseError.message : String(parseError);
@@ -637,6 +505,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     // Guardamos toda la estructura del plan en competencias_desarrollar como JSONB
     // Esto incluye: objetivos, acciones (con responsable, fecha, recursos, indicador, prioridad),
     // dimensionesDebiles, y recomendaciones
+    // NOTA: NO guardamos feedback_individual ni feedback_grupal aquí (se generan por separado)
     const planCompleto = {
       objetivos: planData.objetivos || [],
       acciones: planData.acciones || [],
@@ -651,8 +520,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
         colaborador_id: colaborador_id,
         periodo_id: periodo_id,
         competencias_desarrollar: planCompleto, // Guardamos toda la estructura aquí
-        feedback_individual: planData.feedbackIndividual || "",
-        feedback_grupal: planData.feedbackGrupal || null,
+        feedback_individual: null, // No se genera aquí, se genera por separado
+        feedback_grupal: null, // No se genera aquí, se genera por separado
         generado_por_ia: true, // Marcar como generado por IA
         editable: true,
       })

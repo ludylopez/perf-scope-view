@@ -21,6 +21,7 @@ import { getActivePeriod } from "@/lib/supabase";
 import { getFinalResultFromSupabase } from "@/lib/finalResultSupabase";
 import { GenerarPlanDesarrollo } from "@/components/development/GenerarPlanDesarrollo";
 import { GenerarGuiaRetroalimentacion } from "@/components/development/GuiaRetroalimentacion";
+import { GenerarFeedbackGrupal } from "@/components/development/GenerarFeedbackGrupal";
 import { EditarPlanDesarrollo } from "@/components/development/EditarPlanDesarrollo";
 import { PerformanceRadarAnalysis } from "@/components/evaluation/PerformanceRadarAnalysis";
 import { Edit } from "lucide-react";
@@ -433,6 +434,11 @@ const VistaComparativa = () => {
                     periodoId={periodoId}
                     colaboradorNombre={colaborador.nombre}
                   />
+                  <GenerarFeedbackGrupal
+                    colaboradorId={colaborador.dpi}
+                    periodoId={periodoId}
+                    colaboradorNombre={colaborador.nombre}
+                  />
                 </>
               ) : (
                 <>
@@ -474,6 +480,11 @@ const VistaComparativa = () => {
                     }}
                   />
                   <GenerarGuiaRetroalimentacion
+                    colaboradorId={colaborador.dpi}
+                    periodoId={periodoId}
+                    colaboradorNombre={colaborador.nombre}
+                  />
+                  <GenerarFeedbackGrupal
                     colaboradorId={colaborador.dpi}
                     periodoId={periodoId}
                     colaboradorNombre={colaborador.nombre}

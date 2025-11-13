@@ -28,7 +28,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { exportToPDF, exportToExcel, ExportData } from "@/lib/exports";
-import { getAPIUsageStats } from "@/lib/gemini";
+import { getAPIUsageStats } from "@/lib/openai";
 import { scoreToPercentage } from "@/lib/calculations";
 
 interface DashboardStats {
@@ -613,7 +613,7 @@ const DashboardRRHH = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Zap className="h-5 w-5 text-info" />
-              Uso de API de Google AI (Gemini)
+              Uso de API de OpenAI
             </CardTitle>
             <CardDescription>
               Consumo de créditos de IA para generación de planes de desarrollo

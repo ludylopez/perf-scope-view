@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -10,42 +10,82 @@ import {
 } from "@/components/ui/dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { FileText, Loader2, Download, Edit3, MessageSquare, Lightbulb, Target, Save } from "lucide-react";
+import { Users, Loader2, Save, Edit3, MessageSquare, Lightbulb, Target } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { GuiaRetroalimentacion, PuntoFuerte, AreaDesarrollo } from "@/types/evaluation";
 
-interface GuiaRetroalimentacionProps {
+interface GenerarFeedbackGrupalProps {
   colaboradorId: string;
   periodoId: string;
   colaboradorNombre: string;
 }
 
-export const GenerarGuiaRetroalimentacion = ({
+interface GuiaGrupal {
+  preparacion: string;
+  apertura: string;
+  fortalezasGrupales: Array<{
+    dimension: string;
+    descripcion: string;
+    ejemplo: string;
+  }>;
+  areasDesarrolloGrupales: Array<{
+    dimension: string;
+    situacion: string;
+    comportamiento: string;
+    impacto: string;
+    sugerencia: string;
+  }>;
+  preguntasDialogo: string[];
+  tipsConduccion: string[];
+  cierre: string;
+  feedbackGrupal: string;
+}
+
+export const GenerarFeedbackGrupal = ({
   colaboradorId,
   periodoId,
   colaboradorNombre,
-}: GuiaRetroalimentacionProps) => {
+}: GenerarFeedbackGrupalProps) => {
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
-  const [guia, setGuia] = useState<GuiaRetroalimentacion | null>(null);
+  const [guia, setGuia] = useState<GuiaGrupal | null>(null);
   const [editMode, setEditMode] = useState(false);
+  const [tieneGrupos, setTieneGrupos] = useState(false);
 
   // Estados editables
   const [editedPreparacion, setEditedPreparacion] = useState("");
   const [editedApertura, setEditedApertura] = useState("");
   const [editedCierre, setEditedCierre] = useState("");
-  const [editedFeedbackIndividual, setEditedFeedbackIndividual] = useState("");
+  const [editedFeedbackGrupal, setEditedFeedbackGrupal] = useState("");
 
-  const generarGuia = async () => {
+  // Verificar si el colaborador tiene grupos
+  useEffect(() => {
+    const verificarGrupos = async () => {
+      try {
+        const { data: gruposData } = await supabase
+          .from("group_members")
+          .select("grupo_id, groups!group_members_grupo_id_fkey(nombre, tipo)")
+          .eq("colaborador_id", colaboradorId)
+          .eq("activo", true);
+
+        setTieneGrupos(gruposData && gruposData.length > 0);
+      } catch (error) {
+        console.error("Error verificando grupos:", error);
+        setTieneGrupos(false);
+      }
+    };
+
+    verificarGrupos();
+  }, [colaboradorId]);
+
+  const generarGuiaGrupal = async () => {
     setLoading(true);
     try {
-      // Usar fetch directamente para poder capturar el body del error
       const { data: { session } } = await supabase.auth.getSession();
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://oxadpbdlpvwyapuondei.supabase.co";
       const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im94YWRwYmRscHZ3eWFwdW9uZGVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIzMjU5MzcsImV4cCI6MjA3NzkwMTkzN30.HjIoMaw20qx7DscE-XWCaz88EWa0Jv_aCDcMtv6eadw";
       
-      const response = await fetch(`${supabaseUrl}/functions/v1/generate-feedback-guide`, {
+      const response = await fetch(`${supabaseUrl}/functions/v1/generate-feedback-grupal`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -68,18 +108,12 @@ export const GenerarGuiaRetroalimentacion = ({
       }
 
       if (!response.ok) {
-        console.error("Error from function:", {
-          status: response.status,
-          statusText: response.statusText,
-          body: responseData,
-        });
         const errorMessage = responseData?.error || responseData?.message || `Error ${response.status}: ${response.statusText}`;
         throw new Error(errorMessage);
       }
 
       if (responseData && !responseData.success) {
-        console.error("Error from function response:", responseData);
-        throw new Error(responseData.error || "Error generando guía");
+        throw new Error(responseData.error || "Error generando guía grupal");
       }
 
       if (responseData?.success && responseData.guia) {
@@ -87,182 +121,28 @@ export const GenerarGuiaRetroalimentacion = ({
         setEditedPreparacion(responseData.guia.preparacion || "");
         setEditedApertura(responseData.guia.apertura || "");
         setEditedCierre(responseData.guia.cierre || "");
-        setEditedFeedbackIndividual(responseData.feedbackIndividual || "");
+        setEditedFeedbackGrupal(responseData.guia.feedbackGrupal || "");
         setShowModal(true);
-        toast.success("Guía y feedback de retroalimentación generados exitosamente");
+        toast.success("Guía y feedback grupal generados exitosamente");
       } else {
-        throw new Error(responseData?.error || "Error generando guía: respuesta inválida");
+        throw new Error(responseData?.error || "Error generando guía grupal: respuesta inválida");
       }
     } catch (error: any) {
-      console.error("Error generating guide:", error);
-      const errorMessage = error?.message || error?.toString() || "Error desconocido al generar guía";
-      console.error("Error details:", {
-        message: errorMessage,
-        error: error,
-        stack: error?.stack,
-      });
-      toast.error(`Error al generar guía: ${errorMessage}`);
+      console.error("Error generating group guide:", error);
+      const errorMessage = error?.message || error?.toString() || "Error desconocido al generar guía grupal";
+      toast.error(`Error al generar guía grupal: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
   };
 
-  const descargarPDF = () => {
-    if (!guia) return;
-
-    // Construir contenido HTML para PDF
-    const contenidoHTML = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <title>Guía de Retroalimentación - ${colaboradorNombre}</title>
-        <style>
-          @page {
-            size: letter;
-            margin: 1.5cm;
-          }
-          body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            font-size: 10pt;
-            line-height: 1.4;
-            color: #333;
-          }
-          h1 {
-            font-size: 16pt;
-            color: #1a56db;
-            margin-bottom: 0.3cm;
-            border-bottom: 2px solid #1a56db;
-            padding-bottom: 0.2cm;
-          }
-          h2 {
-            font-size: 12pt;
-            color: #1a56db;
-            margin-top: 0.4cm;
-            margin-bottom: 0.2cm;
-          }
-          h3 {
-            font-size: 10pt;
-            color: #444;
-            margin-top: 0.3cm;
-            margin-bottom: 0.15cm;
-          }
-          .seccion {
-            margin-bottom: 0.4cm;
-          }
-          .item {
-            margin-left: 0.5cm;
-            margin-bottom: 0.3cm;
-          }
-          .label {
-            font-weight: bold;
-            color: #555;
-          }
-          ul {
-            margin: 0.2cm 0;
-            padding-left: 0.8cm;
-          }
-          li {
-            margin-bottom: 0.15cm;
-          }
-          .footer {
-            margin-top: 0.5cm;
-            padding-top: 0.3cm;
-            border-top: 1px solid #ccc;
-            font-size: 9pt;
-            color: #666;
-            text-align: center;
-          }
-        </style>
-      </head>
-      <body>
-        <h1>📋 Guía de Retroalimentación del Desempeño</h1>
-        <p><strong>Colaborador:</strong> ${colaboradorNombre}</p>
-        <p><strong>Fecha:</strong> ${new Date().toLocaleDateString('es-GT')}</p>
-
-        <div class="seccion">
-          <h2>🎯 Preparación para la Reunión</h2>
-          <p>${editMode ? editedPreparacion : guia.preparacion}</p>
-        </div>
-
-        <div class="seccion">
-          <h2>👋 Apertura de la Conversación</h2>
-          <p>${editMode ? editedApertura : guia.apertura}</p>
-        </div>
-
-        <div class="seccion">
-          <h2>⭐ Puntos Fuertes (Reconocimiento)</h2>
-          ${guia.fortalezas.map((f: PuntoFuerte, idx: number) => `
-            <div class="item">
-              <h3>${idx + 1}. ${f.dimension}</h3>
-              <p><span class="label">Reconocimiento:</span> ${f.reconocimiento}</p>
-              <p><span class="label">Ejemplo concreto:</span> ${f.ejemplo}</p>
-              <p><span class="label">Impacto positivo:</span> ${f.impacto}</p>
-            </div>
-          `).join('')}
-        </div>
-
-        <div class="seccion">
-          <h2>🎯 Áreas de Desarrollo (Metodología SBI)</h2>
-          ${guia.areasDesarrollo.map((area: AreaDesarrollo, idx: number) => `
-            <div class="item">
-              <h3>${idx + 1}. ${area.dimension}</h3>
-              <p><span class="label">📍 Situación:</span> ${area.situacion}</p>
-              <p><span class="label">🔍 Comportamiento observado:</span> ${area.comportamiento}</p>
-              <p><span class="label">💡 Impacto:</span> ${area.impacto}</p>
-              <p><span class="label">✅ Sugerencia:</span> ${area.sugerencia}</p>
-            </div>
-          `).join('')}
-        </div>
-
-        <div class="seccion">
-          <h2>💬 Preguntas para el Diálogo</h2>
-          <ul>
-            ${guia.preguntasDialogo.map((p: string) => `<li>${p}</li>`).join('')}
-          </ul>
-        </div>
-
-        <div class="seccion">
-          <h2>💡 Tips para Conducir la Reunión</h2>
-          <ul>
-            ${guia.tipsConduccion.map((t: string) => `<li>${t}</li>`).join('')}
-          </ul>
-        </div>
-
-        <div class="seccion">
-          <h2>🤝 Cierre de la Reunión</h2>
-          <p>${editMode ? editedCierre : guia.cierre}</p>
-        </div>
-
-        <div class="footer">
-          Generado con IA | Municipalidad de Esquipulas | Sistema de Gestión del Desempeño
-        </div>
-      </body>
-      </html>
-    `;
-
-    // Crear blob y descargar
-    const blob = new Blob([contenidoHTML], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Guia-Retroalimentacion-${colaboradorNombre.replace(/\s/g, '-')}-${new Date().toISOString().split('T')[0]}.html`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-
-    toast.success("Guía descargada. Ábrela en tu navegador y usa Ctrl+P para imprimir a PDF");
-  };
-
-  const guardarFeedbackIndividual = async () => {
-    if (!editedFeedbackIndividual.trim()) {
-      toast.error("El feedback individual no puede estar vacío");
+  const guardarFeedbackGrupal = async () => {
+    if (!editedFeedbackGrupal.trim()) {
+      toast.error("El feedback grupal no puede estar vacío");
       return;
     }
 
     try {
-      // Buscar si ya existe un plan de desarrollo para este colaborador y período
       const { data: planExistente } = await supabase
         .from("development_plans")
         .select("id")
@@ -271,11 +151,10 @@ export const GenerarGuiaRetroalimentacion = ({
         .maybeSingle();
 
       if (planExistente) {
-        // Actualizar plan existente
         const { error: errorUpdate } = await supabase
           .from("development_plans")
           .update({
-            feedback_individual: editedFeedbackIndividual,
+            feedback_grupal: editedFeedbackGrupal,
             updated_at: new Date().toISOString(),
           })
           .eq("id", planExistente.id);
@@ -284,13 +163,12 @@ export const GenerarGuiaRetroalimentacion = ({
           throw errorUpdate;
         }
       } else {
-        // Crear nuevo registro solo con feedback (sin plan completo)
         const { error: errorInsert } = await supabase
           .from("development_plans")
           .insert({
             colaborador_id: colaboradorId,
             periodo_id: periodoId,
-            feedback_individual: editedFeedbackIndividual,
+            feedback_grupal: editedFeedbackGrupal,
             generado_por_ia: true,
             editable: true,
           });
@@ -300,17 +178,22 @@ export const GenerarGuiaRetroalimentacion = ({
         }
       }
 
-      toast.success("Feedback individual guardado exitosamente");
+      toast.success("Feedback grupal guardado exitosamente");
     } catch (error: any) {
-      console.error("Error guardando feedback individual:", error);
+      console.error("Error guardando feedback grupal:", error);
       toast.error(`Error al guardar feedback: ${error.message || "Error desconocido"}`);
     }
   };
 
+  // No mostrar el botón si no tiene grupos
+  if (!tieneGrupos) {
+    return null;
+  }
+
   return (
     <>
       <Button
-        onClick={generarGuia}
+        onClick={generarGuiaGrupal}
         disabled={loading}
         size="lg"
         variant="outline"
@@ -319,12 +202,12 @@ export const GenerarGuiaRetroalimentacion = ({
         {loading ? (
           <>
             <Loader2 className="h-4 w-4 animate-spin" />
-            Generando guía...
+            Generando guía grupal...
           </>
         ) : (
           <>
-            <FileText className="h-4 w-4" />
-            Generar Guía y Feedback Individual
+            <Users className="h-4 w-4" />
+            Generar Guía y Feedback Grupal
           </>
         )}
       </Button>
@@ -333,12 +216,12 @@ export const GenerarGuiaRetroalimentacion = ({
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5 text-primary" />
-              Guía y Feedback Individual - {colaboradorNombre}
+              <Users className="h-5 w-5 text-primary" />
+              Guía y Feedback Grupal - {colaboradorNombre}
             </DialogTitle>
             <DialogDescription>
               Guía generada con IA usando metodología SBI (Situación-Comportamiento-Impacto).
-              La guía es solo para ti (jefe). El feedback individual es para compartir con el colaborador.
+              La guía es solo para ti (jefe). El feedback grupal es para compartir con la cuadrilla.
               Puedes editar antes de guardar.
             </DialogDescription>
           </DialogHeader>
@@ -350,8 +233,11 @@ export const GenerarGuiaRetroalimentacion = ({
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-base">
                     <Target className="h-4 w-4" />
-                    Preparación para la Reunión
+                    Preparación para la Reunión Grupal
                   </CardTitle>
+                  <CardDescription className="text-xs text-muted-foreground">
+                    Solo para jefe - No compartir
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   {editMode ? (
@@ -372,8 +258,11 @@ export const GenerarGuiaRetroalimentacion = ({
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-base">
                     <MessageSquare className="h-4 w-4" />
-                    Apertura de la Conversación
+                    Apertura de la Conversación Grupal
                   </CardTitle>
+                  <CardDescription className="text-xs text-muted-foreground">
+                    Solo para jefe - No compartir
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   {editMode ? (
@@ -389,23 +278,22 @@ export const GenerarGuiaRetroalimentacion = ({
                 </CardContent>
               </Card>
 
-              {/* Puntos Fuertes */}
-              {guia.fortalezas && guia.fortalezas.length > 0 && (
+              {/* Fortalezas Grupales */}
+              {guia.fortalezasGrupales && guia.fortalezasGrupales.length > 0 && (
                 <Card className="border-success/50 bg-success/5">
                   <CardHeader>
-                    <CardTitle className="text-base">⭐ Puntos Fuertes (Reconocimiento)</CardTitle>
-                    <CardDescription className="text-xs">
-                      Comienza reconociendo los logros y fortalezas
+                    <CardTitle className="text-base">⭐ Fortalezas del Equipo</CardTitle>
+                    <CardDescription className="text-xs text-muted-foreground">
+                      Solo para jefe - No compartir
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
-                      {guia.fortalezas.map((fortaleza: PuntoFuerte, idx: number) => (
+                      {guia.fortalezasGrupales.map((fortaleza, idx: number) => (
                         <div key={idx} className="border-l-4 border-success pl-3 text-sm">
                           <h4 className="font-semibold mb-1">{fortaleza.dimension}</h4>
-                          <p className="mb-1"><span className="font-medium">Reconocimiento:</span> {fortaleza.reconocimiento}</p>
-                          <p className="mb-1"><span className="font-medium">Ejemplo:</span> {fortaleza.ejemplo}</p>
-                          <p><span className="font-medium">Impacto:</span> {fortaleza.impacto}</p>
+                          <p className="mb-1"><span className="font-medium">Descripción:</span> {fortaleza.descripcion}</p>
+                          <p><span className="font-medium">Ejemplo:</span> {fortaleza.ejemplo}</p>
                         </div>
                       ))}
                     </div>
@@ -413,18 +301,18 @@ export const GenerarGuiaRetroalimentacion = ({
                 </Card>
               )}
 
-              {/* Áreas de Desarrollo con SBI */}
-              {guia.areasDesarrollo && guia.areasDesarrollo.length > 0 && (
+              {/* Áreas de Desarrollo Grupales con SBI */}
+              {guia.areasDesarrolloGrupales && guia.areasDesarrolloGrupales.length > 0 && (
                 <Card className="border-warning/50 bg-warning/5">
                   <CardHeader>
-                    <CardTitle className="text-base">🎯 Áreas de Desarrollo (Metodología SBI)</CardTitle>
-                    <CardDescription className="text-xs">
-                      Situación → Comportamiento → Impacto → Sugerencia
+                    <CardTitle className="text-base">🎯 Áreas de Desarrollo del Equipo (Metodología SBI)</CardTitle>
+                    <CardDescription className="text-xs text-muted-foreground">
+                      Solo para jefe - No compartir
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
-                      {guia.areasDesarrollo.map((area: AreaDesarrollo, idx: number) => (
+                      {guia.areasDesarrolloGrupales.map((area, idx: number) => (
                         <div key={idx} className="border-l-4 border-warning pl-3 text-sm">
                           <h4 className="font-semibold mb-1">{area.dimension}</h4>
                           <p className="mb-1"><span className="font-medium">📍 Situación:</span> {area.situacion}</p>
@@ -444,8 +332,11 @@ export const GenerarGuiaRetroalimentacion = ({
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-base">
                       <MessageSquare className="h-4 w-4" />
-                      Preguntas para el Diálogo
+                      Preguntas para el Diálogo Grupal
                     </CardTitle>
+                    <CardDescription className="text-xs text-muted-foreground">
+                      Solo para jefe - No compartir
+                    </CardDescription>
                   </CardHeader>
                   <CardContent>
                     <ul className="space-y-1 text-sm">
@@ -466,8 +357,11 @@ export const GenerarGuiaRetroalimentacion = ({
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-base">
                       <Lightbulb className="h-4 w-4" />
-                      Tips para Conducir la Reunión
+                      Tips para Conducir la Reunión Grupal
                     </CardTitle>
+                    <CardDescription className="text-xs text-muted-foreground">
+                      Solo para jefe - No compartir
+                    </CardDescription>
                   </CardHeader>
                   <CardContent>
                     <ul className="space-y-1 text-sm">
@@ -485,7 +379,7 @@ export const GenerarGuiaRetroalimentacion = ({
               {/* Cierre */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">🤝 Cierre de la Reunión</CardTitle>
+                  <CardTitle className="text-base">🤝 Cierre de la Reunión Grupal</CardTitle>
                   <CardDescription className="text-xs text-muted-foreground">
                     Solo para jefe - No compartir
                   </CardDescription>
@@ -507,28 +401,28 @@ export const GenerarGuiaRetroalimentacion = ({
               {/* Separador visual */}
               <div className="border-t-2 border-primary/20 my-4"></div>
 
-              {/* Feedback Individual - Para compartir con colaborador */}
+              {/* Feedback Grupal - Para compartir con cuadrilla */}
               <Card className="border-primary/50 bg-primary/5">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-base">
-                    <MessageSquare className="h-4 w-4 text-primary" />
-                    Feedback Individual
+                    <Users className="h-4 w-4 text-primary" />
+                    Feedback Grupal
                   </CardTitle>
                   <CardDescription className="text-xs text-primary font-medium">
-                    ✓ Para compartir con el colaborador
+                    ✓ Para compartir con la cuadrilla
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   {editMode ? (
                     <Textarea
-                      value={editedFeedbackIndividual}
-                      onChange={(e) => setEditedFeedbackIndividual(e.target.value)}
+                      value={editedFeedbackGrupal}
+                      onChange={(e) => setEditedFeedbackGrupal(e.target.value)}
                       rows={8}
                       className="text-sm"
-                      placeholder="Feedback narrativo para compartir con el colaborador..."
+                      placeholder="Feedback narrativo para compartir con la cuadrilla..."
                     />
                   ) : (
-                    <p className="text-sm whitespace-pre-wrap">{editedFeedbackIndividual || "No se generó feedback individual"}</p>
+                    <p className="text-sm whitespace-pre-wrap">{editedFeedbackGrupal || "No se generó feedback grupal"}</p>
                   )}
                 </CardContent>
               </Card>
@@ -543,13 +437,13 @@ export const GenerarGuiaRetroalimentacion = ({
               <Edit3 className="h-4 w-4 mr-2" />
               {editMode ? "Ver Guía" : "Editar"}
             </Button>
-            {editedFeedbackIndividual && (
+            {editedFeedbackGrupal && (
               <>
                 <Button
                   variant="outline"
                   onClick={() => {
-                    navigator.clipboard.writeText(editedFeedbackIndividual);
-                    toast.success("Feedback individual copiado al portapapeles");
+                    navigator.clipboard.writeText(editedFeedbackGrupal);
+                    toast.success("Feedback grupal copiado al portapapeles");
                   }}
                 >
                   <MessageSquare className="h-4 w-4 mr-2" />
@@ -557,20 +451,17 @@ export const GenerarGuiaRetroalimentacion = ({
                 </Button>
                 <Button
                   variant="default"
-                  onClick={guardarFeedbackIndividual}
+                  onClick={guardarFeedbackGrupal}
                 >
                   <Save className="h-4 w-4 mr-2" />
                   Guardar Feedback
                 </Button>
               </>
             )}
-            <Button onClick={descargarPDF} variant="outline">
-              <Download className="h-4 w-4 mr-2" />
-              Descargar Guía (PDF)
-            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </>
   );
 };
+

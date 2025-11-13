@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Zap, TrendingUp, AlertCircle, CheckCircle2 } from "lucide-react";
-import { getAPIUsageStats, getGeminiApiKey } from "@/lib/gemini";
+import { getAPIUsageStats, getOpenAIApiKey } from "@/lib/openai";
 
 // Componente de configuración del sistema
 const ConfiguracionSistema = () => {
@@ -33,11 +33,11 @@ const ConfiguracionSistema = () => {
   const loadStats = () => {
     const stats = getAPIUsageStats();
     setUsageStats(stats);
-    setHasApiKey(!!getGeminiApiKey());
+    setHasApiKey(!!getOpenAIApiKey());
   };
 
-  // Calcular costo estimado (aproximado basado en precios de Gemini)
-  // Gemini Flash: ~$0.075 por 1M tokens de entrada, ~$0.30 por 1M tokens de salida
+  // Calcular costo estimado (aproximado basado en precios de OpenAI)
+  // GPT-4o-mini: ~$0.15 por 1M tokens de entrada, ~$0.60 por 1M tokens de salida
   const calculateEstimatedCost = () => {
     // Usar tokens reales si están disponibles, sino estimar
     const totalTokens = usageStats.totalTokens || 0;
@@ -45,8 +45,8 @@ const ConfiguracionSistema = () => {
       ? totalTokens 
       : (usageStats.totalCalls || 0) * 2000; // Estimación conservadora: 2000 tokens por llamada
     
-    // Costo promedio: ~$0.10 por 1M tokens (mezcla entrada/salida)
-    const costPerMillion = 0.10;
+    // Costo promedio: ~$0.25 por 1M tokens (mezcla entrada/salida)
+    const costPerMillion = 0.25;
     const estimatedCost = (estimatedTokens / 1000000) * costPerMillion;
     
     return {
@@ -81,10 +81,10 @@ const ConfiguracionSistema = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Zap className="h-5 w-5 text-info" />
-              Estado de Google AI (Gemini)
+              Estado de OpenAI
             </CardTitle>
             <CardDescription>
-              Información sobre el uso de la API de Google AI
+              Información sobre el uso de la API de OpenAI
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -117,7 +117,7 @@ const ConfiguracionSistema = () => {
             <div className="p-4 rounded-lg bg-muted/50">
               <p className="text-sm font-medium mb-2">Nota:</p>
               <p className="text-sm text-muted-foreground">
-                La clave de API de Google AI se configura mediante la variable de entorno <code className="bg-muted px-1 rounded">VITE_GEMINI_API_KEY</code> en el servidor.
+                La clave de API de OpenAI se configura mediante la variable de entorno <code className="bg-muted px-1 rounded">VITE_OPENAI_API_KEY</code> en el servidor.
                 Los administradores no pueden modificarla desde esta interfaz por seguridad.
               </p>
             </div>
