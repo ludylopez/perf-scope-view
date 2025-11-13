@@ -653,6 +653,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         competencias_desarrollar: planCompleto, // Guardamos toda la estructura aquí
         feedback_individual: planData.feedbackIndividual || "",
         feedback_grupal: planData.feedbackGrupal || null,
+        generado_por_ia: true, // Marcar como generado por IA
         editable: true,
       })
       .select("*")
