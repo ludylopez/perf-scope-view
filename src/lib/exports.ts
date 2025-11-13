@@ -849,259 +849,195 @@ export const exportEvaluacionCompletaPDFFromElement = async (
     const imgHeightMm = imgHeight * pxToMm;
     
     // Calcular dimensiones
-    const margin = 10; // mm
-    const footerHeight = 15; // mm
+    const margin = 8; // mm - reducir márgenes para más espacio
+    const footerHeight = 12; // mm - reducir footer
     
-    // Calcular altura necesaria del header primero
     const nombreCompleto = empleado.apellidos 
       ? `${empleado.nombre} ${empleado.apellidos}` 
       : empleado.nombre;
     
-    const leftColX = 10;
-    const rightColX = pageWidth / 2 + 5;
-    const labelWidth = 35;
+    // ===== ENCABEZADO MODERNO CON DISEÑO MEJORADO =====
+    // Header más compacto y moderno
+    const headerHeight = 28; // mm - header más compacto
     
-    // Calcular altura necesaria simulando el contenido
-    let yPos = 16; // Inicio después del título
-    doc.setFontSize(8);
-    
-    // Primera fila
-    yPos += 5;
-    
-    // Segunda fila
-    if (empleado.cargo) {
-      const cargoLines = doc.splitTextToSize(empleado.cargo, (pageWidth / 2) - leftColX - labelWidth - 5);
-      yPos += 5 + (cargoLines.length - 1) * 4;
-    } else {
-      yPos += 5;
-    }
-    
-    // Tercera fila
-    if (empleado.area) {
-      const areaLines = doc.splitTextToSize(empleado.area, (pageWidth / 2) - leftColX - labelWidth - 5);
-      yPos += 5 + (areaLines.length - 1) * 4;
-    } else {
-      yPos += 5;
-    }
-    
-    // Cuarta fila
-    if (empleado.direccionUnidad) {
-      const dirLines = doc.splitTextToSize(empleado.direccionUnidad, (pageWidth / 2) - leftColX - labelWidth - 5);
-      yPos += 5 + (dirLines.length - 1) * 4;
-    } else if (empleado.departamentoDependencia) {
-      const deptoLines = doc.splitTextToSize(empleado.departamentoDependencia, (pageWidth / 2) - rightColX - labelWidth - 5);
-      yPos += 5 + (deptoLines.length - 1) * 4;
-    } else {
-      yPos += 5;
-    }
-    
-    // Quinta fila - Profesión
-    if (empleado.profesion) {
-      const profLines = doc.splitTextToSize(empleado.profesion, pageWidth - leftColX - labelWidth - 10);
-      yPos += 2 + 5 + (profLines.length - 1) * 4;
-    }
-    
-    // Calcular headerHeight con margen
-    let headerHeight = Math.max(35, yPos + 8);
-    
-    // ===== ENCABEZADO CON TEXTO SELECCIONABLE =====
-    // Fondo azul
+    // Fondo azul con gradiente (simulado con rectángulo)
     doc.setFillColor(59, 130, 246);
     doc.rect(0, 0, pageWidth, headerHeight, 'F');
     
-    // Título principal (texto seleccionable)
-    doc.setFontSize(18);
+    // Título principal centrado
+    doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(255, 255, 255);
-    doc.text("Evaluación de Desempeño", pageWidth / 2, 7, { align: "center" });
+    doc.text("Evaluación de Desempeño", pageWidth / 2, 8, { align: "center" });
     
-    // Línea separadora debajo del título
-    doc.setDrawColor(255, 255, 255);
-    doc.setLineWidth(0.3);
-    doc.line(10, 10, pageWidth - 10, 10);
+    // Información del empleado en diseño tipo tarjeta moderna
+    // Fondo blanco con borde sutil para la tarjeta de información
+    const cardY = headerHeight + 3;
+    const cardHeight = 22; // Altura de la tarjeta
+    const cardPadding = 4;
     
-    // Información del empleado (TEXTO SELECCIONABLE) - Diseño en columnas organizadas
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(255, 255, 255);
+    // Fondo de tarjeta (blanco con sombra sutil)
+    doc.setFillColor(255, 255, 255);
+    doc.setDrawColor(220, 220, 220);
+    doc.setLineWidth(0.5);
+    doc.roundedRect(margin, cardY, pageWidth - (margin * 2), cardHeight, 2, 2, 'FD');
     
-    // Columna izquierda
-    yPos = 16;
+    // Diseño en grid de 2 columnas
+    const col1X = margin + cardPadding;
+    const col2X = pageWidth / 2 + 2;
+    const colWidth = (pageWidth / 2) - margin - cardPadding - 2;
+    let currentY = cardY + cardPadding + 3;
+    const lineHeight = 4;
     
-    // Primera fila - Columna izquierda
+    doc.setFontSize(7);
+    doc.setTextColor(0, 0, 0);
+    
+    // Columna 1 - Información personal (alineada a la izquierda)
+    let col1Y = currentY;
+    
+    // Nombre completo
     doc.setFont("helvetica", "bold");
-    doc.text("Empleado:", leftColX, yPos);
+    doc.setTextColor(59, 130, 246);
+    doc.setFontSize(7);
+    doc.text("Empleado", col1X, col1Y);
     doc.setFont("helvetica", "normal");
-    doc.text(nombreCompleto, leftColX + labelWidth, yPos);
+    doc.setTextColor(0, 0, 0);
+    const nombreLines = doc.splitTextToSize(nombreCompleto, colWidth - 3);
+    doc.text(nombreLines, col1X, col1Y + 3.5);
+    col1Y += 3.5 + (nombreLines.length > 1 ? (nombreLines.length - 1) * 3 : 0) + 3;
     
-    // Primera fila - Columna derecha
-    if (empleado.dpi) {
-      doc.setFont("helvetica", "bold");
-      doc.text("DPI:", rightColX, yPos);
-      doc.setFont("helvetica", "normal");
-      doc.text(empleado.dpi, rightColX + labelWidth, yPos);
-    }
-    
-    yPos += 5;
-    
-    // Segunda fila
-    const row2Y = yPos;
-    let cargoLines: string[] = [];
+    // Cargo
     if (empleado.cargo) {
       doc.setFont("helvetica", "bold");
-      doc.text("Cargo:", leftColX, row2Y);
+      doc.setTextColor(100, 100, 100);
+      doc.setFontSize(6);
+      doc.text("Cargo", col1X, col1Y);
       doc.setFont("helvetica", "normal");
-      cargoLines = doc.splitTextToSize(empleado.cargo, (pageWidth / 2) - leftColX - labelWidth - 5);
-      doc.text(cargoLines, leftColX + labelWidth, row2Y);
+      doc.setTextColor(0, 0, 0);
+      const cargoLines = doc.splitTextToSize(empleado.cargo, colWidth - 3);
+      doc.text(cargoLines, col1X, col1Y + 3);
+      col1Y += 3 + (cargoLines.length > 1 ? (cargoLines.length - 1) * 2.5 : 0) + 2;
     }
-    if (empleado.nivel) {
-      doc.setFont("helvetica", "bold");
-      doc.text("Nivel:", rightColX, row2Y);
-      doc.setFont("helvetica", "normal");
-      doc.text(empleado.nivel, rightColX + labelWidth, row2Y);
-    }
-    yPos += 5 + (cargoLines.length - 1) * 4;
     
-    // Tercera fila
-    const row3Y = yPos;
-    let areaLines: string[] = [];
+    // Área
     if (empleado.area) {
       doc.setFont("helvetica", "bold");
-      doc.text("Área:", leftColX, row3Y);
+      doc.setTextColor(100, 100, 100);
+      doc.setFontSize(6);
+      doc.text("Área", col1X, col1Y);
       doc.setFont("helvetica", "normal");
-      areaLines = doc.splitTextToSize(empleado.area, (pageWidth / 2) - leftColX - labelWidth - 5);
-      doc.text(areaLines, leftColX + labelWidth, row3Y);
+      doc.setTextColor(0, 0, 0);
+      const areaLines = doc.splitTextToSize(empleado.area, colWidth - 3);
+      doc.text(areaLines, col1X, col1Y + 3);
+      col1Y += 3 + (areaLines.length > 1 ? (areaLines.length - 1) * 2.5 : 0) + 2;
     }
+    
+    // Columna 2 - Información administrativa (alineada a la izquierda de su columna)
+    let col2Y = currentY;
+    
+    // DPI
+    if (empleado.dpi) {
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(59, 130, 246);
+      doc.setFontSize(7);
+      doc.text("DPI", col2X, col2Y);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(0, 0, 0);
+      doc.text(empleado.dpi, col2X, col2Y + 3.5);
+      col2Y += 6.5;
+    }
+    
+    // Nivel
+    if (empleado.nivel) {
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(100, 100, 100);
+      doc.setFontSize(6);
+      doc.text("Nivel", col2X, col2Y);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(0, 0, 0);
+      doc.text(empleado.nivel, col2X, col2Y + 3);
+      col2Y += 5;
+    }
+    
+    // Período
     doc.setFont("helvetica", "bold");
-    doc.text("Período:", rightColX, row3Y);
+    doc.setTextColor(100, 100, 100);
+    doc.setFontSize(6);
+    doc.text("Período", col2X, col2Y);
     doc.setFont("helvetica", "normal");
-    doc.text(periodo, rightColX + labelWidth, row3Y);
-    yPos += 5 + (areaLines.length - 1) * 4;
+    doc.setTextColor(0, 0, 0);
+    doc.text(periodo, col2X, col2Y + 3);
+    col2Y += 5;
     
-    // Cuarta fila
-    const row4Y = yPos;
-    let dirLines: string[] = [];
-    let deptoLines: string[] = [];
-    if (empleado.direccionUnidad) {
-      doc.setFont("helvetica", "bold");
-      doc.text("Dirección/Unidad:", leftColX, row4Y);
-      doc.setFont("helvetica", "normal");
-      dirLines = doc.splitTextToSize(empleado.direccionUnidad, (pageWidth / 2) - leftColX - labelWidth - 5);
-      doc.text(dirLines, leftColX + labelWidth, row4Y);
-    }
-    if (empleado.departamentoDependencia) {
-      doc.setFont("helvetica", "bold");
-      doc.text("Depto/Dependencia:", rightColX, row4Y);
-      doc.setFont("helvetica", "normal");
-      deptoLines = doc.splitTextToSize(empleado.departamentoDependencia, (pageWidth / 2) - rightColX - labelWidth - 5);
-      doc.text(deptoLines, rightColX + labelWidth, row4Y);
-    }
-    yPos += 5 + Math.max((dirLines.length - 1) * 4, (deptoLines.length - 1) * 4);
-    
-    // Quinta fila - Profesión (puede ocupar ambas columnas si es largo)
-    if (empleado.profesion) {
-      yPos += 2;
-      doc.setFont("helvetica", "bold");
-      doc.text("Profesión:", leftColX, yPos);
-      doc.setFont("helvetica", "normal");
-      const profLines = doc.splitTextToSize(empleado.profesion, pageWidth - leftColX - labelWidth - 10);
-      doc.text(profLines, leftColX + labelWidth, yPos);
+    // Dirección/Unidad y Depto (si existen, en una fila adicional compacta)
+    const maxY = Math.max(col1Y, col2Y);
+    if (empleado.direccionUnidad || empleado.departamentoDependencia) {
+      if (empleado.direccionUnidad) {
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(100, 100, 100);
+        doc.setFontSize(6);
+        doc.text("Dirección/Unidad", col1X, maxY);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(0, 0, 0);
+        const dirLines = doc.splitTextToSize(empleado.direccionUnidad, colWidth - 3);
+        doc.text(dirLines, col1X, maxY + 3);
+      }
+      if (empleado.departamentoDependencia) {
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(100, 100, 100);
+        doc.setFontSize(6);
+        doc.text("Depto/Dependencia", col2X, maxY);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(0, 0, 0);
+        const deptoLines = doc.splitTextToSize(empleado.departamentoDependencia, colWidth - 3);
+        doc.text(deptoLines, col2X, maxY + 3);
+      }
     }
     
-    // Agregar información adicional como texto seleccionable debajo del header
-    // (antes de la imagen)
-    let yTextInfo = headerHeight + 5;
-    const textInfoLines: string[] = [];
-    
-    if (empleado.correo) {
-      textInfoLines.push(`Correo: ${empleado.correo}`);
-    }
-    if (empleado.telefono) {
-      textInfoLines.push(`Teléfono: ${empleado.telefono}`);
-    }
-    
-    if (textInfoLines.length > 0) {
-      doc.setFontSize(8);
-      doc.setTextColor(0, 0, 0); // Negro para texto seleccionable
-      textInfoLines.forEach((line, index) => {
-        doc.text(line, 10, yTextInfo + (index * 5));
-      });
-      yTextInfo += textInfoLines.length * 5 + 3;
-    }
+    // Calcular posición final después del header
+    const yAfterHeader = cardY + cardHeight + 3;
     
     const availableWidth = pageWidth - (margin * 2);
-    const availableHeight = pageHeight - yTextInfo - footerHeight - margin;
+    const availableHeight = pageHeight - yAfterHeader - footerHeight - margin;
     
-    // Calcular escala para que la imagen quepa
+    // Calcular escala para que la imagen quepa en UNA SOLA PÁGINA
     const scaleX = availableWidth / imgWidthMm;
     const scaleY = availableHeight / imgHeightMm;
+    // Usar el menor de los dos para asegurar que quepa completamente
     const scale = Math.min(scaleX, scaleY, 1); // No ampliar, solo reducir si es necesario
     
     const scaledWidth = imgWidthMm * scale;
     const scaledHeight = imgHeightMm * scale;
     
-    // Centrar la imagen (después del header y texto adicional)
+    // Centrar la imagen (después del header)
     const x = (pageWidth - scaledWidth) / 2;
-    const y = yTextInfo;
+    const y = yAfterHeader;
 
-    // Dividir la imagen en páginas si es necesario
-    let remainingHeight = scaledHeight;
-    let sourceY = 0;
-    let currentY = y;
-    let pageNum = 1;
-    // Altura disponible en páginas siguientes (solo header, sin texto adicional)
-    const availableHeightNextPages = pageHeight - headerHeight - footerHeight - margin - 5;
-
-    while (remainingHeight > 0 && pageNum <= 10) { // Límite de 10 páginas
-      // Usar altura disponible según la página
-      const availableHeightForPage = pageNum === 1 ? availableHeight : availableHeightNextPages;
-      const heightOnPage = Math.min(remainingHeight, availableHeightForPage);
-      const sourceHeightPx = (heightOnPage / scale) / pxToMm; // Convertir de mm a px
+    // Intentar que todo quepa en una sola página
+    // Si la imagen escalada es más alta que el espacio disponible, reducir más la escala
+    if (scaledHeight > availableHeight) {
+      const newScale = (availableHeight / imgHeightMm) * 0.95; // 95% para dejar un poco de margen
+      const finalScale = Math.min(newScale, scale);
+      const finalScaledWidth = imgWidthMm * finalScale;
+      const finalScaledHeight = imgHeightMm * finalScale;
       
-      // Crear un canvas temporal con la porción de la imagen
-      const tempCanvas = document.createElement("canvas");
-      tempCanvas.width = imgWidth;
-      tempCanvas.height = sourceHeightPx;
-      const tempCtx = tempCanvas.getContext("2d");
-      
-      if (tempCtx) {
-        // Dibujar la porción de la imagen original en el canvas temporal
-        tempCtx.drawImage(canvas, 0, sourceY, imgWidth, sourceHeightPx, 0, 0, imgWidth, sourceHeightPx);
-        const tempImgData = tempCanvas.toDataURL("image/png");
-        
-        // Agregar la porción al PDF
-        doc.addImage(tempImgData, "PNG", x, currentY, scaledWidth, heightOnPage);
-      }
-      
-      remainingHeight -= heightOnPage;
-      sourceY += sourceHeightPx;
-      
-      // Si aún queda contenido, agregar una nueva página
-      if (remainingHeight > 0) {
-        doc.addPage();
-        pageNum++;
-        // En páginas siguientes, solo agregar header (sin texto adicional)
-        // Dibujar header en la nueva página
-        doc.setFillColor(59, 130, 246);
-        doc.rect(0, 0, pageWidth, headerHeight, 'F');
-        doc.setFontSize(16);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(255, 255, 255);
-        doc.text("Evaluación de Desempeño", pageWidth / 2, 8, { align: "center" });
-        currentY = headerHeight + 5; // mm después del header
-      }
+      // Agregar la imagen completa en una sola página
+      doc.addImage(imgData, "PNG", (pageWidth - finalScaledWidth) / 2, y, finalScaledWidth, finalScaledHeight);
+    } else {
+      // La imagen cabe perfectamente, agregarla
+      doc.addImage(imgData, "PNG", x, y, scaledWidth, scaledHeight);
     }
 
-    // Footer en todas las páginas
+    // Footer compacto en todas las páginas
     const totalPages = doc.getNumberOfPages();
     for (let i = 1; i <= totalPages; i++) {
       doc.setPage(i);
-      doc.setFontSize(8);
-      doc.setTextColor(100, 100, 100);
+      doc.setFontSize(7);
+      doc.setTextColor(150, 150, 150);
       doc.text(
         `Página ${i} de ${totalPages} • Generado el ${format(fechaGeneracion, "dd/MM/yyyy HH:mm")}`,
         pageWidth / 2,
-        pageHeight - 10,
+        pageHeight - 6,
         { align: "center" }
       );
     }
