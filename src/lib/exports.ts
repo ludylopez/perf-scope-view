@@ -1000,32 +1000,132 @@ export const exportEvaluacionCompletaPDFFromElement = async (
     const availableWidth = pageWidth - (margin * 2);
     const availableHeight = pageHeight - yAfterHeader - footerHeight - margin;
     
-    // Calcular escala para que la imagen quepa en UNA SOLA PÁGINA
+    // Calcular escala para que la imagen se vea bien (no forzar en una sola página)
+    // Usar una escala razonable que mantenga buena legibilidad
     const scaleX = availableWidth / imgWidthMm;
     const scaleY = availableHeight / imgHeightMm;
-    // Usar el menor de los dos para asegurar que quepa completamente
-    const scale = Math.min(scaleX, scaleY, 1); // No ampliar, solo reducir si es necesario
+    
+    // Usar una escala que permita buena legibilidad
+    // Priorizar el ancho para que el contenido se vea bien, permitir múltiples páginas
+    const optimalScale = Math.min(scaleX * 0.95, 1); // Usar 95% del ancho disponible, máximo 1:1
+    const scale = Math.max(optimalScale, 0.5); // Mínimo 50% para mantener buena legibilidad
     
     const scaledWidth = imgWidthMm * scale;
     const scaledHeight = imgHeightMm * scale;
     
     // Centrar la imagen (después del header)
     const x = (pageWidth - scaledWidth) / 2;
-    const y = yAfterHeader;
-
-    // Intentar que todo quepa en una sola página
-    // Si la imagen escalada es más alta que el espacio disponible, reducir más la escala
-    if (scaledHeight > availableHeight) {
-      const newScale = (availableHeight / imgHeightMm) * 0.95; // 95% para dejar un poco de margen
-      const finalScale = Math.min(newScale, scale);
-      const finalScaledWidth = imgWidthMm * finalScale;
-      const finalScaledHeight = imgHeightMm * finalScale;
+    let currentY = yAfterHeader;
+    let sourceY = 0;
+    let pageNum = 1;
+    
+    // Dividir la imagen en páginas si es necesario, manteniendo buena calidad
+    // En la primera página, el espacio disponible es después del header completo
+    // En páginas siguientes, el espacio es después del header compacto
+    const availableHeightFirstPage = availableHeight;
+    const availableHeightNextPages = pageHeight - headerHeight - footerHeight - margin - 5;
+    
+    while (sourceY < imgHeight && pageNum <= 20) { // Límite de 20 páginas
+      // Calcular cuánto de la imagen cabe en esta página
+      const remainingImgHeight = imgHeight - sourceY;
+      const availableHeightForThisPage = pageNum === 1 ? availableHeightFirstPage : availableHeightNextPages;
+      const availableHeightPx = (availableHeightForThisPage / scale) / pxToMm;
+      const heightToUse = Math.min(remainingImgHeight, availableHeightPx);
       
-      // Agregar la imagen completa en una sola página
-      doc.addImage(imgData, "PNG", (pageWidth - finalScaledWidth) / 2, y, finalScaledWidth, finalScaledHeight);
-    } else {
-      // La imagen cabe perfectamente, agregarla
-      doc.addImage(imgData, "PNG", x, y, scaledWidth, scaledHeight);
+      // Crear un canvas temporal con la porción de la imagen
+      const tempCanvas = document.createElement("canvas");
+      tempCanvas.width = imgWidth;
+      tempCanvas.height = heightToUse;
+      const tempCtx = tempCanvas.getContext("2d");
+      
+      if (tempCtx) {
+        // Dibujar la porción de la imagen original en el canvas temporal
+        tempCtx.drawImage(canvas, 0, sourceY, imgWidth, heightToUse, 0, 0, imgWidth, heightToUse);
+        const tempImgData = tempCanvas.toDataURL("image/png");
+        
+        // Calcular altura en mm para esta porción
+        const heightMm = (heightToUse * pxToMm) * scale;
+        
+        // Agregar la porción al PDF
+        doc.addImage(tempImgData, "PNG", x, currentY, scaledWidth, heightMm);
+      }
+      
+      sourceY += heightToUse;
+      
+      // Si aún queda contenido, agregar una nueva página
+      if (sourceY < imgHeight) {
+        doc.addPage();
+        pageNum++;
+        
+        // Dibujar header en la nueva página
+        doc.setFillColor(59, 130, 246);
+        doc.rect(0, 0, pageWidth, headerHeight, 'F');
+        doc.setFontSize(16);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(255, 255, 255);
+        doc.text("Evaluación de Desempeño", pageWidth / 2, 8, { align: "center" });
+        
+        // Redibujar tarjeta de información del empleado en la nueva página
+        doc.setFillColor(255, 255, 255);
+        doc.setDrawColor(220, 220, 220);
+        doc.setLineWidth(0.5);
+        doc.roundedRect(margin, cardY, pageWidth - (margin * 2), cardHeight, 2, 2, 'FD');
+        
+        // Redibujar información del empleado (versión compacta para páginas siguientes)
+        doc.setFontSize(7);
+        doc.setTextColor(0, 0, 0);
+        let infoY = cardY + cardPadding + 3;
+        
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(59, 130, 246);
+        doc.text("Empleado:", col1X, infoY);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(0, 0, 0);
+        const nombreShort = nombreCompleto.length > 40 ? nombreCompleto.substring(0, 40) + "..." : nombreCompleto;
+        doc.text(nombreShort, col1X + 20, infoY);
+        
+        if (empleado.dpi) {
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(59, 130, 246);
+          doc.text("DPI:", col2X, infoY);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(0, 0, 0);
+          doc.text(empleado.dpi, col2X + 12, infoY);
+        }
+        
+        infoY += 4;
+        if (empleado.cargo) {
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(100, 100, 100);
+          doc.setFontSize(6);
+          doc.text("Cargo:", col1X, infoY);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(0, 0, 0);
+          const cargoShort = empleado.cargo.length > 35 ? empleado.cargo.substring(0, 35) + "..." : empleado.cargo;
+          doc.text(cargoShort, col1X + 15, infoY);
+        }
+        
+        if (empleado.nivel) {
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(100, 100, 100);
+          doc.setFontSize(6);
+          doc.text("Nivel:", col2X, infoY);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(0, 0, 0);
+          doc.text(empleado.nivel, col2X + 15, infoY);
+        }
+        
+        infoY += 4;
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(100, 100, 100);
+        doc.setFontSize(6);
+        doc.text("Período:", col2X, infoY);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(0, 0, 0);
+        doc.text(periodo, col2X + 18, infoY);
+        
+        currentY = yAfterHeader;
+      }
     }
 
     // Footer compacto en todas las páginas
