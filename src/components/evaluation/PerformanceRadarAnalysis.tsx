@@ -108,7 +108,7 @@ export const PerformanceRadarAnalysis = ({
                       </Badge>
                     </div>
                     {dim.descripcion && (
-                      <p className="text-xs text-muted-foreground line-clamp-1">{dim.descripcion}</p>
+                      <p className="text-xs text-muted-foreground leading-relaxed">{dim.descripcion}</p>
                     )}
                   </div>
                 </div>
@@ -146,7 +146,7 @@ export const PerformanceRadarAnalysis = ({
                       </Badge>
                     </div>
                     {dim.descripcion && (
-                      <p className="text-xs text-muted-foreground line-clamp-1">{dim.descripcion}</p>
+                      <p className="text-xs text-muted-foreground leading-relaxed">{dim.descripcion}</p>
                     )}
                   </div>
                 </div>
