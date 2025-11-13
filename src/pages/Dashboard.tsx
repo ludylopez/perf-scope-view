@@ -30,8 +30,10 @@ import { toast } from "@/hooks/use-toast";
 import { getJerarquiaInfo } from "@/lib/jerarquias";
 import { getColaboradorJefe } from "@/lib/supabase";
 import { calculatePerformanceScore, scoreToPercentage, calculateDimensionPercentage, calculateDimensionAverage } from "@/lib/calculations";
-import { TrendingUp, Award, Lightbulb } from "lucide-react";
+import { TrendingUp, Award, Lightbulb, FileDown, Target } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { PerformanceRadarAnalysis } from "@/components/evaluation/PerformanceRadarAnalysis";
+import { supabase } from "@/integrations/supabase/client";
 
 // Helper para calcular respuestas consolidadas (70% jefe + 30% auto)
 const calculateConsolidatedResponses = (
@@ -78,7 +80,83 @@ const getDimensionFriendlyTitle = (dimension: any): string => {
   if (nombre.includes("orientación al servicio") || nombre.includes("atención al usuario")) return "Orientación al Servicio";
   if (nombre.includes("calidad del trabajo")) return "Calidad del Trabajo";
   if (nombre.includes("productividad") || nombre.includes("cumplimiento")) return "Productividad";
+  if (nombre.includes("liderazgo") || nombre.includes("dirección")) return "Tu Liderazgo";
+  if (nombre.includes("ciudadan") || nombre.includes("servicio")) return "Tu Servicio al Ciudadano";
+  if (nombre.includes("gestión") && nombre.includes("resultado")) return "Tus Resultados";
+  if (nombre.includes("transparencia") || nombre.includes("ética")) return "Tu Ética y Transparencia";
   return dimension.nombre.length > 40 ? dimension.nombre.substring(0, 40) + "..." : dimension.nombre;
+};
+
+// Helper para obtener descripción amigable de la dimensión
+const getDimensionFriendlyDescription = (dimension: any, percentage: number): string => {
+  const nombre = dimension.nombre.toLowerCase();
+  
+  if (nombre.includes("técnica") || nombre.includes("competencia") || nombre.includes("conocimiento")) {
+    if (percentage >= 85) {
+      return `con ${percentage}%. Tus habilidades técnicas son tu diferenciador más fuerte.`;
+    } else if (percentage >= 70) {
+      return `con ${percentage}%. Tienes buenos conocimientos en tu área de trabajo.`;
+    } else {
+      return `con ${percentage}%. Hay oportunidad de fortalecer tus conocimientos técnicos.`;
+    }
+  }
+  
+  if (nombre.includes("comportamiento") || nombre.includes("actitud") || nombre.includes("valor")) {
+    if (percentage >= 70) {
+      return `con ${percentage}%. Tus valores y actitud son un buen soporte.`;
+    } else {
+      return `con ${percentage}%. Enfócate en alinear mejor con la cultura y valores.`;
+    }
+  }
+  
+  if (nombre.includes("liderazgo") || nombre.includes("dirección") || nombre.includes("gestión")) {
+    if (percentage >= 75) {
+      return `con ${percentage}%. Tu capacidad de liderazgo es notable.`;
+    } else {
+      return `con ${percentage}%. Puedes mejorar tus habilidades de gestión de equipo.`;
+    }
+  }
+  
+  if (nombre.includes("ciudadano") || nombre.includes("servicio") || nombre.includes("orientación")) {
+    if (percentage >= 70) {
+      return `con ${percentage}%. Tu compromiso con el servicio es evidente.`;
+    } else {
+      return `con ${percentage}%. Fortalece tu enfoque en las necesidades ciudadanas.`;
+    }
+  }
+  
+  // Default genérico
+  if (percentage >= 75) {
+    return `con ${percentage}%. Esta es una de tus áreas más fuertes.`;
+  } else {
+    return `con ${percentage}%. Aquí hay espacio para crecer y mejorar.`;
+  }
+};
+
+// Helper para obtener descripción corta y simple
+const getDimensionShortDescription = (dimension: any): string => {
+  const nombre = dimension.nombre.toLowerCase();
+  
+  if (nombre.includes("competencias laborales") && nombre.includes("técnica")) {
+    return "Técnicas y específicas";
+  }
+  if (nombre.includes("comportamiento") && nombre.includes("organizacional")) {
+    return "Actitud laboral";
+  }
+  if (nombre.includes("relaciones interpersonales") || nombre.includes("trabajo en equipo")) {
+    return "Trabajo en equipo";
+  }
+  if (nombre.includes("orientación al servicio") || nombre.includes("atención al usuario")) {
+    return "Atención al usuario";
+  }
+  if (nombre.includes("calidad del trabajo")) {
+    return "Estándares y precisión";
+  }
+  if (nombre.includes("productividad") || nombre.includes("cumplimiento")) {
+    return "Cumplimiento de objetivos";
+  }
+  
+  return "Desempeño evaluado";
 };
 
 const Dashboard = () => {
@@ -95,6 +173,8 @@ const Dashboard = () => {
     fortalezas: any[];
     areasOportunidad: any[];
     instrument: any;
+    radarData: any[];
+    promedioMunicipal: Record<string, number>;
   } | null>(null);
 
   const isColaborador = user?.rol === "colaborador";
@@ -155,6 +235,7 @@ const Dashboard = () => {
 
         const radarData = instrument.dimensionesDesempeno.map((dim, idx) => ({
           dimension: getDimensionFriendlyTitle(dim),
+          nombreCompleto: dim.nombre,
           numero: idx + 1,
           tuEvaluacion: calculateDimensionPercentage(responsesToUse, dim),
           puntaje: calculateDimensionAverage(responsesToUse, dim),
@@ -165,12 +246,69 @@ const Dashboard = () => {
         const fortalezas = sortedDimensions.slice(0, 3);
         const areasOportunidad = sortedDimensions.slice(-3).reverse();
 
+        // Calcular promedio municipal de resultados finales consolidados
+        let promedioMunicipal: Record<string, number> = {};
+        try {
+          const { data: finalResults } = await supabase
+            .from('final_evaluation_results')
+            .select('colaborador_id, resultado_final, autoevaluacion_id, evaluacion_jefe_id')
+            .eq('periodo_id', activePeriodId);
+
+          if (finalResults && finalResults.length > 0) {
+            const autoevaluacionIds = finalResults.map(r => r.autoevaluacion_id).filter(id => id);
+            const jefeEvaluacionIds = finalResults.map(r => r.evaluacion_jefe_id).filter(id => id);
+            
+            const { data: autoEvals } = await supabase
+              .from('evaluations')
+              .select('id, responses')
+              .in('id', autoevaluacionIds)
+              .eq('tipo', 'auto');
+
+            const { data: jefeEvals } = await supabase
+              .from('evaluations')
+              .select('id, responses')
+              .in('id', jefeEvaluacionIds)
+              .eq('tipo', 'jefe');
+
+            const autoEvalMap = new Map((autoEvals || []).map(e => [e.id, (e.responses as Record<string, number>) || {}]));
+            const jefeEvalMap = new Map((jefeEvals || []).map(e => [e.id, (e.responses as Record<string, number>) || {}]));
+
+            instrument.dimensionesDesempeno.forEach((dim) => {
+              let sumaPorcentajes = 0;
+              let contador = 0;
+
+              finalResults.forEach((resultado) => {
+                const autoResponses = autoEvalMap.get(resultado.autoevaluacion_id) || {};
+                const jefeResponses = jefeEvalMap.get(resultado.evaluacion_jefe_id) || {};
+                const consolidadas = calculateConsolidatedResponses(autoResponses, jefeResponses);
+                const porcentaje = calculateDimensionPercentage(consolidadas, dim);
+                if (porcentaje > 0) {
+                  sumaPorcentajes += porcentaje;
+                  contador++;
+                }
+              });
+
+              promedioMunicipal[dim.id] = contador > 0 ? Math.round(sumaPorcentajes / contador) : 0;
+            });
+          }
+        } catch (error) {
+          console.error('Error calculando promedio municipal:', error);
+        }
+
+        // Agregar promedio municipal a radarData
+        const radarDataWithPromedio = radarData.map(d => ({
+          ...d,
+          promedioMunicipal: promedioMunicipal[d.dimensionData.id] || 0
+        }));
+
         setResultadoData({
           performancePercentage,
           jefeCompleto,
           fortalezas,
           areasOportunidad,
-          instrument
+          instrument,
+          radarData: radarDataWithPromedio,
+          promedioMunicipal
         });
       } catch (error) {
         console.error('Error cargando resultados:', error);
@@ -342,36 +480,46 @@ const Dashboard = () => {
             {/* Mostrar resultados si están disponibles */}
             {evaluationStatus === "submitted" && resultadoData && (
               <>
-                {/* Resumen de Resultados */}
-                <Card className="border-2 border-primary/20">
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle className="flex items-center gap-2">
-                          <TrendingUp className="h-5 w-5 text-primary" />
-                          Mis Resultados - Periodo {activePeriod?.nombre || 'N/A'}
-                        </CardTitle>
-                        <CardDescription>
-                          {resultadoData.jefeCompleto 
-                            ? "Resultado consolidado de tu evaluación de desempeño"
-                            : "Autoevaluación enviada. Esperando evaluación del jefe para resultado consolidado."}
-                        </CardDescription>
-                      </div>
-                      <Badge className={resultadoData.jefeCompleto ? "bg-success text-success-foreground" : "bg-info text-info-foreground"}>
-                        {resultadoData.jefeCompleto ? "Resultado Consolidado" : "Autoevaluación Enviada"}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid gap-6 md:grid-cols-2">
-                      {/* Puntaje Global */}
-                      <div className="flex flex-col items-center gap-4">
-                        <Badge className={`${getScoreInterpretation(resultadoData.performancePercentage).color} px-4 py-2 text-base font-medium`}>
+                {/* Título y Badge */}
+                <div className="mb-6">
+                  <div className="flex items-center gap-3 mb-2">
+                    <h1 className="text-3xl font-bold text-foreground">
+                      Mis Resultados
+                    </h1>
+                    <Badge className="bg-success text-success-foreground">
+                      <CheckCircle2 className="mr-1 h-3 w-3" />
+                      {resultadoData.jefeCompleto ? "Resultado Consolidado" : "Autoevaluación Enviada"}
+                    </Badge>
+                  </div>
+                  <p className="text-muted-foreground">
+                    {resultadoData.jefeCompleto 
+                      ? "Resultado consolidado de tu evaluación de desempeño"
+                      : "Autoevaluación enviada. Esperando evaluación del jefe para resultado consolidado."}
+                  </p>
+                </div>
+
+                {/* Mensaje informativo si el jefe no ha completado */}
+                {!resultadoData.jefeCompleto && (
+                  <Alert className="mb-6 border-blue-200 bg-blue-50 dark:bg-blue-950/20">
+                    <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    <AlertDescription className="text-blue-800 dark:text-blue-200">
+                      Su autoevaluación fue recibida. Cuando su jefe complete la evaluación, aquí aparecerá su resultado consolidado.
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {/* Resumen visual mejorado */}
+                <Card className="mb-6 border-2 border-primary/20">
+                  <CardContent className="pt-6">
+                    <div className="flex flex-col lg:flex-row gap-8 items-center">
+                      {/* Sección izquierda: Badge y gráfico circular */}
+                      <div className="flex flex-col items-center gap-4 lg:w-1/2">
+                        <Badge className="bg-success hover:bg-success text-success-foreground px-4 py-2 text-base font-medium">
                           <TrendingUp className="mr-2 h-4 w-4" />
                           Tu desempeño es {getScoreInterpretation(resultadoData.performancePercentage).label}
                         </Badge>
                         
-                        <div className="relative w-48 h-48">
+                        <div className="relative w-64 h-64">
                           <svg className="w-full h-full" viewBox="0 0 100 100">
                             <circle
                               cx="50"
@@ -396,14 +544,22 @@ const Dashboard = () => {
                           </svg>
                           <div className="absolute inset-0 flex items-center justify-center">
                             <div className="text-center">
-                              <div className="text-4xl font-bold text-primary">{resultadoData.performancePercentage}%</div>
+                              <div className="text-5xl font-bold text-primary">{resultadoData.performancePercentage}%</div>
                             </div>
                           </div>
                         </div>
+                        
+                        <p className="text-center text-sm text-muted-foreground max-w-md">
+                          Con un puntaje global de <strong>{resultadoData.performancePercentage}%</strong>,
+                          {resultadoData.performancePercentage >= 75 
+                            ? " estás cumpliendo satisfactoriamente con las expectativas del cargo." 
+                            : " hay áreas importantes que requieren atención y mejora."}
+                        </p>
                       </div>
 
-                      {/* Fortalezas y Áreas de Oportunidad */}
-                      <div className="space-y-4">
+                      {/* Sección derecha: Tarjetas informativas */}
+                      <div className="flex flex-col gap-4 lg:w-1/2">
+                        {/* Tu Mayor Fortaleza */}
                         {resultadoData.fortalezas.length > 0 && (
                           <div className="flex items-start gap-3 p-4 rounded-lg bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800">
                             <div className="flex-shrink-0 p-2 rounded-lg bg-yellow-100 dark:bg-yellow-900/30">
@@ -411,15 +567,16 @@ const Dashboard = () => {
                             </div>
                             <div className="flex-1">
                               <h4 className="font-semibold text-sm mb-1 text-foreground">
-                                {resultadoData.fortalezas[0].dimension}
+                                {getDimensionFriendlyTitle(resultadoData.fortalezas[0].dimensionData)}
                               </h4>
                               <p className="text-sm text-muted-foreground">
-                                Tu mayor fortaleza con {resultadoData.fortalezas[0].tuEvaluacion}%
+                                {getDimensionFriendlyDescription(resultadoData.fortalezas[0].dimensionData, resultadoData.fortalezas[0].tuEvaluacion)}
                               </p>
                             </div>
                           </div>
                         )}
 
+                        {/* Área Prioritaria de Mejora */}
                         {resultadoData.areasOportunidad.length > 0 && (
                           <div className="flex items-start gap-3 p-4 rounded-lg bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800">
                             <div className="flex-shrink-0 p-2 rounded-lg bg-orange-100 dark:bg-orange-900/30">
@@ -430,31 +587,58 @@ const Dashboard = () => {
                                 Área para Fortalecer
                               </h4>
                               <p className="text-sm text-muted-foreground">
-                                <strong>{resultadoData.areasOportunidad[0].dimension}:</strong>{" "}
-                                {resultadoData.areasOportunidad[0].tuEvaluacion}%
+                                <strong>{getDimensionFriendlyTitle(resultadoData.areasOportunidad[0].dimensionData)}:</strong>{" "}
+                                {getDimensionFriendlyDescription(resultadoData.areasOportunidad[0].dimensionData, resultadoData.areasOportunidad[0].tuEvaluacion)}
                               </p>
                             </div>
                           </div>
                         )}
                       </div>
                     </div>
+                  </CardContent>
+                </Card>
 
-                    {!resultadoData.jefeCompleto && (
-                      <Alert className="mt-4 border-blue-200 bg-blue-50 dark:bg-blue-950/20">
-                        <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                        <AlertDescription className="text-blue-800 dark:text-blue-200">
-                          Su autoevaluación fue recibida. Cuando su jefe complete la evaluación, aquí aparecerá su resultado consolidado.
-                        </AlertDescription>
-                      </Alert>
-                    )}
+                {/* Gráfico de Radar */}
+                <div className="mb-6">
+                  <PerformanceRadarAnalysis
+                    radarData={resultadoData.radarData.map(d => ({
+                      dimension: d.dimension,
+                      tuResultado: d.tuEvaluacion,
+                      promedioMunicipal: Object.keys(resultadoData.promedioMunicipal).length > 0 ? d.promedioMunicipal : undefined,
+                    }))}
+                    dimensionAnalysis={resultadoData.radarData.map(d => ({
+                      nombre: d.nombreCompleto || d.dimension,
+                      descripcion: d.dimensionData?.descripcion,
+                      porcentaje: d.tuEvaluacion,
+                      isFortaleza: d.tuEvaluacion >= 80,
+                      promedioMunicipal: Object.keys(resultadoData.promedioMunicipal).length > 0 ? d.promedioMunicipal : undefined,
+                    }))}
+                    title="Panorama de Competencias"
+                    description={resultadoData.jefeCompleto ? "Vista integral de tu desempeño por dimensión comparado con el promedio municipal" : "Vista de tu autoevaluación por dimensión comparado con el promedio municipal"}
+                  />
+                </div>
 
-                    <div className="mt-6 flex gap-3">
+                {/* Botón para ver detalle de respuestas */}
+                <Card className="border-primary/20">
+                  <CardContent className="pt-6">
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                      <div className="flex items-start gap-3">
+                        <div className="p-3 rounded-xl bg-primary/10">
+                          <FileDown className="h-6 w-6 text-primary" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-lg mb-1">Ver Detalle de Respuestas</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Revisa todas tus respuestas por cada dimensión evaluada
+                          </p>
+                        </div>
+                      </div>
                       <Button 
-                        variant="outline" 
-                        className="flex-1"
-                        onClick={() => navigate("/mi-autoevaluacion")}
+                        onClick={() => navigate("/mis-respuestas-detalle")}
+                        className="w-full sm:w-auto"
                       >
                         Ver Detalle Completo
+                        <Target className="ml-2 h-4 w-4" />
                       </Button>
                     </div>
                   </CardContent>
@@ -499,94 +683,6 @@ const Dashboard = () => {
                 </CardContent>
               </Card>
             )}
-
-            <Card className="md:col-span-2 lg:col-span-3">
-              <CardHeader>
-                <CardTitle>Estado del Proceso</CardTitle>
-                <CardDescription>
-                  Timeline de su evaluación de desempeño
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 md:grid-cols-3">
-                  <div className="flex items-center gap-3 rounded-lg border p-4">
-                    <div className={`flex h-10 w-10 items-center justify-center rounded-full ${
-                      evaluationStatus === "submitted" 
-                        ? "bg-success/10" 
-                        : evaluationStatus === "in_progress"
-                        ? "bg-info/10"
-                        : "bg-warning/10"
-                    }`}>
-                      {evaluationStatus === "submitted" ? (
-                        <CheckCircle2 className="h-5 w-5 text-success" />
-                      ) : (
-                        <Clock className={`h-5 w-5 ${
-                          evaluationStatus === "in_progress" ? "text-info" : "text-warning"
-                        }`} />
-                      )}
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">Autoevaluación</p>
-                      <p className="text-xs text-muted-foreground">
-                        {evaluationStatus === "submitted" 
-                          ? "Completada" 
-                          : evaluationStatus === "in_progress"
-                          ? `En progreso (${Math.round(progress)}%)`
-                          : "Pendiente"}
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-3 rounded-lg border p-4">
-                    <div className={`flex h-10 w-10 items-center justify-center rounded-full ${
-                      resultadoData?.jefeCompleto 
-                        ? "bg-success/10" 
-                        : evaluationStatus === "submitted"
-                        ? "bg-info/10"
-                        : "bg-muted"
-                    }`}>
-                      {resultadoData?.jefeCompleto ? (
-                        <CheckCircle2 className="h-5 w-5 text-success" />
-                      ) : (
-                        <Clock className={`h-5 w-5 ${
-                          evaluationStatus === "submitted" ? "text-info" : "text-muted-foreground"
-                        }`} />
-                      )}
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">Evaluación Jefe</p>
-                      <p className="text-xs text-muted-foreground">
-                        {resultadoData?.jefeCompleto 
-                          ? "Completada" 
-                          : evaluationStatus === "submitted"
-                          ? "En espera"
-                          : "Pendiente"}
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-3 rounded-lg border p-4">
-                    <div className={`flex h-10 w-10 items-center justify-center rounded-full ${
-                      resultadoData?.jefeCompleto 
-                        ? "bg-success/10" 
-                        : "bg-muted"
-                    }`}>
-                      {resultadoData?.jefeCompleto ? (
-                        <CheckCircle2 className="h-5 w-5 text-success" />
-                      ) : (
-                        <BarChart3 className="h-5 w-5 text-muted-foreground" />
-                      )}
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">Resultados Finales</p>
-                      <p className="text-xs text-muted-foreground">
-                        {resultadoData?.jefeCompleto ? "Disponible" : "No disponible"}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
           </div>
         )}
 
