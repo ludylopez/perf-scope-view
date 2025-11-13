@@ -21,7 +21,9 @@ import { getActivePeriod } from "@/lib/supabase";
 import { getFinalResultFromSupabase } from "@/lib/finalResultSupabase";
 import { GenerarPlanDesarrollo } from "@/components/development/GenerarPlanDesarrollo";
 import { GenerarGuiaRetroalimentacion } from "@/components/development/GuiaRetroalimentacion";
+import { EditarPlanDesarrollo } from "@/components/development/EditarPlanDesarrollo";
 import { PerformanceRadarAnalysis } from "@/components/evaluation/PerformanceRadarAnalysis";
+import { Edit } from "lucide-react";
 
 const MOCK_COLABORADORES: Record<string, any> = {
   "1": {
@@ -52,6 +54,7 @@ const VistaComparativa = () => {
   const [planDesarrollo, setPlanDesarrollo] = useState<any>(null);
   const [promedioGrupo, setPromedioGrupo] = useState<number | null>(null);
   const [periodoId, setPeriodoId] = useState<string>("");
+  const [mostrarEditarPlan, setMostrarEditarPlan] = useState(false);
 
   useEffect(() => {
     if (!id || !user) {
@@ -407,27 +410,76 @@ const VistaComparativa = () => {
         {colaborador && periodoId && (
           <div className="mb-6">
             <div className="flex justify-center gap-4 flex-wrap">
-              <GenerarPlanDesarrollo
-                colaboradorId={colaborador.dpi}
-                periodoId={periodoId}
-                colaboradorNombre={colaborador.nombre}
-                planExistente={planDesarrollo}
-                onPlanGenerado={(plan) => {
-                  setPlanDesarrollo({
-                    id: plan.id,
-                    feedbackIndividual: plan.feedbackIndividual,
-                    feedbackGrupal: plan.feedbackGrupal,
-                    planEstructurado: plan.planEstructurado,
-                    recomendaciones: plan.recomendaciones,
-                  });
-                  toast.success("Plan de desarrollo guardado");
-                }}
-              />
-              <GenerarGuiaRetroalimentacion
-                colaboradorId={colaborador.dpi}
-                periodoId={periodoId}
-                colaboradorNombre={colaborador.nombre}
-              />
+              {!planDesarrollo ? (
+                <>
+                  <GenerarPlanDesarrollo
+                    colaboradorId={colaborador.dpi}
+                    periodoId={periodoId}
+                    colaboradorNombre={colaborador.nombre}
+                    planExistente={null}
+                    onPlanGenerado={(plan) => {
+                      setPlanDesarrollo({
+                        id: plan.id,
+                        feedbackIndividual: plan.feedbackIndividual,
+                        feedbackGrupal: plan.feedbackGrupal,
+                        planEstructurado: plan.planEstructurado,
+                        recomendaciones: plan.recomendaciones,
+                      });
+                      toast.success("Plan de desarrollo guardado");
+                    }}
+                  />
+                  <GenerarGuiaRetroalimentacion
+                    colaboradorId={colaborador.dpi}
+                    periodoId={periodoId}
+                    colaboradorNombre={colaborador.nombre}
+                  />
+                </>
+              ) : (
+                <>
+                  <Button
+                    variant="default"
+                    size="lg"
+                    onClick={() => setMostrarEditarPlan(true)}
+                    className="gap-2"
+                  >
+                    <Edit className="h-4 w-4" />
+                    Editar Plan de Desarrollo
+                  </Button>
+                  <GenerarPlanDesarrollo
+                    colaboradorId={colaborador.dpi}
+                    periodoId={periodoId}
+                    colaboradorNombre={colaborador.nombre}
+                    planExistente={planDesarrollo}
+                    onPlanGenerado={async (planNuevo) => {
+                      // Eliminar el plan anterior si existe
+                      if (planDesarrollo?.id && planDesarrollo.id !== planNuevo.id) {
+                        try {
+                          await supabase
+                            .from("development_plans")
+                            .delete()
+                            .eq("id", planDesarrollo.id);
+                        } catch (error) {
+                          console.error("Error al eliminar plan anterior:", error);
+                        }
+                      }
+                      // Actualizar con el nuevo plan
+                      setPlanDesarrollo({
+                        id: planNuevo.id,
+                        feedbackIndividual: planNuevo.feedbackIndividual,
+                        feedbackGrupal: planNuevo.feedbackGrupal,
+                        planEstructurado: planNuevo.planEstructurado,
+                        recomendaciones: planNuevo.recomendaciones,
+                      });
+                      toast.success("Plan de desarrollo regenerado exitosamente");
+                    }}
+                  />
+                  <GenerarGuiaRetroalimentacion
+                    colaboradorId={colaborador.dpi}
+                    periodoId={periodoId}
+                    colaboradorNombre={colaborador.nombre}
+                  />
+                </>
+              )}
             </div>
             {planDesarrollo && (
               <div className="mt-4 text-center">
@@ -437,6 +489,34 @@ const VistaComparativa = () => {
               </div>
             )}
           </div>
+        )}
+
+        {/* Modal de Edición del Plan */}
+        {mostrarEditarPlan && planDesarrollo && (
+          <EditarPlanDesarrollo
+            plan={{
+              id: planDesarrollo.id,
+              colaboradorId: colaborador.dpi,
+              periodoId: periodoId,
+              feedbackIndividual: planDesarrollo.feedbackIndividual || "",
+              feedbackGrupal: planDesarrollo.feedbackGrupal || null,
+              planEstructurado: planDesarrollo.planEstructurado,
+              recomendaciones: planDesarrollo.recomendaciones || [],
+              editable: true,
+            }}
+            colaboradorNombre={colaborador.nombre}
+            onPlanGuardado={(planActualizado) => {
+              setPlanDesarrollo({
+                id: planActualizado.id,
+                feedbackIndividual: planActualizado.feedbackIndividual,
+                feedbackGrupal: planActualizado.feedbackGrupal,
+                planEstructurado: planActualizado.planEstructurado,
+                recomendaciones: planActualizado.recomendaciones,
+              });
+              setMostrarEditarPlan(false);
+            }}
+            onClose={() => setMostrarEditarPlan(false)}
+          />
         )}
 
         {/* Toggle Individual/Grupal */}
