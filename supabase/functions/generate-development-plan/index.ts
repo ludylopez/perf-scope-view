@@ -681,7 +681,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       JSON.stringify({ 
         success: false, 
         error: `Error interno: ${errorMessage}`,
-        details: process.env.NODE_ENV === "development" ? errorStack : undefined
+        details: Deno.env.get("NODE_ENV") === "development" ? errorStack : undefined
       }),
       { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
     );
