@@ -15,6 +15,9 @@ import { getNineBoxDescription } from "@/lib/finalScore";
 import { toast } from "sonner";
 import { exportResultadoIndividualPDF } from "@/lib/exports";
 import { scoreToPercentage } from "@/lib/calculations";
+import { PerformanceRadarAnalysis } from "@/components/evaluation/PerformanceRadarAnalysis";
+import { getInstrumentForUser } from "@/lib/instruments";
+import { supabase } from "@/integrations/supabase/client";
 
 const VistaResultadosFinales = () => {
   const { user } = useAuth();
@@ -23,6 +26,9 @@ const VistaResultadosFinales = () => {
   const [resultadoFinal, setResultadoFinal] = useState<any>(null);
   const [planDesarrollo, setPlanDesarrollo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [autoevaluacion, setAutoevaluacion] = useState<any>(null);
+  const [evaluacionJefe, setEvaluacionJefe] = useState<any>(null);
+  const [instrument, setInstrument] = useState<any>(null);
 
   useEffect(() => {
     if (!user) {
@@ -39,6 +45,10 @@ const VistaResultadosFinales = () => {
     }
 
     try {
+      // Cargar instrumento del usuario
+      const userInstrument = await getInstrumentForUser(user?.nivel || "");
+      setInstrument(userInstrument);
+
       // Cargar resultado final desde localStorage
       const resultadoKey = `final_result_${user?.dpi}_${activePeriodId}`;
       const stored = localStorage.getItem(resultadoKey);
@@ -48,7 +58,6 @@ const VistaResultadosFinales = () => {
         setResultadoFinal(resultadoData.resultadoFinal);
       } else {
         // Intentar cargar desde Supabase
-        const { supabase } = await import("@/integrations/supabase/client");
         const { data, error } = await supabase
           .from("final_evaluation_results")
           .select("*")
@@ -65,13 +74,41 @@ const VistaResultadosFinales = () => {
         }
       }
 
+      // Cargar autoevaluación
+      const { data: autoData } = await supabase
+        .from("evaluations")
+        .select("*")
+        .eq("usuario_id", user?.dpi)
+        .eq("colaborador_id", user?.dpi)
+        .eq("periodo_id", activePeriodId)
+        .eq("tipo", "autoevaluacion")
+        .eq("estado", "enviado")
+        .maybeSingle();
+
+      if (autoData) {
+        setAutoevaluacion(autoData);
+      }
+
+      // Cargar evaluación del jefe
+      const { data: jefeData } = await supabase
+        .from("evaluations")
+        .select("*")
+        .eq("colaborador_id", user?.dpi)
+        .eq("periodo_id", activePeriodId)
+        .eq("tipo", "evaluacion_jefe")
+        .eq("estado", "enviado")
+        .maybeSingle();
+
+      if (jefeData) {
+        setEvaluacionJefe(jefeData);
+      }
+
       // Cargar plan de desarrollo
       const planKey = `development_plan_${user?.dpi}_${activePeriodId}`;
       const planStored = localStorage.getItem(planKey);
       if (planStored) {
         setPlanDesarrollo(JSON.parse(planStored));
       } else {
-        const { supabase } = await import("@/integrations/supabase/client");
         const { data } = await supabase
           .from("development_plans")
           .select("*")
@@ -211,6 +248,48 @@ const VistaResultadosFinales = () => {
               </div>
             </CardContent>
           </Card>
+        )}
+
+        {/* Vista de Radar con Análisis de Dimensiones */}
+        {instrument && autoevaluacion && evaluacionJefe && (
+          <div className="mb-6">
+            <PerformanceRadarAnalysis
+              radarData={instrument.dimensionesDesempeno.map((dim: any) => {
+                const autoItems = dim.items.map((item: any) => autoevaluacion.responses[item.id]).filter((v: any) => v !== undefined);
+                const jefeItems = dim.items.map((item: any) => evaluacionJefe.responses[item.id]).filter((v: any) => v !== undefined);
+                
+                const autoAvg = autoItems.length > 0 ? autoItems.reduce((sum: number, val: number) => sum + val, 0) / autoItems.length : 0;
+                const jefeAvg = jefeItems.length > 0 ? jefeItems.reduce((sum: number, val: number) => sum + val, 0) / jefeItems.length : 0;
+                
+                return {
+                  dimension: dim.nombre.substring(0, 20),
+                  tuResultado: scoreToPercentage(jefeAvg),
+                  promedioMunicipal: scoreToPercentage(autoAvg),
+                };
+              })}
+              dimensionAnalysis={instrument.dimensionesDesempeno.map((dim: any) => {
+                const autoItems = dim.items.map((item: any) => autoevaluacion.responses[item.id]).filter((v: any) => v !== undefined);
+                const jefeItems = dim.items.map((item: any) => evaluacionJefe.responses[item.id]).filter((v: any) => v !== undefined);
+                
+                const autoAvg = autoItems.length > 0 ? autoItems.reduce((sum: number, val: number) => sum + val, 0) / autoItems.length : 0;
+                const jefeAvg = jefeItems.length > 0 ? jefeItems.reduce((sum: number, val: number) => sum + val, 0) / jefeItems.length : 0;
+                
+                const porcentaje = scoreToPercentage(jefeAvg);
+                const diferencia = jefeAvg - autoAvg;
+                const isFortaleza = porcentaje >= 80 || (diferencia > 0.3 && porcentaje >= 75);
+                
+                return {
+                  nombre: dim.nombre,
+                  descripcion: dim.descripcion,
+                  porcentaje: porcentaje,
+                  isFortaleza: isFortaleza,
+                  promedioMunicipal: scoreToPercentage(autoAvg),
+                };
+              })}
+              title="Panorama de Competencias"
+              description="Vista integral de tu desempeño por dimensión comparado con tu autoevaluación"
+            />
+          </div>
         )}
 
         {/* Plan de Desarrollo */}

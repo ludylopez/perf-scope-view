@@ -21,6 +21,7 @@ import { getActivePeriod } from "@/lib/supabase";
 import { getFinalResultFromSupabase } from "@/lib/finalResultSupabase";
 import { GenerarPlanDesarrollo } from "@/components/development/GenerarPlanDesarrollo";
 import { GenerarGuiaRetroalimentacion } from "@/components/development/GuiaRetroalimentacion";
+import { PerformanceRadarAnalysis } from "@/components/evaluation/PerformanceRadarAnalysis";
 
 const MOCK_COLABORADORES: Record<string, any> = {
   "1": {
@@ -427,43 +428,61 @@ const VistaComparativa = () => {
         )}
 
         {/* Gráficos Comparativos */}
-        <div className="grid gap-6 mb-6 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>
-                {vistaModo === "grupal" && perteneceCuadrilla 
-                  ? "Comparativo Individual vs Promedio Grupal"
-                  : "Comparativo por Dimensión"}
-              </CardTitle>
-              <CardDescription>
-                {vistaModo === "grupal" && perteneceCuadrilla
-                  ? "Comparación del colaborador individual vs promedio de su cuadrilla"
-                  : "Radar comparativo autoevaluación vs evaluación jefe"}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <RadarChart data={vistaModo === "grupal" && promedioGrupo !== null
-                  ? radarData.map(d => ({ ...d, promedioGrupo: promedioGrupo }))
-                  : radarData}>
-                  <PolarGrid />
-                  <PolarAngleAxis dataKey="dimension" />
-                  <PolarRadiusAxis angle={90} domain={[0, 100]} />
-                  <Radar
-                    name="Autoevaluación"
-                    dataKey="autoevaluacion"
-                    stroke={COLORS.auto}
-                    fill={COLORS.auto}
-                    fillOpacity={0.6}
-                  />
-                  <Radar
-                    name="Evaluación Jefe"
-                    dataKey="evaluacionJefe"
-                    stroke={COLORS.jefe}
-                    fill={COLORS.jefe}
-                    fillOpacity={0.6}
-                  />
-                  {vistaModo === "grupal" && promedioGrupo !== null && (
+        <div className="mb-6">
+          {/* Nueva vista integrada de radar con análisis */}
+          <PerformanceRadarAnalysis
+            radarData={radarData.map(d => ({
+              dimension: d.dimension,
+              tuResultado: d.evaluacionJefe,
+              promedioMunicipal: d.autoevaluacion,
+            }))}
+            dimensionAnalysis={comparativo.map(dim => {
+              const porcentaje = scoreToPercentage(dim.evaluacionJefe);
+              // Consideramos fortaleza si está por encima del 80% o si la diferencia con autoevaluación es positiva y alta
+              const isFortaleza = porcentaje >= 80 || (dim.diferencia > 0.3 && porcentaje >= 75);
+              return {
+                nombre: dim.nombre,
+                descripcion: instrument.dimensionesDesempeno.find(d => d.id === dim.dimensionId)?.descripcion,
+                porcentaje: porcentaje,
+                isFortaleza: isFortaleza,
+                promedioMunicipal: scoreToPercentage(dim.autoevaluacion),
+              };
+            })}
+            title="Panorama de Competencias"
+            description="Vista integral del desempeño por dimensión comparado con la autoevaluación"
+          />
+        </div>
+
+        {/* Gráficos adicionales en vista grupal */}
+        {vistaModo === "grupal" && perteneceCuadrilla && promedioGrupo !== null && (
+          <div className="grid gap-6 mb-6 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Comparativo Individual vs Promedio Grupal</CardTitle>
+                <CardDescription>
+                  Comparación del colaborador vs promedio de su cuadrilla
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <RadarChart data={radarData.map(d => ({ ...d, promedioGrupo: promedioGrupo }))}>
+                    <PolarGrid />
+                    <PolarAngleAxis dataKey="dimension" />
+                    <PolarRadiusAxis angle={90} domain={[0, 100]} />
+                    <Radar
+                      name="Autoevaluación"
+                      dataKey="autoevaluacion"
+                      stroke={COLORS.auto}
+                      fill={COLORS.auto}
+                      fillOpacity={0.6}
+                    />
+                    <Radar
+                      name="Evaluación Jefe"
+                      dataKey="evaluacionJefe"
+                      stroke={COLORS.jefe}
+                      fill={COLORS.jefe}
+                      fillOpacity={0.6}
+                    />
                     <Radar
                       name="Promedio Grupo"
                       dataKey="promedioGrupo"
@@ -471,40 +490,36 @@ const VistaComparativa = () => {
                       fill="#ffc658"
                       fillOpacity={0.4}
                     />
-                  )}
-                  <Tooltip />
-                  <Legend />
-                </RadarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
+                    <Tooltip />
+                    <Legend />
+                  </RadarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Comparativo de Promedios</CardTitle>
-              <CardDescription>
-                Barras comparativas por dimensión
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={vistaModo === "grupal" && promedioGrupo !== null
-                  ? barData.map(d => ({ ...d, promedioGrupo: promedioGrupo }))
-                  : barData}>
-                  <XAxis dataKey="dimension" angle={-45} textAnchor="end" height={80} />
-                  <YAxis domain={[0, 100]} />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="autoevaluacion" fill={COLORS.auto} name="Autoevaluación (%)" />
-                  <Bar dataKey="evaluacionJefe" fill={COLORS.jefe} name="Evaluación Jefe (%)" />
-                  {vistaModo === "grupal" && promedioGrupo !== null && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Comparativo de Promedios</CardTitle>
+                <CardDescription>
+                  Barras comparativas con promedio grupal
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={barData.map(d => ({ ...d, promedioGrupo: promedioGrupo }))}>
+                    <XAxis dataKey="dimension" angle={-45} textAnchor="end" height={80} />
+                    <YAxis domain={[0, 100]} />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="autoevaluacion" fill={COLORS.auto} name="Autoevaluación (%)" />
+                    <Bar dataKey="evaluacionJefe" fill={COLORS.jefe} name="Evaluación Jefe (%)" />
                     <Bar dataKey="promedioGrupo" fill="#ffc658" name="Promedio Grupo (%)" />
-                  )}
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </div>
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* Plan de Desarrollo - Acciones y Objetivos */}
         {planDesarrollo && planDesarrollo.planEstructurado && (
