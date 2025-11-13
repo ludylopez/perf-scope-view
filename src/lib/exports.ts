@@ -494,7 +494,7 @@ export const exportEvaluacionCompletaPDF = (
     performancePercentage: number;
     jefeCompleto: boolean;
     fortalezas: any[];
-    areasOportunidad: any[];
+    areasDeOportunidad: any[];
     radarData: any[];
     promedioMunicipal: Record<string, number>;
   }
@@ -671,7 +671,7 @@ export const exportEvaluacionCompletaPDF = (
   }
 
   // Áreas de Oportunidad con tarjetas de color
-  if (resultadoData.areasOportunidad.length > 0) {
+  if (resultadoData.areasDeOportunidad.length > 0) {
     if (yPosition > pageHeight - 100) {
       doc.addPage();
       yPosition = 20;
@@ -683,7 +683,7 @@ export const exportEvaluacionCompletaPDF = (
     doc.text("Áreas de Oportunidad", 14, yPosition);
     yPosition += 12;
 
-    resultadoData.areasOportunidad.forEach((area, index) => {
+    resultadoData.areasDeOportunidad.forEach((area, index) => {
       if (yPosition > pageHeight - 50) {
         doc.addPage();
         yPosition = 20;
@@ -1015,7 +1015,7 @@ export const exportEvaluacionCompletaPDFFromElement = async (
     
     // Centrar la imagen (después del header)
     const x = (pageWidth - scaledWidth) / 2;
-    let currentY = yAfterHeader;
+    let imageY = yAfterHeader;
     let sourceY = 0;
     let pageNum = 1;
     

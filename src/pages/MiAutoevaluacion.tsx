@@ -621,7 +621,7 @@ const MiAutoevaluacion = () => {
                         performancePercentage,
                         jefeCompleto,
                         fortalezas,
-                        areasOportunidad,
+                        areasDeOportunidad,
                         radarData: radarData.map(d => ({
                           ...d,
                           promedioMunicipal: promedioMunicipal[d.dimensionData.id] || 0
