@@ -7,8 +7,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { 
   ClipboardCheck, 
   Users, 
@@ -20,11 +18,10 @@ import {
   FileText,
   PlayCircle,
   Sparkles,
-  Trash2,
   Database
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { getEvaluationDraft, hasSubmittedEvaluation, saveEvaluationDraft, submitEvaluation, EvaluationDraft, getSubmittedEvaluation, hasJefeEvaluation, getJefeEvaluationDraft } from "@/lib/storage";
+import { getEvaluationDraft, hasSubmittedEvaluation, submitEvaluation, EvaluationDraft, getSubmittedEvaluation, hasJefeEvaluation, getJefeEvaluationDraft } from "@/lib/storage";
 import { getInstrumentForUser } from "@/lib/instruments";
 import { toast } from "@/hooks/use-toast";
 import { getJerarquiaInfo } from "@/lib/jerarquias";
@@ -133,36 +130,10 @@ const getDimensionFriendlyDescription = (dimension: any, percentage: number): st
   }
 };
 
-// Helper para obtener descripción corta y simple
-const getDimensionShortDescription = (dimension: any): string => {
-  const nombre = dimension.nombre.toLowerCase();
-  
-  if (nombre.includes("competencias laborales") && nombre.includes("técnica")) {
-    return "Técnicas y específicas";
-  }
-  if (nombre.includes("comportamiento") && nombre.includes("organizacional")) {
-    return "Actitud laboral";
-  }
-  if (nombre.includes("relaciones interpersonales") || nombre.includes("trabajo en equipo")) {
-    return "Trabajo en equipo";
-  }
-  if (nombre.includes("orientación al servicio") || nombre.includes("atención al usuario")) {
-    return "Atención al usuario";
-  }
-  if (nombre.includes("calidad del trabajo")) {
-    return "Estándares y precisión";
-  }
-  if (nombre.includes("productividad") || nombre.includes("cumplimiento")) {
-    return "Cumplimiento de objetivos";
-  }
-  
-  return "Desempeño evaluado";
-};
-
 const Dashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { activePeriodId, activePeriod, isLoading: periodLoading } = usePeriod();
+  const { activePeriodId, activePeriod } = usePeriod();
   
   const [evaluationStatus, setEvaluationStatus] = useState<"not_started" | "in_progress" | "submitted">("not_started");
   const [progress, setProgress] = useState(0);
