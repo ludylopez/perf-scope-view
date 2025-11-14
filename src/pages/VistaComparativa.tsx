@@ -154,33 +154,36 @@ const VistaComparativa = () => {
         });
         
         // Primero intentar buscar con el periodo_id exacto
-        let { data: planData, error: planError } = await supabase
+        // Obtener todos los planes y tomar el más reciente (puede haber múltiples)
+        let { data: plansArray, error: planError } = await supabase
           .from("development_plans")
           .select("*")
           .eq("colaborador_id", colaboradorFormatted.dpi)
           .eq("periodo_id", currentPeriodoId)
-          .order("created_at", { ascending: false })
-          .maybeSingle();
+          .order("created_at", { ascending: false });
 
-        // Si no se encuentra, intentar buscar cualquier plan del colaborador (por si el periodo_id cambió)
-        if (!planData && !planError) {
+        let planData = null;
+        
+        if (planError) {
+          console.error('❌ Error al cargar plan de desarrollo:', planError);
+        } else if (plansArray && plansArray.length > 0) {
+          // Tomar el más reciente (ya está ordenado por created_at DESC)
+          planData = plansArray[0];
+          console.log(`✅ Se encontraron ${plansArray.length} planes, usando el más reciente:`, planData.id);
+        } else {
           console.log('⚠️ No se encontró plan con periodo_id exacto, buscando planes recientes del colaborador...');
-          const { data: plansData } = await supabase
+          // Si no se encuentra, intentar buscar cualquier plan del colaborador (por si el periodo_id cambió)
+          const { data: plansDataAll } = await supabase
             .from("development_plans")
             .select("*")
             .eq("colaborador_id", colaboradorFormatted.dpi)
             .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
+            .limit(1);
           
-          if (plansData) {
-            console.log('✅ Se encontró un plan reciente del colaborador (puede ser de otro período):', plansData);
-            planData = plansData;
+          if (plansDataAll && plansDataAll.length > 0) {
+            planData = plansDataAll[0];
+            console.log('✅ Se encontró un plan reciente del colaborador (puede ser de otro período):', planData.id);
           }
-        }
-
-        if (planError) {
-          console.error('❌ Error al cargar plan de desarrollo:', planError);
         }
 
         if (planData) {

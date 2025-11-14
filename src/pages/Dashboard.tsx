@@ -288,18 +288,29 @@ const Dashboard = () => {
         // Cargar plan de desarrollo si existe
         // IMPORTANTE: Verificar que el plan corresponda al colaborador actual
         try {
-          const { data: planData, error: planError } = await supabase
+          // Obtener todos los planes y tomar el más reciente (puede haber múltiples)
+          const { data: plansArray, error: planError } = await supabase
             .from("development_plans")
             .select("*")
             .eq("colaborador_id", user.dpi) // Filtrar por el DPI del colaborador autenticado
             .eq("periodo_id", activePeriodId) // Filtrar por el período activo
-            .order("created_at", { ascending: false }) // Obtener el más reciente
-            .maybeSingle();
+            .order("created_at", { ascending: false }); // Ordenar por fecha descendente
 
+          let planData = null;
+          
           if (planError) {
-            console.error('Error al cargar plan de desarrollo:', planError);
+            console.error('❌ Error al cargar plan de desarrollo:', planError);
             setPlanDesarrollo(null);
-          } else if (planData) {
+          } else if (plansArray && plansArray.length > 0) {
+            // Tomar el más reciente (ya está ordenado por created_at DESC)
+            planData = plansArray[0];
+            console.log(`✅ Se encontraron ${plansArray.length} planes, usando el más reciente:`, planData.id);
+          } else {
+            console.log('⚠️ No se encontró plan de desarrollo para este colaborador');
+            setPlanDesarrollo(null);
+          }
+
+          if (planData) {
             // Validación adicional: asegurar que el plan pertenece al colaborador correcto
             if (planData.colaborador_id !== user.dpi) {
               console.warn('⚠️ Plan de desarrollo no corresponde al colaborador actual. Ignorando plan.');
