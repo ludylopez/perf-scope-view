@@ -144,7 +144,7 @@ function buildUserPrompt(data: any): string {
 📊 Nivel: ${colaborador.nivel}
 🏢 Área: ${colaborador.area || "No especificada"}
 📅 Fecha de ingreso: ${colaborador.fecha_ingreso ? new Date(colaborador.fecha_ingreso).toLocaleDateString('es-GT') : "No registrada"}
-🎓 Formación académica: ${colaborador.formacion_academica || "No registrada"}
+🎓 Profesión: ${colaborador.profesion || "No registrada"}
 ${grupos.length > 0 ? `👥 Pertenece a cuadrilla(s): ${grupos.map((g: any) => g.nombre).join(", ")}` : ""}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

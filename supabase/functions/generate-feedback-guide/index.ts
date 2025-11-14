@@ -60,7 +60,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     // 1. Obtener información del colaborador (SIN DPI)
     const { data: colaborador, error: errorColab } = await supabase
       .from("users")
-      .select("nombre, apellidos, nivel, cargo, area, formacion_academica")
+      .select("nombre, apellidos, nivel, cargo, area, profesion")
       .eq("dpi", colaborador_id)
       .single();
 
@@ -407,7 +407,7 @@ function buildUserPrompt(data: any): string {
 - Cargo: ${colaborador.cargo}
 - Nivel: ${colaborador.nivel}
 - Área: ${colaborador.area || "No especificada"}
-- Formación académica: ${colaborador.formacion_academica || "No especificada"}
+- Profesión: ${colaborador.profesion || "No especificada"}
 
 📊 **RESULTADOS DE LA EVALUACIÓN:**
 - Desempeño Final: ${resultado.desempenoFinal?.toFixed(2) || "N/A"}/5.0
