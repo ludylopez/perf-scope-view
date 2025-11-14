@@ -1,5 +1,5 @@
 import { Instrument } from "@/types/evaluation";
-import { INSTRUMENT_A1, INSTRUMENT_A3, INSTRUMENT_O2, INSTRUMENT_E1 } from "@/data/instruments";
+import { INSTRUMENT_A1, INSTRUMENT_A3, INSTRUMENT_O2, INSTRUMENT_E1, INSTRUMENT_O1 } from "@/data/instruments";
 import { InstrumentCalculationConfig, getInstrumentCalculationConfig } from "./instrumentCalculations";
 
 const INSTRUMENTS: Record<string, Instrument> = {
@@ -7,6 +7,7 @@ const INSTRUMENTS: Record<string, Instrument> = {
   A3: INSTRUMENT_A3,
   O2: INSTRUMENT_O2,
   E1: INSTRUMENT_E1,
+  O1: INSTRUMENT_O1,
   // Se pueden agregar más instrumentos aquí cuando estén disponibles
   // A2: INSTRUMENT_A2,
   // S2: INSTRUMENT_S2,
@@ -15,7 +16,6 @@ const INSTRUMENTS: Record<string, Instrument> = {
   // E2: INSTRUMENT_E2,
   // A4: INSTRUMENT_A4,
   // OTE: INSTRUMENT_OTE,
-  // O1: INSTRUMENT_O1,
   // OS: INSTRUMENT_OS
 };
 

@@ -129,36 +129,60 @@ export const INSTRUMENT_A2: Instrument = {
 
 ---
 
-### Paso 3: (Opcional) Configurar Cálculos Personalizados en `src/lib/instrumentCalculations.ts`
+### Paso 3: Configurar Cálculos en `src/lib/instrumentCalculations.ts`
 
 **Ubicación:** `src/lib/instrumentCalculations.ts`
 
-**¿Cuándo es necesario?**
+**⚠️ IMPORTANTE:** Aunque es técnicamente opcional, **se recomienda agregar la configuración** para mantener consistencia con otros instrumentos (A3, O2) y evitar warnings en consola.
+
+**¿Cuándo requiere personalización?**
 - Solo si el instrumento requiere:
-  - Pesos diferentes a 70/30 (jefe/auto)
+  - Pesos diferentes a 70/30 (jefe/auto) - ej: A1 usa 55/45
   - Thresholds diferentes para 9-box
   - Lógica de cálculo especial
 
-**Si NO requiere personalización:**
-- [ ] ✅ **No hacer nada** - El sistema usará A1 como fallback automáticamente
-
-**Si SÍ requiere personalización:**
+**Acciones:**
 1. [ ] Agregar configuración en `INSTRUMENT_CALCULATION_CONFIGS`:
    ```typescript
+   // Instrumento {NIVEL} - {Descripción del nivel}
    {NIVEL}: {
      instrumentId: "{NIVEL}",
      nivel: "{NIVEL}",
      calcularDesempeno: (responses, dimensions) => {
-       // Lógica estándar o personalizada
+       // Cálculo estándar con pesos
+       let totalScore = 0;
+       for (const dimension of dimensions) {
+         const itemResponses = dimension.items
+           .map((item: any) => responses[item.id])
+           .filter((v: any) => v !== undefined);
+         if (itemResponses.length === 0) continue;
+
+         const avg = itemResponses.reduce((sum: number, val: number) => sum + val, 0) / itemResponses.length;
+         totalScore += avg * dimension.peso;
+       }
+       return Math.round(totalScore * 100) / 100;
      },
      calcularPotencial: (potencialResponses, potencialDimensions) => {
-       // Lógica estándar o personalizada
+       let totalScore = 0;
+       for (const dimension of potencialDimensions) {
+         const itemResponses = dimension.items
+           .map((item: any) => potencialResponses[item.id])
+           .filter((v: any) => v !== undefined);
+         if (itemResponses.length === 0) continue;
+
+         const avg = itemResponses.reduce((sum: number, val: number) => sum + val, 0) / itemResponses.length;
+         totalScore += avg * dimension.peso;
+       }
+       return Math.round(totalScore * 100) / 100;
      },
      calcularResultadoFinal: (desempenoAuto, desempenoJefe, potencial) => {
-       // Pesos personalizados si aplica
+       // {NIVEL} usa pesos estándar: 30% autoevaluación + 70% jefe
+       // O personalizados si aplica: ej. A1 usa 45% auto + 55% jefe
+       const desempenoFinal = Math.round((desempenoJefe * 0.7 + desempenoAuto * 0.3) * 100) / 100;
+       return { desempenoFinal, potencial };
      },
-     pesoJefe: 0.7, // O el valor personalizado
-     pesoAuto: 0.3, // O el valor personalizado
+     pesoJefe: 0.7, // Pesos estándar (o personalizados)
+     pesoAuto: 0.3,
      thresholds9Box: {
        desempeno: { bajo: 3, medio: 4, alto: 4.5 },
        potencial: { bajo: 3, medio: 4, alto: 4.5 },
@@ -170,6 +194,7 @@ export const INSTRUMENT_A2: Instrument = {
 - [ ] Los pesos suman 1.0 (pesoJefe + pesoAuto = 1.0)
 - [ ] La lógica de cálculo es correcta
 - [ ] Los thresholds son apropiados
+- [ ] No hay errores de TypeScript
 
 ---
 
@@ -208,6 +233,134 @@ export const INSTRUMENT_A2: Instrument = {
    ```
 
 **Nota:** Este mapeo es principalmente informativo. El sistema funciona sin él.
+
+---
+
+### Paso 6: ⚠️ CRÍTICO - Crear Migración SQL para Base de Datos
+
+**Ubicación:** `supabase/migrations/YYYYMMDDHHMMSS_add_instrument_{nivel}.sql`
+
+**⚠️ ESTE PASO ES OBLIGATORIO** - Sin la migración SQL, el instrumento no funcionará correctamente en producción.
+
+**Acciones:**
+1. [ ] Crear archivo de migración con formato: `YYYYMMDDHHMMSS_add_instrument_{nivel}.sql`
+2. [ ] Incluir `INSERT INTO instrument_configs` con:
+   - `id`: '{NIVEL}'
+   - `nivel`: '{NIVEL}'
+   - `dimensiones_desempeno`: JSONB completo con todas las dimensiones
+   - `dimensiones_potencial`: JSONB completo con todas las dimensiones de potencial (si aplica)
+   - `configuracion_calculo`: JSONB con `{"pesoJefe": 0.7, "pesoAuto": 0.3}` (o personalizado)
+   - `activo`: `true`
+3. [ ] Incluir `ON CONFLICT (id) DO UPDATE SET` para permitir re-ejecución
+4. [ ] Actualizar comentario de tabla si es necesario
+
+**Ejemplo de estructura:**
+```sql
+-- Migración: Agregar Instrumento {NIVEL}
+-- Fecha: YYYY-MM-DD
+-- Descripción: Inserta la configuración del instrumento de evaluación para nivel {NIVEL}
+
+INSERT INTO instrument_configs (
+  id,
+  nivel,
+  dimensiones_desempeno,
+  dimensiones_potencial,
+  configuracion_calculo,
+  activo
+) VALUES (
+  '{NIVEL}',
+  '{NIVEL}',
+  '[{...dimensiones...}]'::JSONB,
+  '[{...dimensiones potencial...}]'::JSONB,
+  '{"pesoJefe": 0.7, "pesoAuto": 0.3}'::JSONB,
+  true
+)
+ON CONFLICT (id) DO UPDATE SET
+  nivel = EXCLUDED.nivel,
+  dimensiones_desempeno = EXCLUDED.dimensiones_desempeno,
+  dimensiones_potencial = EXCLUDED.dimensiones_potencial,
+  configuracion_calculo = EXCLUDED.configuracion_calculo,
+  activo = EXCLUDED.activo,
+  updated_at = NOW();
+```
+
+**Verificaciones:**
+- [ ] El JSONB está correctamente formateado
+- [ ] Todos los IDs coinciden con los del frontend
+- [ ] Los pesos en `configuracion_calculo` coinciden con los del frontend
+- [ ] El `ON CONFLICT` está incluido
+
+---
+
+### Paso 7: ⚠️ CRÍTICO - Ejecutar Migración en Base de Datos
+
+**Método 1: Mediante MCP (Recomendado)**
+1. [ ] Usar `mcp_supabase_apply_migration` con:
+   - `project_id`: ID del proyecto Supabase
+   - `name`: `add_instrument_{nivel}` (snake_case)
+   - `query`: Contenido completo del archivo SQL
+
+**Método 2: Mediante SQL Editor de Supabase**
+1. [ ] Abrir SQL Editor en Supabase Dashboard
+2. [ ] Copiar y pegar el contenido del archivo de migración
+3. [ ] Ejecutar la consulta
+4. [ ] Verificar que no haya errores
+
+**Verificaciones post-ejecución:**
+1. [ ] Verificar inserción en BD:
+   ```sql
+   SELECT id, nivel, activo, 
+          jsonb_array_length(dimensiones_desempeno) as dim_desempeno,
+          jsonb_array_length(dimensiones_potencial) as dim_potencial
+   FROM instrument_configs 
+   WHERE id = '{NIVEL}';
+   ```
+2. [ ] Verificar configuración de cálculo:
+   ```sql
+   SELECT configuracion_calculo->>'pesoJefe' as peso_jefe,
+          configuracion_calculo->>'pesoAuto' as peso_auto
+   FROM instrument_configs 
+   WHERE id = '{NIVEL}';
+   ```
+3. [ ] Confirmar que `activo = true`
+
+---
+
+### Paso 8: Verificar Funcionalidad del Dashboard
+
+**Ubicación:** `src/pages/Dashboard.tsx`
+
+**⚠️ IMPORTANTE:** El Dashboard debe verificar que el jefe completó su evaluación antes de mostrar resultados.
+
+**Verificaciones:**
+1. [ ] El Dashboard NO muestra resultados si solo se completó la autoevaluación
+2. [ ] El Dashboard muestra un mensaje informativo cuando la autoevaluación está enviada pero el jefe no completó
+3. [ ] El Dashboard muestra resultados completos solo cuando `jefeCompleto === true`
+4. [ ] El gráfico radar se muestra correctamente con todas las dimensiones
+5. [ ] Los porcentajes se muestran correctamente (0-100)
+
+**Nota:** Esta funcionalidad ya está implementada en el código base, pero debe verificarse para cada nuevo instrumento.
+
+---
+
+### Paso 9: Verificar Redondeo de Progreso
+
+**Ubicación:** `src/pages/Autoevaluacion.tsx` y `src/pages/EvaluacionColaborador.tsx`
+
+**⚠️ IMPORTANTE:** El campo `progreso` en la tabla `evaluations` es INTEGER, por lo que debe redondearse.
+
+**Verificaciones:**
+1. [ ] En `Autoevaluacion.tsx`, el cálculo de `progressPercentage` usa `Math.round()`:
+   ```typescript
+   const progressPercentage = totalItems > 0 ? Math.round((answeredItems / totalItems) * 100) : 0;
+   ```
+2. [ ] En `EvaluacionColaborador.tsx`, el cálculo de `progreso` usa `Math.round()`:
+   ```typescript
+   progreso: Math.round((desempenoProgress + potencialProgress) / 2),
+   ```
+3. [ ] No hay errores de "invalid input syntax for type integer" en consola
+
+**Nota:** Esta funcionalidad ya está implementada, pero debe verificarse para evitar errores.
 
 ---
 
@@ -252,17 +405,36 @@ El sistema ya incluye validaciones automáticas, pero debo verificar:
 
 ## 📝 Checklist Final Pre-Entrega
 
+### Frontend
 - [ ] ✅ Instrumento creado en `src/data/instruments.ts`
 - [ ] ✅ Instrumento importado y registrado en `src/lib/instruments.ts`
-- [ ] ✅ (Si aplica) Configuración de cálculo agregada en `src/lib/instrumentCalculations.ts`
+- [ ] ✅ Configuración de cálculo agregada en `src/lib/instrumentCalculations.ts` (recomendado)
 - [ ] ✅ (Si aplica) Nombres amigables agregados en `Dashboard.tsx`
 - [ ] ✅ Validaciones de integridad pasadas (pesos, IDs, órdenes)
-- [ ] ✅ Testing completo realizado
+
+### Backend (Base de Datos)
+- [ ] ✅ Migración SQL creada en `supabase/migrations/`
+- [ ] ✅ Migración ejecutada en Supabase (mediante MCP o SQL Editor)
+- [ ] ✅ Instrumento insertado y activo en tabla `instrument_configs`
+- [ ] ✅ Configuración de cálculo verificada en BD
+- [ ] ✅ Verificación SQL ejecutada exitosamente
+
+### Funcionalidad
+- [ ] ✅ Dashboard NO muestra resultados hasta que jefe complete
+- [ ] ✅ Mensaje informativo se muestra cuando autoevaluación enviada pero jefe no completó
+- [ ] ✅ Progreso se redondea correctamente (sin errores de decimales)
 - [ ] ✅ Gráfico radar funciona correctamente
 - [ ] ✅ Cálculos son correctos
+- [ ] ✅ Autoevaluación se puede completar
+- [ ] ✅ Evaluación de jefe se puede completar
+- [ ] ✅ Evaluación de potencial se puede completar (si aplica)
+
+### Testing y Validación
+- [ ] ✅ Testing completo realizado
 - [ ] ✅ No hay errores en consola
 - [ ] ✅ No hay errores de TypeScript
 - [ ] ✅ No hay errores de linting
+- [ ] ✅ No hay errores de base de datos
 
 ---
 
@@ -290,7 +462,28 @@ El sistema ya incluye validaciones automáticas, pero debo verificar:
 **Solución:**
 - Verificar que el nivel en el instrumento coincida exactamente con `user.nivel`
 - Verificar que esté registrado en `INSTRUMENTS`
+- Verificar que la migración SQL se ejecutó correctamente
+- Verificar que el instrumento esté activo en `instrument_configs`
 - Revisar logs en consola
+
+### Problema 6: Error "invalid input syntax for type integer" al auto-guardar
+**Solución:**
+- Verificar que `progressPercentage` use `Math.round()` en `Autoevaluacion.tsx`
+- Verificar que `progreso` use `Math.round()` en `EvaluacionColaborador.tsx`
+- El campo `progreso` en BD es INTEGER, no acepta decimales
+
+### Problema 7: Dashboard muestra resultados antes de que jefe complete
+**Solución:**
+- Verificar que `loadResultadosData()` solo se llame si `jefeCompleto === true`
+- Verificar que la condición de visualización incluya `resultadoData.jefeCompleto`
+- Verificar que se muestre mensaje informativo cuando autoevaluación enviada pero jefe no completó
+
+### Problema 8: Migración SQL falla o no se ejecuta
+**Solución:**
+- Verificar formato JSONB correcto (usar `'[...]'::JSONB`)
+- Verificar que todos los IDs coincidan con el frontend
+- Verificar que `ON CONFLICT` esté incluido para permitir re-ejecución
+- Ejecutar verificación SQL post-migración para confirmar inserción
 
 ---
 
@@ -301,6 +494,19 @@ El sistema ya incluye validaciones automáticas, pero debo verificar:
 - **Registro de instrumentos:** `src/lib/instruments.ts`
 - **Configuraciones de cálculo:** `src/lib/instrumentCalculations.ts`
 - **Documentación de escalabilidad:** `docs/ESCALABILIDAD_INSTRUMENTOS.md`
+- **Ejemplo de migración:** `supabase/migrations/20251116000000_add_instrument_e1.sql`
+- **Verificación final:** `docs/VERIFICACION_FINAL_E1.md`
+
+## 🔄 Pasos Adicionales Descubiertos Durante Implementación
+
+Durante la implementación del instrumento E1, se identificaron pasos adicionales críticos que no estaban en el checklist original:
+
+1. **Migración SQL obligatoria** - Sin ejecutar la migración en BD, el instrumento no funciona en producción
+2. **Configuración en `instrumentCalculations.ts` recomendada** - Aunque opcional, evita warnings y mantiene consistencia
+3. **Verificación de Dashboard** - Asegurar que no muestre resultados hasta que jefe complete
+4. **Redondeo de progreso** - Crítico para evitar errores de tipo INTEGER en BD
+
+Estos pasos ahora están incluidos en el checklist actualizado.
 
 ---
 
