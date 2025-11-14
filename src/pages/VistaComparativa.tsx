@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, BarChart3, TrendingUp, TrendingDown, Minus, Users2, User, Target, CheckCircle2, AlertCircle, FileText } from "lucide-react";
+import { ArrowLeft, BarChart3, TrendingUp, TrendingDown, Minus, Users2, User, Target, CheckCircle2, AlertCircle, FileText, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, Cell } from "recharts";
 import { getSubmittedEvaluation, getJefeEvaluationDraft, getMockColaboradorEvaluation } from "@/lib/storage";
@@ -710,347 +710,8 @@ const VistaComparativa = () => {
 
           {/* Tab: Análisis */}
           <TabsContent value="analisis" className="space-y-6 mt-6">
-              {!planDesarrollo ? (
-                <>
-                  <GenerarPlanDesarrollo
-                    colaboradorId={colaborador.dpi}
-                    periodoId={periodoId}
-                    colaboradorNombre={colaborador.nombre}
-                    planExistente={null}
-                    onPlanGenerado={async (plan) => {
-                      // Recargar el plan desde la BD para asegurar que tenemos la estructura correcta
-                      try {
-                        const { data: planData, error: planError } = await supabase
-                          .from("development_plans")
-                          .select("*")
-                          .eq("id", plan.id)
-                          .single();
-                        
-                        if (!planError && planData) {
-                          const competencias = planData.competencias_desarrollar || {};
-                          
-                          let planEstructurado = null;
-                          let recomendaciones = [];
-                          
-                          if (typeof competencias === 'object' && competencias !== null) {
-                            if (competencias.acciones && Array.isArray(competencias.acciones)) {
-                              planEstructurado = {
-                                objetivos: Array.isArray(competencias.objetivos) ? competencias.objetivos : [],
-                                acciones: competencias.acciones,
-                                dimensionesDebiles: Array.isArray(competencias.dimensionesDebiles) ? competencias.dimensionesDebiles : [],
-                              };
-                              recomendaciones = Array.isArray(competencias.recomendaciones) ? competencias.recomendaciones : [];
-                            } else if (Array.isArray(competencias.objetivos) && competencias.objetivos.length > 0) {
-                              planEstructurado = {
-                                objetivos: competencias.objetivos,
-                                acciones: [],
-                                dimensionesDebiles: Array.isArray(competencias.dimensionesDebiles) ? competencias.dimensionesDebiles : [],
-                              };
-                              recomendaciones = Array.isArray(competencias.recomendaciones) ? competencias.recomendaciones : [];
-                            }
-                          }
-
-                          setPlanDesarrollo({
-                            id: planData.id,
-                            feedbackIndividual: planData.feedback_individual || "",
-                            feedbackGrupal: planData.feedback_grupal || null,
-                            planEstructurado: planEstructurado,
-                            recomendaciones: recomendaciones,
-                          });
-                          toast.success("Plan de desarrollo guardado");
-                        } else {
-                          // Fallback al plan recibido
-                          setPlanDesarrollo({
-                            id: plan.id,
-                            feedbackIndividual: plan.feedbackIndividual,
-                            feedbackGrupal: plan.feedbackGrupal,
-                            planEstructurado: plan.planEstructurado,
-                            recomendaciones: plan.recomendaciones,
-                          });
-                          toast.success("Plan de desarrollo guardado");
-                        }
-                      } catch (error) {
-                        console.error("Error recargando plan:", error);
-                        // Fallback al plan recibido
-                        setPlanDesarrollo({
-                          id: plan.id,
-                          feedbackIndividual: plan.feedbackIndividual,
-                          feedbackGrupal: plan.feedbackGrupal,
-                          planEstructurado: plan.planEstructurado,
-                          recomendaciones: plan.recomendaciones,
-                        });
-                        toast.success("Plan de desarrollo guardado");
-                      }
-                    }}
-                  />
-                  <GenerarGuiaRetroalimentacion
-                    colaboradorId={colaborador.dpi}
-                    periodoId={periodoId}
-                    colaboradorNombre={colaborador.nombre}
-                    onGuiaGenerada={async () => {
-                      // Recargar la guía desde la BD
-                      try {
-                        const { data: guiaData, error: guiaError } = await supabase
-                          .from("feedback_guides")
-                          .select("*")
-                          .eq("colaborador_id", colaborador.dpi)
-                          .eq("periodo_id", periodoId)
-                          .eq("tipo", "individual")
-                          .order("created_at", { ascending: false })
-                          .limit(1)
-                          .maybeSingle();
-
-                        if (!guiaError && guiaData) {
-                          setGuiaFeedback({
-                            id: guiaData.id,
-                            preparacion: guiaData.preparacion || "",
-                            apertura: guiaData.apertura || "",
-                            fortalezas: guiaData.fortalezas || [],
-                            areasDesarrollo: guiaData.areas_desarrollo || [],
-                            preguntasDialogo: guiaData.preguntas_dialogo || [],
-                            tipsConduccion: guiaData.tips_conduccion || [],
-                            cierre: guiaData.cierre || "",
-                            fechaGeneracion: guiaData.fecha_generacion,
-                          });
-                          setMostrarGuiaFeedback(true); // Mostrar automáticamente la guía
-                        }
-                      } catch (error) {
-                        console.error("Error recargando guía:", error);
-                      }
-                    }}
-                  />
-                  <GenerarFeedbackGrupal
-                    colaboradorId={colaborador.dpi}
-                    periodoId={periodoId}
-                    colaboradorNombre={colaborador.nombre}
-                  />
-                </>
-              ) : (
-                <>
-                  <Button
-                    variant="default"
-                    size="lg"
-                    onClick={() => setMostrarEditarPlan(true)}
-                    className="gap-2"
-                  >
-                    <Edit className="h-4 w-4" />
-                    Editar Plan de Desarrollo
-                  </Button>
-                  <GenerarPlanDesarrollo
-                    colaboradorId={colaborador.dpi}
-                    periodoId={periodoId}
-                    colaboradorNombre={colaborador.nombre}
-                    planExistente={planDesarrollo}
-                    onPlanGenerado={async (planNuevo) => {
-                      // Eliminar el plan anterior si existe
-                      if (planDesarrollo?.id && planDesarrollo.id !== planNuevo.id) {
-                        try {
-                          await supabase
-                            .from("development_plans")
-                            .delete()
-                            .eq("id", planDesarrollo.id);
-                        } catch (error) {
-                          console.error("Error al eliminar plan anterior:", error);
-                        }
-                      }
-                      // Recargar el plan desde la BD para asegurar que tenemos la estructura correcta
-                      try {
-                        const { data: planData, error: planError } = await supabase
-                          .from("development_plans")
-                          .select("*")
-                          .eq("id", planNuevo.id)
-                          .single();
-                        
-                        if (!planError && planData) {
-                          const competencias = planData.competencias_desarrollar || {};
-                          
-                          let planEstructurado = null;
-                          let recomendaciones = [];
-                          
-                          if (typeof competencias === 'object' && competencias !== null) {
-                            if (competencias.acciones && Array.isArray(competencias.acciones)) {
-                              planEstructurado = {
-                                objetivos: Array.isArray(competencias.objetivos) ? competencias.objetivos : [],
-                                acciones: competencias.acciones,
-                                dimensionesDebiles: Array.isArray(competencias.dimensionesDebiles) ? competencias.dimensionesDebiles : [],
-                              };
-                              recomendaciones = Array.isArray(competencias.recomendaciones) ? competencias.recomendaciones : [];
-                            } else if (Array.isArray(competencias.objetivos) && competencias.objetivos.length > 0) {
-                              planEstructurado = {
-                                objetivos: competencias.objetivos,
-                                acciones: [],
-                                dimensionesDebiles: Array.isArray(competencias.dimensionesDebiles) ? competencias.dimensionesDebiles : [],
-                              };
-                              recomendaciones = Array.isArray(competencias.recomendaciones) ? competencias.recomendaciones : [];
-                            }
-                          }
-
-                          setPlanDesarrollo({
-                            id: planData.id,
-                            feedbackIndividual: planData.feedback_individual || "",
-                            feedbackGrupal: planData.feedback_grupal || null,
-                            planEstructurado: planEstructurado,
-                            recomendaciones: recomendaciones,
-                          });
-                          toast.success("Plan de desarrollo regenerado exitosamente");
-                        } else {
-                          // Fallback al plan recibido
-                          setPlanDesarrollo({
-                            id: planNuevo.id,
-                            feedbackIndividual: planNuevo.feedbackIndividual,
-                            feedbackGrupal: planNuevo.feedbackGrupal,
-                            planEstructurado: planNuevo.planEstructurado,
-                            recomendaciones: planNuevo.recomendaciones,
-                          });
-                          toast.success("Plan de desarrollo regenerado exitosamente");
-                        }
-                      } catch (error) {
-                        console.error("Error recargando plan:", error);
-                        // Fallback al plan recibido
-                        setPlanDesarrollo({
-                          id: planNuevo.id,
-                          feedbackIndividual: planNuevo.feedbackIndividual,
-                          feedbackGrupal: planNuevo.feedbackGrupal,
-                          planEstructurado: planNuevo.planEstructurado,
-                          recomendaciones: planNuevo.recomendaciones,
-                        });
-                        toast.success("Plan de desarrollo regenerado exitosamente");
-                      }
-                    }}
-                  />
-                  <GenerarGuiaRetroalimentacion
-                    colaboradorId={colaborador.dpi}
-                    periodoId={periodoId}
-                    colaboradorNombre={colaborador.nombre}
-                    onGuiaGenerada={async () => {
-                      // Recargar la guía desde la BD
-                      try {
-                        const { data: guiaData, error: guiaError } = await supabase
-                          .from("feedback_guides")
-                          .select("*")
-                          .eq("colaborador_id", colaborador.dpi)
-                          .eq("periodo_id", periodoId)
-                          .eq("tipo", "individual")
-                          .order("created_at", { ascending: false })
-                          .limit(1)
-                          .maybeSingle();
-
-                        if (!guiaError && guiaData) {
-                          setGuiaFeedback({
-                            id: guiaData.id,
-                            preparacion: guiaData.preparacion || "",
-                            apertura: guiaData.apertura || "",
-                            fortalezas: guiaData.fortalezas || [],
-                            areasDesarrollo: guiaData.areas_desarrollo || [],
-                            preguntasDialogo: guiaData.preguntas_dialogo || [],
-                            tipsConduccion: guiaData.tips_conduccion || [],
-                            cierre: guiaData.cierre || "",
-                            fechaGeneracion: guiaData.fecha_generacion,
-                          });
-                          setMostrarGuiaFeedback(true); // Mostrar automáticamente la guía
-                        }
-                      } catch (error) {
-                        console.error("Error recargando guía:", error);
-                      }
-                    }}
-                  />
-                  <GenerarFeedbackGrupal
-                    colaboradorId={colaborador.dpi}
-                    periodoId={periodoId}
-                    colaboradorNombre={colaborador.nombre}
-                  />
-                </>
-              )}
-            </div>
-            {planDesarrollo && (
-              <div className="mt-4 text-center">
-                <p className="text-sm text-muted-foreground">
-                  ✅ Plan de desarrollo cargado. Desplázate hacia abajo para ver los detalles.
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Modal de Edición del Plan */}
-        {mostrarEditarPlan && planDesarrollo && (
-          <EditarPlanDesarrollo
-            plan={{
-              id: planDesarrollo.id,
-              colaboradorId: colaborador.dpi,
-              periodoId: periodoId,
-              feedbackIndividual: planDesarrollo.feedbackIndividual || "",
-              feedbackGrupal: planDesarrollo.feedbackGrupal || null,
-              planEstructurado: planDesarrollo.planEstructurado,
-              recomendaciones: planDesarrollo.recomendaciones || [],
-              editable: true,
-            }}
-            colaboradorNombre={colaborador.nombre}
-            onPlanGuardado={(planActualizado) => {
-              setPlanDesarrollo({
-                id: planActualizado.id,
-                feedbackIndividual: planActualizado.feedbackIndividual,
-                feedbackGrupal: planActualizado.feedbackGrupal,
-                planEstructurado: planActualizado.planEstructurado,
-                recomendaciones: planActualizado.recomendaciones,
-              });
-              setMostrarEditarPlan(false);
-            }}
-            onClose={() => setMostrarEditarPlan(false)}
-          />
-        )}
-
-        {/* Toggle Individual/Grupal */}
-        {perteneceCuadrilla && gruposColaborador.length > 0 && (
-          <Card className="mb-6">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Users2 className="h-5 w-5 text-info" />
-                  <div>
-                    <p className="font-medium">Vista de Comparación</p>
-                    <p className="text-sm text-muted-foreground">
-                      Este colaborador pertenece a {gruposColaborador.length} cuadrilla{gruposColaborador.length > 1 ? 's' : ''}: {gruposColaborador.map(g => g.nombre).join(', ')}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex gap-2 border rounded-lg p-1">
-                  <Button
-                    variant={vistaModo === "individual" ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setVistaModo("individual")}
-                  >
-                    <User className="mr-2 h-4 w-4" />
-                    Individual
-                  </Button>
-                  <Button
-                    variant={vistaModo === "grupal" ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setVistaModo("grupal")}
-                  >
-                    <Users2 className="mr-2 h-4 w-4" />
-                    Grupal
-                  </Button>
-                </div>
-              </div>
-              {promedioGrupo !== null && (
-                <div className="mt-4 p-3 bg-info/10 border border-info/20 rounded-lg">
-                  <p className="text-sm">
-                    <strong>Promedio del Equipo:</strong> {Math.round(promedioGrupo)}% 
-                    <span className="text-muted-foreground ml-2">
-                      (Comparar con el desempeño individual del colaborador: {scoreToPercentage(resultadoFinal.desempenoFinal)}%)
-                    </span>
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Gráficos Comparativos */}
-        <div className="mb-6">
-          {/* Nueva vista integrada de radar con análisis */}
-          <PerformanceRadarAnalysis
+            {/* Nueva vista integrada de radar con análisis */}
+            <PerformanceRadarAnalysis
             radarData={radarData.map(d => ({
               dimension: d.dimension,
               tuResultado: d.evaluacionJefe,
@@ -1071,10 +732,9 @@ const VistaComparativa = () => {
             title="Panorama de Competencias"
             description="Vista integral del desempeño por dimensión comparado con la autoevaluación"
           />
-        </div>
 
-        {/* Gráficos adicionales en vista grupal */}
-        {vistaModo === "grupal" && perteneceCuadrilla && promedioGrupo !== null && (
+            {/* Gráficos adicionales en vista grupal */}
+            {vistaModo === "grupal" && perteneceCuadrilla && promedioGrupo !== null && (
           <div className="grid gap-6 mb-6 md:grid-cols-2">
             <Card>
               <CardHeader>
@@ -1139,10 +799,211 @@ const VistaComparativa = () => {
               </CardContent>
             </Card>
           </div>
-        )}
+            )}
 
-        {/* Plan de Desarrollo - Acciones y Objetivos */}
-        {planDesarrollo && planDesarrollo.planEstructurado && (
+            {/* Tabla Comparativa Detallada */}
+            <Card>
+              <CardHeader>
+                <CardTitle>
+                  {vistaModo === "grupal" && perteneceCuadrilla
+                    ? "Análisis Individual vs Promedio Grupal"
+                    : "Análisis Detallado por Dimensión"}
+                </CardTitle>
+                <CardDescription>
+                  {vistaModo === "grupal" && perteneceCuadrilla
+                    ? "Comparación del desempeño individual con el promedio de la cuadrilla"
+                    : "Comparación punto por punto con diferencias identificadas"}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  {comparativo.map((item, idx) => {
+                    const diferenciaPorcentaje = scoreToPercentage(item.evaluacionJefe) - scoreToPercentage(item.autoevaluacion);
+                    const isAligned = Math.abs(diferenciaPorcentaje) < 10;
+                    const jefeHigher = diferenciaPorcentaje > 10;
+                    const autoHigher = diferenciaPorcentaje < -10;
+
+                    return (
+                      <div key={item.dimensionId} className="border rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <h3 className="font-semibold text-lg">{item.nombre}</h3>
+                          {isAligned ? (
+                            <Badge variant="outline" className="text-success border-success">
+                              <Minus className="mr-1 h-3 w-3" />
+                              Alineado
+                            </Badge>
+                          ) : jefeHigher ? (
+                            <Badge variant="outline" className="text-accent border-accent">
+                              <TrendingUp className="mr-1 h-3 w-3" />
+                              Jefe más alto
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-warning border-warning">
+                              <TrendingDown className="mr-1 h-3 w-3" />
+                              Colaborador más alto
+                            </Badge>
+                          )}
+                        </div>
+                        
+                        <div className={`grid gap-4 mb-3 ${
+                          vistaModo === "grupal" && perteneceCuadrilla && promedioGrupo !== null
+                            ? "md:grid-cols-4"
+                            : "md:grid-cols-3"
+                        }`}>
+                          <div>
+                            <p className="text-sm text-muted-foreground mb-1">Autoevaluación</p>
+                            <div className="flex items-center gap-2">
+                              <Progress value={scoreToPercentage(item.autoevaluacion)} className="flex-1" />
+                              <span className="font-medium w-16 text-right">
+                                {scoreToPercentage(item.autoevaluacion)}%
+                              </span>
+                            </div>
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground mb-1">Evaluación Jefe</p>
+                            <div className="flex items-center gap-2">
+                              <Progress value={scoreToPercentage(item.evaluacionJefe)} className="flex-1" />
+                              <span className="font-medium w-16 text-right">
+                                {scoreToPercentage(item.evaluacionJefe)}%
+                              </span>
+                            </div>
+                          </div>
+                          {vistaModo === "grupal" && perteneceCuadrilla && promedioGrupo !== null && (
+                            <div>
+                              <p className="text-sm text-muted-foreground mb-1">Promedio Cuadrilla</p>
+                              <div className="flex items-center gap-2">
+                                <Progress value={promedioGrupo} className="flex-1" />
+                                <span className="font-medium w-16 text-right text-info">
+                                  {Math.round(promedioGrupo)}%
+                                </span>
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-1">Promedio del grupo</p>
+                            </div>
+                          )}
+                          <div>
+                            <p className="text-sm text-muted-foreground mb-1">Diferencia</p>
+                            <div className="flex items-center gap-2">
+                              <span className={`font-medium w-16 text-right ${
+                                Math.abs(item.diferencia) < 0.3 ? "text-muted-foreground" :
+                                item.diferencia > 0 ? "text-accent" : "text-warning"
+                              }`}>
+                                {item.diferencia > 0 ? "+" : ""}{scoreToPercentage(item.evaluacionJefe) - scoreToPercentage(item.autoevaluacion)}%
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                ({item.diferencia > 0 ? "+" : ""}{item.diferencia.toFixed(2)})
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Comentarios */}
+                        <div className="grid gap-3 md:grid-cols-2 mt-4 pt-4 border-t">
+                          {autoevaluacion.comments[item.dimensionId] && (
+                            <div className="text-sm">
+                              <p className="font-medium text-muted-foreground mb-1">
+                                Comentarios del Colaborador:
+                              </p>
+                              <p className="text-sm">{autoevaluacion.comments[item.dimensionId]}</p>
+                            </div>
+                          )}
+                          {evaluacionJefe.comments[item.dimensionId] && (
+                            <div className="text-sm">
+                              <p className="font-medium text-muted-foreground mb-1">
+                                Comentarios del Jefe:
+                              </p>
+                              <p className="text-sm">{evaluacionJefe.comments[item.dimensionId]}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Tab: Plan de Desarrollo */}
+          <TabsContent value="plan" className="space-y-6 mt-6">
+            {!planDesarrollo ? (
+              <Card>
+                <CardContent className="pt-6 text-center">
+                  <p className="text-muted-foreground mb-4">
+                    No hay un plan de desarrollo generado aún. Genera uno desde la pestaña "Resumen".
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                {/* Acciones del Plan */}
+                <div className="flex gap-3 mb-4">
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    onClick={() => setMostrarEditarPlan(true)}
+                    className="gap-2"
+                  >
+                    <Edit className="h-4 w-4" />
+                    Editar Plan
+                  </Button>
+                  <GenerarPlanDesarrollo
+                    colaboradorId={colaborador.dpi}
+                    periodoId={periodoId}
+                    colaboradorNombre={colaborador.nombre}
+                    planExistente={planDesarrollo}
+                    onPlanGenerado={async (planNuevo) => {
+                      if (planDesarrollo?.id && planDesarrollo.id !== planNuevo.id) {
+                        try {
+                          await supabase
+                            .from("development_plans")
+                            .delete()
+                            .eq("id", planDesarrollo.id);
+                        } catch (error) {
+                          console.error("Error al eliminar plan anterior:", error);
+                        }
+                      }
+                      try {
+                        const { data: planData, error: planError } = await supabase
+                          .from("development_plans")
+                          .select("*")
+                          .eq("id", planNuevo.id)
+                          .single();
+                        
+                        if (!planError && planData) {
+                          const competencias = planData.competencias_desarrollar || {};
+                          
+                          let planEstructurado = null;
+                          let recomendaciones = [];
+                          
+                          if (typeof competencias === 'object' && competencias !== null) {
+                            if (competencias.acciones && Array.isArray(competencias.acciones)) {
+                              planEstructurado = {
+                                objetivos: Array.isArray(competencias.objetivos) ? competencias.objetivos : [],
+                                acciones: competencias.acciones,
+                                dimensionesDebiles: Array.isArray(competencias.dimensionesDebiles) ? competencias.dimensionesDebiles : [],
+                              };
+                              recomendaciones = Array.isArray(competencias.recomendaciones) ? competencias.recomendaciones : [];
+                            }
+                          }
+
+                          setPlanDesarrollo({
+                            id: planData.id,
+                            feedbackIndividual: planData.feedback_individual || "",
+                            feedbackGrupal: planData.feedback_grupal || null,
+                            planEstructurado: planEstructurado,
+                            recomendaciones: recomendaciones,
+                          });
+                          toast.success("Plan regenerado exitosamente");
+                        }
+                      } catch (error) {
+                        console.error("Error recargando plan:", error);
+                      }
+                    }}
+                  />
+                </div>
+
+                {/* Plan de Desarrollo - Acciones y Objetivos */}
+                {planDesarrollo.planEstructurado && (
           <div className="space-y-6 mb-6">
             {/* Objetivos */}
             {planDesarrollo.planEstructurado.objetivos && Array.isArray(planDesarrollo.planEstructurado.objetivos) && planDesarrollo.planEstructurado.objetivos.length > 0 && (
@@ -1269,34 +1130,37 @@ const VistaComparativa = () => {
                 </CardContent>
               </Card>
             )}
-          </div>
-        )}
+                </>
+              )}
+          </TabsContent>
 
-        {/* Guía de Retroalimentación (Solo para el Jefe) */}
-        {guiaFeedback && (
-          <Card className="mb-6 border-primary/20">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <FileText className="h-5 w-5 text-primary" />
-                    Guía de Retroalimentación
-                  </CardTitle>
-                  <CardDescription>
-                    Guía estructurada para conducir la conversación de retroalimentación (solo visible para el jefe)
-                  </CardDescription>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setMostrarGuiaFeedback(!mostrarGuiaFeedback)}
-                >
-                  {mostrarGuiaFeedback ? "Ocultar" : "Ver Guía"}
-                </Button>
-              </div>
-            </CardHeader>
-            {mostrarGuiaFeedback && (
-              <CardContent className="space-y-6">
+          {/* Tab: Retroalimentación */}
+          <TabsContent value="retroalimentacion" className="space-y-6 mt-6">
+            {/* Guía de Retroalimentación (Solo para el Jefe) */}
+            {guiaFeedback && (
+              <Card className="mb-6 border-primary/20">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        <FileText className="h-5 w-5 text-primary" />
+                        Guía de Retroalimentación
+                      </CardTitle>
+                      <CardDescription>
+                        Guía estructurada para conducir la conversación de retroalimentación (solo visible para el jefe)
+                      </CardDescription>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setMostrarGuiaFeedback(!mostrarGuiaFeedback)}
+                    >
+                      {mostrarGuiaFeedback ? "Ocultar" : "Ver Guía"}
+                    </Button>
+                  </div>
+                </CardHeader>
+                {mostrarGuiaFeedback && (
+                  <CardContent className="space-y-6">
                 {/* Preparación */}
                 {guiaFeedback.preparacion && (
                   <div>
@@ -1404,176 +1268,85 @@ const VistaComparativa = () => {
                 )}
               </CardContent>
             )}
-          </Card>
-        )}
-
-        {/* Feedback Individual y Grupal */}
-        {planDesarrollo && (
-          <div className="space-y-6 mb-6">
-            {planDesarrollo.feedbackIndividual && (
-              <Card className="w-full">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <User className="h-5 w-5 text-primary" />
-                    Feedback Individual
-                  </CardTitle>
-                  <CardDescription>
-                    Retroalimentación personalizada para el colaborador
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="p-6 bg-muted/30 rounded-lg border min-h-[200px] max-h-[600px] overflow-y-auto">
-                    <p className="whitespace-pre-wrap text-base leading-relaxed text-foreground">
-                      {planDesarrollo.feedbackIndividual}
-                    </p>
-                  </div>
-                </CardContent>
               </Card>
             )}
-            
-            {planDesarrollo.feedbackGrupal && (
-              <Card className="border-info/20 bg-info/5 w-full">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Users2 className="h-5 w-5 text-info" />
-                    Feedback Grupal
-                  </CardTitle>
-                  <CardDescription>
-                    Retroalimentación para toda la cuadrilla
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="p-6 bg-background rounded-lg border border-info/20 min-h-[200px] max-h-[600px] overflow-y-auto">
-                    <p className="whitespace-pre-wrap text-base leading-relaxed text-foreground">
-                      {planDesarrollo.feedbackGrupal}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
+
+            {/* Feedback Individual y Grupal */}
+            {planDesarrollo && (
+              <div className="space-y-6">
+                {planDesarrollo.feedbackIndividual && (
+                  <Card className="w-full">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <User className="h-5 w-5 text-primary" />
+                        Feedback Individual
+                      </CardTitle>
+                      <CardDescription>
+                        Retroalimentación personalizada para el colaborador
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="p-6 bg-muted/30 rounded-lg border min-h-[200px] max-h-[600px] overflow-y-auto">
+                        <p className="whitespace-pre-wrap text-base leading-relaxed text-foreground">
+                          {planDesarrollo.feedbackIndividual}
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+                
+                {planDesarrollo.feedbackGrupal && (
+                  <Card className="border-info/20 bg-info/5 w-full">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Users2 className="h-5 w-5 text-info" />
+                        Feedback Grupal
+                      </CardTitle>
+                      <CardDescription>
+                        Retroalimentación para toda la cuadrilla
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="p-6 bg-background rounded-lg border border-info/20 min-h-[200px] max-h-[600px] overflow-y-auto">
+                        <p className="whitespace-pre-wrap text-base leading-relaxed text-foreground">
+                          {planDesarrollo.feedbackGrupal}
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
             )}
-          </div>
+          </TabsContent>
+        </Tabs>
+
+        {/* Modal de Edición del Plan */}
+        {mostrarEditarPlan && planDesarrollo && (
+          <EditarPlanDesarrollo
+            plan={{
+              id: planDesarrollo.id,
+              colaboradorId: colaborador.dpi,
+              periodoId: periodoId,
+              feedbackIndividual: planDesarrollo.feedbackIndividual || "",
+              feedbackGrupal: planDesarrollo.feedbackGrupal || null,
+              planEstructurado: planDesarrollo.planEstructurado,
+              recomendaciones: planDesarrollo.recomendaciones || [],
+              editable: true,
+            }}
+            colaboradorNombre={colaborador.nombre}
+            onPlanGuardado={(planActualizado) => {
+              setPlanDesarrollo({
+                id: planActualizado.id,
+                feedbackIndividual: planActualizado.feedbackIndividual,
+                feedbackGrupal: planActualizado.feedbackGrupal,
+                planEstructurado: planActualizado.planEstructurado,
+                recomendaciones: planActualizado.recomendaciones,
+              });
+              setMostrarEditarPlan(false);
+            }}
+            onClose={() => setMostrarEditarPlan(false)}
+          />
         )}
-
-        {/* Tabla Comparativa Detallada */}
-        <Card>
-          <CardHeader>
-            <CardTitle>
-              {vistaModo === "grupal" && perteneceCuadrilla
-                ? "Análisis Individual vs Promedio Grupal"
-                : "Análisis Detallado por Dimensión"}
-            </CardTitle>
-            <CardDescription>
-              {vistaModo === "grupal" && perteneceCuadrilla
-                ? "Comparación del desempeño individual con el promedio de la cuadrilla"
-                : "Comparación punto por punto con diferencias identificadas"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-6">
-              {comparativo.map((item, idx) => {
-                const diferenciaPorcentaje = scoreToPercentage(item.evaluacionJefe) - scoreToPercentage(item.autoevaluacion);
-                const isAligned = Math.abs(diferenciaPorcentaje) < 10; // 10% de diferencia es considerado alineado
-                const jefeHigher = diferenciaPorcentaje > 10;
-                const autoHigher = diferenciaPorcentaje < -10;
-
-                return (
-                  <div key={item.dimensionId} className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="font-semibold text-lg">{item.nombre}</h3>
-                      {isAligned ? (
-                        <Badge variant="outline" className="text-success border-success">
-                          <Minus className="mr-1 h-3 w-3" />
-                          Alineado
-                        </Badge>
-                      ) : jefeHigher ? (
-                        <Badge variant="outline" className="text-accent border-accent">
-                          <TrendingUp className="mr-1 h-3 w-3" />
-                          Jefe más alto
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-warning border-warning">
-                          <TrendingDown className="mr-1 h-3 w-3" />
-                          Colaborador más alto
-                        </Badge>
-                      )}
-                    </div>
-                    
-                    <div className={`grid gap-4 mb-3 ${
-                      vistaModo === "grupal" && perteneceCuadrilla && promedioGrupo !== null
-                        ? "md:grid-cols-4"
-                        : "md:grid-cols-3"
-                    }`}>
-                      <div>
-                        <p className="text-sm text-muted-foreground mb-1">Autoevaluación</p>
-                        <div className="flex items-center gap-2">
-                          <Progress value={scoreToPercentage(item.autoevaluacion)} className="flex-1" />
-                          <span className="font-medium w-16 text-right">
-                            {scoreToPercentage(item.autoevaluacion)}%
-                          </span>
-                        </div>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground mb-1">Evaluación Jefe</p>
-                        <div className="flex items-center gap-2">
-                          <Progress value={scoreToPercentage(item.evaluacionJefe)} className="flex-1" />
-                          <span className="font-medium w-16 text-right">
-                            {scoreToPercentage(item.evaluacionJefe)}%
-                          </span>
-                        </div>
-                      </div>
-                      {vistaModo === "grupal" && perteneceCuadrilla && promedioGrupo !== null && (
-                        <div>
-                          <p className="text-sm text-muted-foreground mb-1">Promedio Cuadrilla</p>
-                          <div className="flex items-center gap-2">
-                            <Progress value={promedioGrupo} className="flex-1" />
-                            <span className="font-medium w-16 text-right text-info">
-                              {Math.round(promedioGrupo)}%
-                            </span>
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-1">Promedio del grupo</p>
-                        </div>
-                      )}
-                      <div>
-                        <p className="text-sm text-muted-foreground mb-1">Diferencia</p>
-                        <div className="flex items-center gap-2">
-                          <span className={`font-medium w-16 text-right ${
-                            Math.abs(item.diferencia) < 0.3 ? "text-muted-foreground" :
-                            item.diferencia > 0 ? "text-accent" : "text-warning"
-                          }`}>
-                            {item.diferencia > 0 ? "+" : ""}{scoreToPercentage(item.evaluacionJefe) - scoreToPercentage(item.autoevaluacion)}%
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            ({item.diferencia > 0 ? "+" : ""}{item.diferencia.toFixed(2)})
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Comentarios */}
-                    <div className="grid gap-3 md:grid-cols-2 mt-4 pt-4 border-t">
-                      {autoevaluacion.comments[item.dimensionId] && (
-                        <div className="text-sm">
-                          <p className="font-medium text-muted-foreground mb-1">
-                            Comentarios del Colaborador:
-                          </p>
-                          <p className="text-sm">{autoevaluacion.comments[item.dimensionId]}</p>
-                        </div>
-                      )}
-                      {evaluacionJefe.comments[item.dimensionId] && (
-                        <div className="text-sm">
-                          <p className="font-medium text-muted-foreground mb-1">
-                            Comentarios del Jefe:
-                          </p>
-                          <p className="text-sm">{evaluacionJefe.comments[item.dimensionId]}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
       </main>
     </div>
   );
