@@ -46,6 +46,16 @@ export const PerformanceRadarAnalysis = ({
         problema: d.tuResultado < 0 || d.tuResultado > 100 ? '⚠️ NO ES PORCENTAJE' : '✅ Es porcentaje válido'
       });
     });
+    
+    // Verificar dimensiones duplicadas
+    const dimensiones = radarData.map(d => d.dimension);
+    const duplicados = dimensiones.filter((dim, idx) => dimensiones.indexOf(dim) !== idx);
+    if (duplicados.length > 0) {
+      console.warn('⚠️ [PerformanceRadarAnalysis] Dimensiones duplicadas encontradas:', duplicados);
+    }
+    
+    // Log del array completo que se pasa a RadarChart
+    console.log('📊 [PerformanceRadarAnalysis] Array completo para RadarChart:', JSON.stringify(radarData, null, 2));
   }
   
   // Validar que hay datos
@@ -69,6 +79,23 @@ export const PerformanceRadarAnalysis = ({
       </Card>
     );
   }
+
+  // Normalizar y validar datos para Recharts
+  // Asegurar que todos los valores sean números válidos y que no haya problemas con los datos
+  const normalizedRadarData = radarData.map((d, idx) => {
+    const tuResultado = typeof d.tuResultado === 'number' && !isNaN(d.tuResultado) ? d.tuResultado : 0;
+    const promedioMunicipal = d.promedioMunicipal !== undefined && typeof d.promedioMunicipal === 'number' && !isNaN(d.promedioMunicipal) && d.promedioMunicipal > 0
+      ? d.promedioMunicipal
+      : undefined;
+    
+    return {
+      dimension: d.dimension || `Dimensión ${idx + 1}`,
+      tuResultado: Math.max(0, Math.min(100, tuResultado)), // Asegurar que esté entre 0-100
+      ...(promedioMunicipal !== undefined && { promedioMunicipal: Math.max(0, Math.min(100, promedioMunicipal)) })
+    };
+  });
+
+  console.log('📊 [PerformanceRadarAnalysis] Datos normalizados para Recharts:', normalizedRadarData);
   
   // Ordenar dimensiones: primero fortalezas (descendente), luego oportunidades (ascendente)
   const sortedDimensions = [...dimensionAnalysis].sort((a, b) => {
@@ -94,13 +121,13 @@ export const PerformanceRadarAnalysis = ({
         </CardHeader>
         <CardContent className="p-8">
           <ResponsiveContainer width="100%" height={450}>
-            <RadarChart data={radarData}>
+            <RadarChart data={normalizedRadarData}>
               <defs>
                 <linearGradient id="radarGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.8}/>
                   <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
                 </linearGradient>
-                {radarData.some(d => d.promedioMunicipal !== undefined && d.promedioMunicipal > 0) && (
+                {normalizedRadarData.some(d => d.promedioMunicipal !== undefined && d.promedioMunicipal > 0) && (
                   <linearGradient id="promedioGradient" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#82ca9d" stopOpacity={0.8}/>
                     <stop offset="100%" stopColor="#82ca9d" stopOpacity={0.3}/>
@@ -129,7 +156,7 @@ export const PerformanceRadarAnalysis = ({
                 fillOpacity={0.6}
                 strokeWidth={3}
               />
-              {radarData.some(d => d.promedioMunicipal !== undefined && d.promedioMunicipal > 0) && (
+              {normalizedRadarData.some(d => d.promedioMunicipal !== undefined && d.promedioMunicipal > 0) && (
                 <Radar
                   name="Promedio Municipal (mismo nivel)"
                   dataKey="promedioMunicipal"

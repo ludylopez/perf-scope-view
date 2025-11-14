@@ -237,6 +237,8 @@ const Dashboard = () => {
         const performancePercentage = scoreToPercentage(performanceScore);
         console.log('📊 [Dashboard] Score calculado:', { performanceScore, performancePercentage });
 
+        // Primero generar todos los títulos para detectar duplicados
+        const titulosGenerados: string[] = [];
         const radarData = instrument.dimensionesDesempeno.map((dim, idx) => {
           const promedio = calculateDimensionAverage(responsesToUse, dim);
           const porcentaje = calculateDimensionPercentage(responsesToUse, dim);
@@ -267,8 +269,20 @@ const Dashboard = () => {
           // Asegurar que el porcentaje sea un número válido
           const porcentajeFinal = typeof porcentaje === 'number' && !isNaN(porcentaje) ? porcentaje : 0;
           
+          // Generar título único para evitar duplicados en el gráfico
+          let dimensionTitle = getDimensionFriendlyTitle(dim);
+          // Si el título ya existe, usar el nombre completo o agregar un identificador
+          if (titulosGenerados.includes(dimensionTitle)) {
+            // Usar el nombre completo si es corto, o una versión truncada con identificador
+            dimensionTitle = dim.nombre.length <= 30 
+              ? dim.nombre 
+              : `${dimensionTitle} (${idx + 1})`;
+            console.warn(`⚠️ [Dashboard] Título duplicado detectado para "${getDimensionFriendlyTitle(dim)}", usando: "${dimensionTitle}"`);
+          }
+          titulosGenerados.push(dimensionTitle);
+          
           return {
-            dimension: getDimensionFriendlyTitle(dim),
+            dimension: dimensionTitle,
             nombreCompleto: dim.nombre,
             numero: idx + 1,
             tuEvaluacion: porcentajeFinal, // Asegurar que es porcentaje (0-100)
