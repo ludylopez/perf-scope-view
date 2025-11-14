@@ -1158,9 +1158,9 @@ const VistaComparativa = () => {
 
         {/* Feedback Individual y Grupal */}
         {planDesarrollo && (
-          <div className="grid gap-6 mb-6 md:grid-cols-2">
+          <div className="space-y-6 mb-6">
             {planDesarrollo.feedbackIndividual && (
-              <Card>
+              <Card className="w-full">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <User className="h-5 w-5 text-primary" />
@@ -1171,8 +1171,8 @@ const VistaComparativa = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="p-4 bg-background rounded-lg border">
-                    <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                  <div className="p-6 bg-muted/30 rounded-lg border min-h-[200px] max-h-[600px] overflow-y-auto">
+                    <p className="whitespace-pre-wrap text-base leading-relaxed text-foreground">
                       {planDesarrollo.feedbackIndividual}
                     </p>
                   </div>
@@ -1181,7 +1181,7 @@ const VistaComparativa = () => {
             )}
             
             {planDesarrollo.feedbackGrupal && (
-              <Card className="border-info/20 bg-info/5">
+              <Card className="border-info/20 bg-info/5 w-full">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Users2 className="h-5 w-5 text-info" />
@@ -1192,8 +1192,8 @@ const VistaComparativa = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="p-4 bg-background rounded-lg border border-info/20">
-                    <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                  <div className="p-6 bg-background rounded-lg border border-info/20 min-h-[200px] max-h-[600px] overflow-y-auto">
+                    <p className="whitespace-pre-wrap text-base leading-relaxed text-foreground">
                       {planDesarrollo.feedbackGrupal}
                     </p>
                   </div>
