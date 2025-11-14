@@ -309,12 +309,24 @@ const Dashboard = () => {
             // Procesar el plan de desarrollo
             // El plan se guarda en competencias_desarrollar como JSONB con estructura:
             // { objetivos: [], acciones: [], dimensionesDebiles: [], recomendaciones: [] }
-            const competencias = planData.competencias_desarrollar || {};
+            let competencias = planData.competencias_desarrollar || {};
+            
+            // Si viene como string, parsearlo
+            if (typeof competencias === 'string') {
+              try {
+                competencias = JSON.parse(competencias);
+              } catch (e) {
+                console.error('Error parseando competencias_desarrollar como string:', e);
+                competencias = {};
+              }
+            }
             
             console.log('🔍 Plan raw desde BD:', { 
               id: planData.id, 
               competencias_desarrollar: competencias,
-              tipo: typeof competencias 
+              tipo: typeof competencias,
+              tieneAcciones: !!(competencias && typeof competencias === 'object' && competencias.acciones),
+              tieneObjetivos: !!(competencias && typeof competencias === 'object' && competencias.objetivos),
             });
             
             // Extraer estructura del plan desde competencias_desarrollar
@@ -340,6 +352,15 @@ const Dashboard = () => {
                 };
                 recomendaciones = Array.isArray(competencias.recomendaciones) ? competencias.recomendaciones : [];
               }
+              // Si solo tiene acciones sin objetivos, crear estructura con acciones
+              else if (competencias.acciones && Array.isArray(competencias.acciones) && competencias.acciones.length > 0) {
+                planEstructurado = {
+                  objetivos: [],
+                  acciones: competencias.acciones,
+                  dimensionesDebiles: Array.isArray(competencias.dimensionesDebiles) ? competencias.dimensionesDebiles : [],
+                };
+                recomendaciones = Array.isArray(competencias.recomendaciones) ? competencias.recomendaciones : [];
+              }
             }
 
             const planCargado = {
@@ -356,8 +377,16 @@ const Dashboard = () => {
             };
 
             console.log('📋 Plan procesado en Dashboard:', planCargado);
+            console.log('🔍 Verificación planEstructurado:', {
+              existe: !!planCargado.planEstructurado,
+              tieneObjetivos: !!planCargado.planEstructurado?.objetivos,
+              tieneAcciones: !!planCargado.planEstructurado?.acciones,
+              tieneDimensiones: !!planCargado.planEstructurado?.dimensionesDebiles,
+              tieneRecomendaciones: !!planCargado.recomendaciones,
+            });
             setPlanDesarrollo(planCargado);
           } else {
+            console.log('⚠️ No se encontró plan de desarrollo en BD');
             setPlanDesarrollo(null);
           }
         } catch (error) {
@@ -672,9 +701,25 @@ const Dashboard = () => {
                   />
                 </div>
 
-                {/* Plan de Desarrollo - Acciones y Objetivos */}
-                {planDesarrollo && planDesarrollo.planEstructurado && (
+                {/* Plan de Desarrollo - Acciones y Objetivos 
+                    Plan generado con IA desde la vista del jefe */}
+                {planDesarrollo ? (
                   <div className="space-y-6 mb-6">
+                    {!planDesarrollo.planEstructurado ? (
+                      <Card className="border-warning">
+                        <CardContent className="pt-6">
+                          <div className="text-center text-muted-foreground">
+                            <AlertCircle className="h-8 w-8 mx-auto mb-2 text-warning" />
+                            <p className="font-medium">Plan de desarrollo encontrado pero sin estructura completa.</p>
+                            <p className="text-sm mt-2">Contacta a tu jefe para que genere el plan de desarrollo con IA.</p>
+                            <p className="text-xs mt-4 text-muted-foreground">
+                              Debug: Plan ID: {planDesarrollo.id}, tiene planEstructurado: {planDesarrollo.planEstructurado ? 'Sí' : 'No'}
+                            </p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ) : (
+                      <>
                     {/* Objetivos */}
                     {planDesarrollo.planEstructurado.objetivos && Array.isArray(planDesarrollo.planEstructurado.objetivos) && planDesarrollo.planEstructurado.objetivos.length > 0 && (
                       <Card>
@@ -818,7 +863,19 @@ const Dashboard = () => {
                         </CardContent>
                       </Card>
                     )}
+                      </>
+                    )}
                   </div>
+                ) : (
+                  <Card className="border-muted mb-6">
+                    <CardContent className="pt-6">
+                      <div className="text-center text-muted-foreground">
+                        <Target className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                        <p className="font-medium">No hay plan de desarrollo disponible</p>
+                        <p className="text-sm mt-2">Tu jefe generará tu plan de desarrollo con IA después de completar tu evaluación.</p>
+                      </div>
+                    </CardContent>
+                  </Card>
                 )}
 
                 {/* Botones de acción */}
