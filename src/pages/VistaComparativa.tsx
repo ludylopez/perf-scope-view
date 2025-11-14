@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, BarChart3, TrendingUp, TrendingDown, Minus, Users2, User, Target, CheckCircle2, AlertCircle, FileText, MessageSquare } from "lucide-react";
+import { ArrowLeft, BarChart3, TrendingUp, TrendingDown, Minus, Users2, User, Target, CheckCircle2, AlertCircle, FileText, MessageSquare, Shield, Briefcase, Award, Zap, Users, Heart, Building2 } from "lucide-react";
 import { toast } from "sonner";
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, Cell } from "recharts";
 import { getSubmittedEvaluation, getJefeEvaluationDraft, getMockColaboradorEvaluation } from "@/lib/storage";
@@ -59,6 +59,33 @@ const VistaComparativa = () => {
   const [periodoId, setPeriodoId] = useState<string>("");
   const [mostrarEditarPlan, setMostrarEditarPlan] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("resumen");
+
+  // Helper para obtener icono según la dimensión
+  const getDimensionIcon = (dimensionNombre: string) => {
+    const nombre = dimensionNombre.toLowerCase();
+    if (nombre.includes("productividad") || nombre.includes("cumplimiento") || nombre.includes("objetivos")) {
+      return Target;
+    }
+    if (nombre.includes("calidad")) {
+      return Shield;
+    }
+    if (nombre.includes("competencias") || nombre.includes("técnicas") || nombre.includes("específicas")) {
+      return Briefcase;
+    }
+    if (nombre.includes("comportamiento") || nombre.includes("organizacional")) {
+      return Users;
+    }
+    if (nombre.includes("relaciones") || nombre.includes("interpersonales") || nombre.includes("equipo")) {
+      return Heart;
+    }
+    if (nombre.includes("liderazgo") || nombre.includes("dirección")) {
+      return Award;
+    }
+    if (nombre.includes("servicio") || nombre.includes("ciudadano")) {
+      return Zap;
+    }
+    return Building2;
+  };
 
   useEffect(() => {
     if (!id || !user) {
@@ -816,108 +843,181 @@ const VistaComparativa = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-6">
+                <div className="space-y-4">
                   {comparativo.map((item, idx) => {
                     const diferenciaPorcentaje = scoreToPercentage(item.evaluacionJefe) - scoreToPercentage(item.autoevaluacion);
                     const isAligned = Math.abs(diferenciaPorcentaje) < 10;
                     const jefeHigher = diferenciaPorcentaje > 10;
                     const autoHigher = diferenciaPorcentaje < -10;
+                    const DimensionIcon = getDimensionIcon(item.nombre);
+                    const porcentajeAuto = scoreToPercentage(item.autoevaluacion);
+                    const porcentajeJefe = scoreToPercentage(item.evaluacionJefe);
 
                     return (
-                      <div key={item.dimensionId} className="border rounded-lg p-4">
-                        <div className="flex items-center justify-between mb-3">
-                          <h3 className="font-semibold text-lg">{item.nombre}</h3>
-                          {isAligned ? (
-                            <Badge variant="outline" className="text-success border-success">
-                              <Minus className="mr-1 h-3 w-3" />
-                              Alineado
-                            </Badge>
-                          ) : jefeHigher ? (
-                            <Badge variant="outline" className="text-accent border-accent">
-                              <TrendingUp className="mr-1 h-3 w-3" />
-                              Jefe más alto
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="text-warning border-warning">
-                              <TrendingDown className="mr-1 h-3 w-3" />
-                              Colaborador más alto
-                            </Badge>
-                          )}
-                        </div>
-                        
-                        <div className={`grid gap-4 mb-3 ${
-                          vistaModo === "grupal" && perteneceCuadrilla && promedioGrupo !== null
-                            ? "md:grid-cols-4"
-                            : "md:grid-cols-3"
-                        }`}>
-                          <div>
-                            <p className="text-sm text-muted-foreground mb-1">Autoevaluación</p>
-                            <div className="flex items-center gap-2">
-                              <Progress value={scoreToPercentage(item.autoevaluacion)} className="flex-1" />
-                              <span className="font-medium w-16 text-right">
-                                {scoreToPercentage(item.autoevaluacion)}%
-                              </span>
-                            </div>
-                          </div>
-                          <div>
-                            <p className="text-sm text-muted-foreground mb-1">Evaluación Jefe</p>
-                            <div className="flex items-center gap-2">
-                              <Progress value={scoreToPercentage(item.evaluacionJefe)} className="flex-1" />
-                              <span className="font-medium w-16 text-right">
-                                {scoreToPercentage(item.evaluacionJefe)}%
-                              </span>
-                            </div>
-                          </div>
-                          {vistaModo === "grupal" && perteneceCuadrilla && promedioGrupo !== null && (
-                            <div>
-                              <p className="text-sm text-muted-foreground mb-1">Promedio Cuadrilla</p>
-                              <div className="flex items-center gap-2">
-                                <Progress value={promedioGrupo} className="flex-1" />
-                                <span className="font-medium w-16 text-right text-info">
-                                  {Math.round(promedioGrupo)}%
-                                </span>
+                      <Card key={item.dimensionId} className="border-2">
+                        <CardContent className="pt-6">
+                          <div className="flex items-start gap-4">
+                            {/* Icono circular */}
+                            <div className="flex-shrink-0">
+                              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                                <DimensionIcon className="h-6 w-6 text-primary" />
                               </div>
-                              <p className="text-xs text-muted-foreground mt-1">Promedio del grupo</p>
                             </div>
-                          )}
-                          <div>
-                            <p className="text-sm text-muted-foreground mb-1">Diferencia</p>
-                            <div className="flex items-center gap-2">
-                              <span className={`font-medium w-16 text-right ${
-                                Math.abs(item.diferencia) < 0.3 ? "text-muted-foreground" :
-                                item.diferencia > 0 ? "text-accent" : "text-warning"
-                              }`}>
-                                {item.diferencia > 0 ? "+" : ""}{scoreToPercentage(item.evaluacionJefe) - scoreToPercentage(item.autoevaluacion)}%
-                              </span>
-                              <span className="text-xs text-muted-foreground">
-                                ({item.diferencia > 0 ? "+" : ""}{item.diferencia.toFixed(2)})
-                              </span>
+
+                            {/* Contenido principal */}
+                            <div className="flex-1">
+                              {/* Header con título y badge */}
+                              <div className="flex items-start justify-between mb-4">
+                                <h3 className="font-bold text-lg uppercase tracking-tight text-foreground">
+                                  {item.nombre}
+                                </h3>
+                                {isAligned ? (
+                                  <Badge className="bg-success text-success-foreground border-0">
+                                    <CheckCircle2 className="mr-1 h-3 w-3" />
+                                    Alineado
+                                  </Badge>
+                                ) : jefeHigher ? (
+                                  <Badge variant="outline" className="text-accent border-accent">
+                                    <TrendingUp className="mr-1 h-3 w-3" />
+                                    Jefe más alto
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="text-warning border-warning">
+                                    <TrendingDown className="mr-1 h-3 w-3" />
+                                    Colaborador más alto
+                                  </Badge>
+                                )}
+                              </div>
+
+                              {/* Comparación visual mejorada */}
+                              <div className="space-y-3">
+                                {/* Autoevaluación */}
+                                <div className="flex items-center gap-4">
+                                  <div className="flex items-center gap-2 min-w-[140px]">
+                                    <div className="w-2 h-2 rounded-full bg-primary"></div>
+                                    <span className="text-sm font-medium text-muted-foreground">Autoevaluación</span>
+                                  </div>
+                                  <div className="flex-1 relative">
+                                    <div className="h-8 bg-muted rounded-lg overflow-hidden relative">
+                                      <div 
+                                        className="absolute top-0 left-0 h-full bg-primary rounded-lg transition-all"
+                                        style={{ width: `${porcentajeAuto}%` }}
+                                      ></div>
+                                    </div>
+                                  </div>
+                                  <span className="text-lg font-bold text-foreground min-w-[50px] text-right">
+                                    {porcentajeAuto}%
+                                  </span>
+                                </div>
+
+                                {/* Evaluación Jefe */}
+                                <div className="flex items-center gap-4">
+                                  <div className="flex items-center gap-2 min-w-[140px]">
+                                    <div className="w-2 h-2 rounded-full bg-accent"></div>
+                                    <span className="text-sm font-medium text-muted-foreground">Evaluación Jefe</span>
+                                  </div>
+                                  <div className="flex-1 relative">
+                                    <div className="h-8 bg-muted rounded-lg overflow-hidden relative">
+                                      <div 
+                                        className="absolute top-0 left-0 h-full bg-accent rounded-lg transition-all"
+                                        style={{ width: `${porcentajeJefe}%` }}
+                                      ></div>
+                                    </div>
+                                  </div>
+                                  <span className="text-lg font-bold text-foreground min-w-[50px] text-right">
+                                    {porcentajeJefe}%
+                                  </span>
+                                </div>
+
+                                {/* Promedio Grupal (si aplica) */}
+                                {vistaModo === "grupal" && perteneceCuadrilla && promedioGrupo !== null && (
+                                  <div className="flex items-center gap-4">
+                                    <div className="flex items-center gap-2 min-w-[140px]">
+                                      <div className="w-2 h-2 rounded-full bg-info"></div>
+                                      <span className="text-sm font-medium text-muted-foreground">Promedio Cuadrilla</span>
+                                    </div>
+                                    <div className="flex-1 relative">
+                                      <div className="h-8 bg-muted rounded-lg overflow-hidden relative">
+                                        <div 
+                                          className="absolute top-0 left-0 h-full bg-info rounded-lg transition-all"
+                                          style={{ width: `${promedioGrupo}%` }}
+                                        ></div>
+                                      </div>
+                                    </div>
+                                    <span className="text-lg font-bold text-info min-w-[50px] text-right">
+                                      {Math.round(promedioGrupo)}%
+                                    </span>
+                                  </div>
+                                )}
+
+                                {/* Diferencia */}
+                                <div className="flex items-center gap-4 pt-2 border-t">
+                                  <div className="min-w-[140px]">
+                                    <span className="text-sm font-medium text-muted-foreground">Diferencia</span>
+                                  </div>
+                                  <div className="flex-1"></div>
+                                  <div className="min-w-[50px] text-right">
+                                    <span className={`text-base font-semibold ${
+                                      Math.abs(diferenciaPorcentaje) < 1 ? "text-muted-foreground" :
+                                      diferenciaPorcentaje > 0 ? "text-accent" : "text-warning"
+                                    }`}>
+                                      {diferenciaPorcentaje > 0 ? "+" : ""}{diferenciaPorcentaje}%
+                                    </span>
+                                    <span className="text-xs text-muted-foreground ml-2">
+                                      ({item.diferencia > 0 ? "+" : ""}{item.diferencia.toFixed(2)})
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Comentarios */}
+                              {(autoevaluacion.comments[item.dimensionId] || evaluacionJefe.comments[item.dimensionId]) && (
+                                <div className="grid gap-3 md:grid-cols-2 mt-4 pt-4 border-t">
+                                  {autoevaluacion.comments[item.dimensionId] && (
+                                    <div className="text-sm">
+                                      <p className="font-medium text-muted-foreground mb-1">
+                                        Comentarios del Colaborador:
+                                      </p>
+                                      <p className="text-sm text-foreground">{autoevaluacion.comments[item.dimensionId]}</p>
+                                    </div>
+                                  )}
+                                  {evaluacionJefe.comments[item.dimensionId] && (
+                                    <div className="text-sm">
+                                      <p className="font-medium text-muted-foreground mb-1">
+                                        Comentarios del Jefe:
+                                      </p>
+                                      <p className="text-sm text-foreground">{evaluacionJefe.comments[item.dimensionId]}</p>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           </div>
-                        </div>
-
-                        {/* Comentarios */}
-                        <div className="grid gap-3 md:grid-cols-2 mt-4 pt-4 border-t">
-                          {autoevaluacion.comments[item.dimensionId] && (
-                            <div className="text-sm">
-                              <p className="font-medium text-muted-foreground mb-1">
-                                Comentarios del Colaborador:
-                              </p>
-                              <p className="text-sm">{autoevaluacion.comments[item.dimensionId]}</p>
-                            </div>
-                          )}
-                          {evaluacionJefe.comments[item.dimensionId] && (
-                            <div className="text-sm">
-                              <p className="font-medium text-muted-foreground mb-1">
-                                Comentarios del Jefe:
-                              </p>
-                              <p className="text-sm">{evaluacionJefe.comments[item.dimensionId]}</p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
+                        </CardContent>
+                      </Card>
                     );
                   })}
+                </div>
+
+                {/* Leyenda */}
+                <div className="mt-6 pt-4 border-t flex items-center gap-6 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-primary"></div>
+                    <span>Autoevaluación</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-accent"></div>
+                    <span>Evaluación Jefe</span>
+                  </div>
+                  {vistaModo === "grupal" && perteneceCuadrilla && (
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-info"></div>
+                      <span>Promedio Cuadrilla</span>
+                    </div>
+                  )}
+                  <div className="ml-auto">
+                    <span>Diferencia: % de variación</span>
+                  </div>
                 </div>
               </CardContent>
             </Card>
