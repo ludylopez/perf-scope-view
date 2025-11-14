@@ -293,6 +293,7 @@ const Dashboard = () => {
             .select("*")
             .eq("colaborador_id", user.dpi) // Filtrar por el DPI del colaborador autenticado
             .eq("periodo_id", activePeriodId) // Filtrar por el período activo
+            .order("created_at", { ascending: false }) // Obtener el más reciente
             .maybeSingle();
 
           if (planError) {
@@ -325,17 +326,25 @@ const Dashboard = () => {
               id: planData.id, 
               competencias_desarrollar: competencias,
               tipo: typeof competencias,
-              tieneAcciones: !!(competencias && typeof competencias === 'object' && competencias.acciones),
-              tieneObjetivos: !!(competencias && typeof competencias === 'object' && competencias.objetivos),
+              esArray: Array.isArray(competencias),
+              esObjeto: typeof competencias === 'object' && competencias !== null && !Array.isArray(competencias),
+              keys: typeof competencias === 'object' && competencias !== null ? Object.keys(competencias) : [],
             });
             
             // Extraer estructura del plan desde competencias_desarrollar
             let planEstructurado = null;
             let recomendaciones = [];
             
-            if (typeof competencias === 'object' && competencias !== null) {
+            if (typeof competencias === 'object' && competencias !== null && !Array.isArray(competencias)) {
+              console.log('✅ competencias es objeto válido, verificando estructura...');
+              console.log('  - tiene acciones:', !!(competencias.acciones && Array.isArray(competencias.acciones)));
+              console.log('  - tiene objetivos:', !!(competencias.objetivos && Array.isArray(competencias.objetivos)));
+              console.log('  - tiene dimensionesDebiles:', !!(competencias.dimensionesDebiles && Array.isArray(competencias.dimensionesDebiles)));
+              console.log('  - tiene recomendaciones:', !!(competencias.recomendaciones && Array.isArray(competencias.recomendaciones)));
+              
               // Verificar si tiene la estructura completa
               if (competencias.acciones && Array.isArray(competencias.acciones)) {
+                console.log('✅ Plan tiene acciones, creando planEstructurado completo');
                 planEstructurado = {
                   objetivos: Array.isArray(competencias.objetivos) ? competencias.objetivos : [],
                   acciones: competencias.acciones,
@@ -345,6 +354,7 @@ const Dashboard = () => {
               }
               // Si tiene objetivos pero no acciones, crear estructura básica
               else if (Array.isArray(competencias.objetivos) && competencias.objetivos.length > 0) {
+                console.log('✅ Plan tiene objetivos pero no acciones, creando estructura básica');
                 planEstructurado = {
                   objetivos: competencias.objetivos,
                   acciones: [],
@@ -354,13 +364,18 @@ const Dashboard = () => {
               }
               // Si solo tiene acciones sin objetivos, crear estructura con acciones
               else if (competencias.acciones && Array.isArray(competencias.acciones) && competencias.acciones.length > 0) {
+                console.log('✅ Plan tiene acciones sin objetivos, creando estructura con acciones');
                 planEstructurado = {
                   objetivos: [],
                   acciones: competencias.acciones,
                   dimensionesDebiles: Array.isArray(competencias.dimensionesDebiles) ? competencias.dimensionesDebiles : [],
                 };
                 recomendaciones = Array.isArray(competencias.recomendaciones) ? competencias.recomendaciones : [];
+              } else {
+                console.warn('⚠️ Plan no tiene estructura reconocida:', competencias);
               }
+            } else {
+              console.warn('⚠️ competencias no es un objeto válido:', typeof competencias, competencias);
             }
 
             const planCargado = {
