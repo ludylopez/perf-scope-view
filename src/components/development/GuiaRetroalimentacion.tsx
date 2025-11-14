@@ -19,12 +19,14 @@ interface GuiaRetroalimentacionProps {
   colaboradorId: string;
   periodoId: string;
   colaboradorNombre: string;
+  onGuiaGenerada?: () => void;
 }
 
 export const GenerarGuiaRetroalimentacion = ({
   colaboradorId,
   periodoId,
   colaboradorNombre,
+  onGuiaGenerada,
 }: GuiaRetroalimentacionProps) => {
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -90,6 +92,10 @@ export const GenerarGuiaRetroalimentacion = ({
         setEditedFeedbackIndividual(responseData.feedbackIndividual || "");
         setShowModal(true);
         toast.success("Guía y feedback de retroalimentación generados exitosamente");
+        // Notificar que se generó la guía para recargar en la vista
+        if (onGuiaGenerada) {
+          onGuiaGenerada();
+        }
       } else {
         throw new Error(responseData?.error || "Error generando guía: respuesta inválida");
       }

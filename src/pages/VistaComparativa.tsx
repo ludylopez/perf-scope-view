@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, BarChart3, TrendingUp, TrendingDown, Minus, Users2, User, Target, CheckCircle2, AlertCircle } from "lucide-react";
+import { ArrowLeft, BarChart3, TrendingUp, TrendingDown, Minus, Users2, User, Target, CheckCircle2, AlertCircle, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, Cell } from "recharts";
 import { getSubmittedEvaluation, getJefeEvaluationDraft, getMockColaboradorEvaluation } from "@/lib/storage";
@@ -53,6 +53,8 @@ const VistaComparativa = () => {
   const [perteneceCuadrilla, setPerteneceCuadrilla] = useState(false);
   const [gruposColaborador, setGruposColaborador] = useState<any[]>([]);
   const [planDesarrollo, setPlanDesarrollo] = useState<any>(null);
+  const [guiaFeedback, setGuiaFeedback] = useState<any>(null);
+  const [mostrarGuiaFeedback, setMostrarGuiaFeedback] = useState(false);
   const [promedioGrupo, setPromedioGrupo] = useState<number | null>(null);
   const [periodoId, setPeriodoId] = useState<string>("");
   const [mostrarEditarPlan, setMostrarEditarPlan] = useState(false);
@@ -236,6 +238,42 @@ const VistaComparativa = () => {
         } else {
           console.log('⚠️ No se encontró plan de desarrollo para este colaborador');
           setPlanDesarrollo(null);
+        }
+
+        // Cargar guía de feedback individual si existe
+        try {
+          const { data: guiaData, error: guiaError } = await supabase
+            .from("feedback_guides")
+            .select("*")
+            .eq("colaborador_id", colaboradorFormatted.dpi)
+            .eq("periodo_id", currentPeriodoId)
+            .eq("tipo", "individual")
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (guiaError) {
+            console.error('Error al cargar guía de feedback:', guiaError);
+          } else if (guiaData) {
+            console.log('✅ Guía de feedback encontrada:', guiaData.id);
+            setGuiaFeedback({
+              id: guiaData.id,
+              preparacion: guiaData.preparacion || "",
+              apertura: guiaData.apertura || "",
+              fortalezas: guiaData.fortalezas || [],
+              areasDesarrollo: guiaData.areas_desarrollo || [],
+              preguntasDialogo: guiaData.preguntas_dialogo || [],
+              tipsConduccion: guiaData.tips_conduccion || [],
+              cierre: guiaData.cierre || "",
+              fechaGeneracion: guiaData.fecha_generacion,
+            });
+          } else {
+            console.log('⚠️ No se encontró guía de feedback para este colaborador');
+            setGuiaFeedback(null);
+          }
+        } catch (error) {
+          console.error('Error cargando guía de feedback:', error);
+          setGuiaFeedback(null);
         }
 
         // Cargar ambas evaluaciones
@@ -498,6 +536,37 @@ const VistaComparativa = () => {
                     colaboradorId={colaborador.dpi}
                     periodoId={periodoId}
                     colaboradorNombre={colaborador.nombre}
+                    onGuiaGenerada={async () => {
+                      // Recargar la guía desde la BD
+                      try {
+                        const { data: guiaData, error: guiaError } = await supabase
+                          .from("feedback_guides")
+                          .select("*")
+                          .eq("colaborador_id", colaborador.dpi)
+                          .eq("periodo_id", periodoId)
+                          .eq("tipo", "individual")
+                          .order("created_at", { ascending: false })
+                          .limit(1)
+                          .maybeSingle();
+
+                        if (!guiaError && guiaData) {
+                          setGuiaFeedback({
+                            id: guiaData.id,
+                            preparacion: guiaData.preparacion || "",
+                            apertura: guiaData.apertura || "",
+                            fortalezas: guiaData.fortalezas || [],
+                            areasDesarrollo: guiaData.areas_desarrollo || [],
+                            preguntasDialogo: guiaData.preguntas_dialogo || [],
+                            tipsConduccion: guiaData.tips_conduccion || [],
+                            cierre: guiaData.cierre || "",
+                            fechaGeneracion: guiaData.fecha_generacion,
+                          });
+                          setMostrarGuiaFeedback(true); // Mostrar automáticamente la guía
+                        }
+                      } catch (error) {
+                        console.error("Error recargando guía:", error);
+                      }
+                    }}
                   />
                   <GenerarFeedbackGrupal
                     colaboradorId={colaborador.dpi}
@@ -602,6 +671,37 @@ const VistaComparativa = () => {
                     colaboradorId={colaborador.dpi}
                     periodoId={periodoId}
                     colaboradorNombre={colaborador.nombre}
+                    onGuiaGenerada={async () => {
+                      // Recargar la guía desde la BD
+                      try {
+                        const { data: guiaData, error: guiaError } = await supabase
+                          .from("feedback_guides")
+                          .select("*")
+                          .eq("colaborador_id", colaborador.dpi)
+                          .eq("periodo_id", periodoId)
+                          .eq("tipo", "individual")
+                          .order("created_at", { ascending: false })
+                          .limit(1)
+                          .maybeSingle();
+
+                        if (!guiaError && guiaData) {
+                          setGuiaFeedback({
+                            id: guiaData.id,
+                            preparacion: guiaData.preparacion || "",
+                            apertura: guiaData.apertura || "",
+                            fortalezas: guiaData.fortalezas || [],
+                            areasDesarrollo: guiaData.areas_desarrollo || [],
+                            preguntasDialogo: guiaData.preguntas_dialogo || [],
+                            tipsConduccion: guiaData.tips_conduccion || [],
+                            cierre: guiaData.cierre || "",
+                            fechaGeneracion: guiaData.fecha_generacion,
+                          });
+                          setMostrarGuiaFeedback(true); // Mostrar automáticamente la guía
+                        }
+                      } catch (error) {
+                        console.error("Error recargando guía:", error);
+                      }
+                    }}
                   />
                   <GenerarFeedbackGrupal
                     colaboradorId={colaborador.dpi}
@@ -919,6 +1019,141 @@ const VistaComparativa = () => {
               </Card>
             )}
           </div>
+        )}
+
+        {/* Guía de Retroalimentación (Solo para el Jefe) */}
+        {guiaFeedback && (
+          <Card className="mb-6 border-primary/20">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-primary" />
+                    Guía de Retroalimentación
+                  </CardTitle>
+                  <CardDescription>
+                    Guía estructurada para conducir la conversación de retroalimentación (solo visible para el jefe)
+                  </CardDescription>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setMostrarGuiaFeedback(!mostrarGuiaFeedback)}
+                >
+                  {mostrarGuiaFeedback ? "Ocultar" : "Ver Guía"}
+                </Button>
+              </div>
+            </CardHeader>
+            {mostrarGuiaFeedback && (
+              <CardContent className="space-y-6">
+                {/* Preparación */}
+                {guiaFeedback.preparacion && (
+                  <div>
+                    <h4 className="font-semibold mb-2 text-primary">📋 Preparación</h4>
+                    <p className="text-sm text-muted-foreground whitespace-pre-wrap bg-muted/30 p-3 rounded-lg">
+                      {guiaFeedback.preparacion}
+                    </p>
+                  </div>
+                )}
+
+                {/* Apertura */}
+                {guiaFeedback.apertura && (
+                  <div>
+                    <h4 className="font-semibold mb-2 text-primary">👋 Apertura</h4>
+                    <p className="text-sm text-muted-foreground whitespace-pre-wrap bg-muted/30 p-3 rounded-lg">
+                      {guiaFeedback.apertura}
+                    </p>
+                  </div>
+                )}
+
+                {/* Fortalezas */}
+                {guiaFeedback.fortalezas && Array.isArray(guiaFeedback.fortalezas) && guiaFeedback.fortalezas.length > 0 && (
+                  <div>
+                    <h4 className="font-semibold mb-3 text-primary">🌟 Fortalezas</h4>
+                    <div className="space-y-3">
+                      {guiaFeedback.fortalezas.map((fortaleza: any, idx: number) => (
+                        <div key={idx} className="border-l-4 border-success pl-4 py-2 bg-success/5 rounded-r-lg">
+                          <h5 className="font-medium text-sm mb-1">{fortaleza.dimension || "Fortaleza"}</h5>
+                          <p className="text-sm text-muted-foreground mb-2">{fortaleza.descripcion}</p>
+                          {fortaleza.ejemplo && (
+                            <p className="text-xs text-muted-foreground italic">Ejemplo: {fortaleza.ejemplo}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Áreas de Desarrollo */}
+                {guiaFeedback.areasDesarrollo && Array.isArray(guiaFeedback.areasDesarrollo) && guiaFeedback.areasDesarrollo.length > 0 && (
+                  <div>
+                    <h4 className="font-semibold mb-3 text-primary">⚠️ Áreas de Desarrollo</h4>
+                    <div className="space-y-3">
+                      {guiaFeedback.areasDesarrollo.map((area: any, idx: number) => (
+                        <div key={idx} className="border-l-4 border-warning pl-4 py-2 bg-warning/5 rounded-r-lg">
+                          <h5 className="font-medium text-sm mb-2">{area.dimension || "Área de desarrollo"}</h5>
+                          <div className="space-y-1 text-sm text-muted-foreground">
+                            {area.situacion && (
+                              <p><strong>Situación:</strong> {area.situacion}</p>
+                            )}
+                            {area.comportamiento && (
+                              <p><strong>Comportamiento:</strong> {area.comportamiento}</p>
+                            )}
+                            {area.impacto && (
+                              <p><strong>Impacto:</strong> {area.impacto}</p>
+                            )}
+                            {area.sugerencia && (
+                              <p className="text-primary"><strong>Sugerencia:</strong> {area.sugerencia}</p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Preguntas de Diálogo */}
+                {guiaFeedback.preguntasDialogo && Array.isArray(guiaFeedback.preguntasDialogo) && guiaFeedback.preguntasDialogo.length > 0 && (
+                  <div>
+                    <h4 className="font-semibold mb-3 text-primary">💬 Preguntas para el Diálogo</h4>
+                    <ul className="space-y-2">
+                      {guiaFeedback.preguntasDialogo.map((pregunta: string, idx: number) => (
+                        <li key={idx} className="flex items-start gap-2 text-sm text-muted-foreground bg-muted/30 p-3 rounded-lg">
+                          <span className="text-primary mt-0.5">•</span>
+                          <span>{pregunta}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Tips de Conducción */}
+                {guiaFeedback.tipsConduccion && Array.isArray(guiaFeedback.tipsConduccion) && guiaFeedback.tipsConduccion.length > 0 && (
+                  <div>
+                    <h4 className="font-semibold mb-3 text-primary">💡 Tips para Conducir la Conversación</h4>
+                    <ul className="space-y-2">
+                      {guiaFeedback.tipsConduccion.map((tip: string, idx: number) => (
+                        <li key={idx} className="flex items-start gap-2 text-sm text-muted-foreground bg-muted/30 p-3 rounded-lg">
+                          <span className="text-primary mt-0.5">→</span>
+                          <span>{tip}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Cierre */}
+                {guiaFeedback.cierre && (
+                  <div>
+                    <h4 className="font-semibold mb-2 text-primary">🎯 Cierre</h4>
+                    <p className="text-sm text-muted-foreground whitespace-pre-wrap bg-muted/30 p-3 rounded-lg">
+                      {guiaFeedback.cierre}
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            )}
+          </Card>
         )}
 
         {/* Feedback Individual y Grupal */}
