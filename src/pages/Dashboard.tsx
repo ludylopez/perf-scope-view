@@ -73,16 +73,26 @@ const getScoreInterpretation = (percentage: number) => {
 // Helper para obtener título amigable de dimensión
 const getDimensionFriendlyTitle = (dimension: any): string => {
   const nombre = dimension.nombre.toLowerCase();
+  
+  // Casos específicos para S2
+  if (nombre.includes("servicio institucional") && nombre.includes("transparencia")) return "Servicio y Transparencia";
+  if (nombre.includes("liderazgo estratégico")) return "Liderazgo Estratégico";
+  if (nombre.includes("gestión") && nombre.includes("toma de decisiones")) return "Gestión y Decisiones";
+  if (nombre.includes("desarrollo") && nombre.includes("aprendizaje")) return "Desarrollo y Aprendizaje";
+  if (nombre.includes("visión institucional")) return "Visión Institucional";
+  
+  // Casos generales
   if (nombre.includes("competencias laborales") && nombre.includes("técnica")) return "Competencias Laborales";
   if (nombre.includes("comportamiento") && nombre.includes("organizacional")) return "Comportamiento Organizacional";
   if (nombre.includes("relaciones interpersonales") || nombre.includes("trabajo en equipo")) return "Relaciones Interpersonales";
   if (nombre.includes("orientación al servicio") || nombre.includes("atención al usuario")) return "Orientación al Servicio";
-  if (nombre.includes("calidad del trabajo")) return "Calidad del Trabajo";
+  if (nombre.includes("calidad del trabajo") || nombre.includes("calidad")) return "Calidad";
   if (nombre.includes("productividad") || nombre.includes("cumplimiento")) return "Productividad";
-  if (nombre.includes("liderazgo") || nombre.includes("dirección")) return "Tu Liderazgo";
-  if (nombre.includes("ciudadan") || nombre.includes("servicio")) return "Tu Servicio al Ciudadano";
-  if (nombre.includes("gestión") && nombre.includes("resultado")) return "Tus Resultados";
-  if (nombre.includes("transparencia") || nombre.includes("ética")) return "Tu Ética y Transparencia";
+  if (nombre.includes("liderazgo") || nombre.includes("dirección")) return "Liderazgo";
+  if (nombre.includes("ciudadan") || nombre.includes("servicio")) return "Servicio al Ciudadano";
+  if (nombre.includes("gestión") && nombre.includes("resultado")) return "Gestión de Resultados";
+  if (nombre.includes("transparencia") || nombre.includes("ética")) return "Ética y Transparencia";
+  
   return dimension.nombre.length > 40 ? dimension.nombre.substring(0, 40) + "..." : dimension.nombre;
 };
 
