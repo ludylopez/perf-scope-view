@@ -1111,6 +1111,8 @@ const VistaComparativa = () => {
                 </CardContent>
               </Card>
             )}
+          </div>
+        )}
 
             {/* Recomendaciones */}
             {planDesarrollo.recomendaciones && Array.isArray(planDesarrollo.recomendaciones) && planDesarrollo.recomendaciones.length > 0 && (
@@ -1130,8 +1132,8 @@ const VistaComparativa = () => {
                 </CardContent>
               </Card>
             )}
-                </>
-              )}
+              </>
+            )}
           </TabsContent>
 
           {/* Tab: Retroalimentación */}
