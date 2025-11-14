@@ -513,26 +513,91 @@ Deno.serve(async (req: Request): Promise<Response> => {
       recomendaciones: planData.recomendaciones || [],
     };
 
-    const { data: planInserted, error: planError } = await supabase
+    // Primero verificar si ya existe un plan para este colaborador y período
+    const { data: existingPlans, error: checkError } = await supabase
       .from("development_plans")
-      .insert({
-        evaluacion_id: evaluacionJefe.id,
-        colaborador_id: colaborador_id,
-        periodo_id: periodo_id,
-        competencias_desarrollar: planCompleto, // Guardamos toda la estructura aquí
-        feedback_individual: null, // No se genera aquí, se genera por separado
-        feedback_grupal: null, // No se genera aquí, se genera por separado
-        generado_por_ia: true, // Marcar como generado por IA
-        editable: true,
-      })
-      .select("*")
-      .single();
+      .select("id")
+      .eq("colaborador_id", colaborador_id)
+      .eq("periodo_id", periodo_id)
+      .order("created_at", { ascending: false })
+      .limit(1);
 
-    if (planError) {
+    if (checkError) {
+      console.error("Error verificando planes existentes:", checkError);
       return new Response(
-        JSON.stringify({ success: false, error: `Error guardando plan: ${planError.message}` }),
+        JSON.stringify({ success: false, error: `Error verificando planes existentes: ${checkError.message}` }),
         { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
       );
+    }
+
+    let planInserted;
+    
+    if (existingPlans && existingPlans.length > 0) {
+      // Si existe un plan, actualizarlo (UPSERT)
+      console.log(`Actualizando plan existente: ${existingPlans[0].id}`);
+      
+      // Primero eliminar todos los planes antiguos para este colaborador y período
+      const { error: deleteError } = await supabase
+        .from("development_plans")
+        .delete()
+        .eq("colaborador_id", colaborador_id)
+        .eq("periodo_id", periodo_id);
+
+      if (deleteError) {
+        console.error("Error eliminando planes antiguos:", deleteError);
+        // Continuar de todas formas, intentar insertar el nuevo
+      }
+
+      // Insertar el nuevo plan
+      const { data: newPlan, error: insertError } = await supabase
+        .from("development_plans")
+        .insert({
+          evaluacion_id: evaluacionJefe.id,
+          colaborador_id: colaborador_id,
+          periodo_id: periodo_id,
+          competencias_desarrollar: planCompleto,
+          feedback_individual: null, // No se genera aquí, se genera por separado
+          feedback_grupal: null, // No se genera aquí, se genera por separado
+          generado_por_ia: true,
+          editable: true,
+        })
+        .select("*")
+        .single();
+
+      if (insertError) {
+        return new Response(
+          JSON.stringify({ success: false, error: `Error guardando plan: ${insertError.message}` }),
+          { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
+        );
+      }
+
+      planInserted = newPlan;
+    } else {
+      // Si no existe, crear uno nuevo
+      console.log("Creando nuevo plan");
+      const { data: newPlan, error: insertError } = await supabase
+        .from("development_plans")
+        .insert({
+          evaluacion_id: evaluacionJefe.id,
+          colaborador_id: colaborador_id,
+          periodo_id: periodo_id,
+          competencias_desarrollar: planCompleto,
+          feedback_individual: null, // No se genera aquí, se genera por separado
+          feedback_grupal: null, // No se genera aquí, se genera por separado
+          generado_por_ia: true,
+          editable: true,
+        })
+        .select("*")
+        .single();
+
+      if (insertError) {
+        return new Response(
+          JSON.stringify({ success: false, error: `Error guardando plan: ${insertError.message}` }),
+          { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
+        );
+      }
+
+      planInserted = newPlan;
     }
 
     return new Response(
