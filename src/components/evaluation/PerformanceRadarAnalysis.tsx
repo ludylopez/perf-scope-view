@@ -36,13 +36,16 @@ export const PerformanceRadarAnalysis = ({
   
   // Verificar valores de tuResultado
   if (radarData && radarData.length > 0) {
-    console.log('📊 [PerformanceRadarAnalysis] Valores tuResultado:', radarData.map(d => ({
-      dimension: d.dimension,
-      tuResultado: d.tuResultado,
-      tipo: typeof d.tuResultado,
-      esPorcentaje: d.tuResultado >= 0 && d.tuResultado <= 100,
-      promedioMunicipal: d.promedioMunicipal
-    })));
+    console.log('📊 [PerformanceRadarAnalysis] Valores tuResultado:');
+    radarData.forEach((d, idx) => {
+      console.log(`  Dimensión ${idx + 1} (${d.dimension}):`, {
+        tuResultado: d.tuResultado,
+        tipo: typeof d.tuResultado,
+        esPorcentaje: d.tuResultado >= 0 && d.tuResultado <= 100,
+        promedioMunicipal: d.promedioMunicipal,
+        problema: d.tuResultado < 0 || d.tuResultado > 100 ? '⚠️ NO ES PORCENTAJE' : '✅ Es porcentaje válido'
+      });
+    });
   }
   
   // Validar que hay datos

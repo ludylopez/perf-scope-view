@@ -251,8 +251,18 @@ const Dashboard = () => {
             itemValues: itemValues,
             promedio: promedio,
             porcentaje: porcentaje,
-            verificado: `Promedio ${promedio} → Porcentaje ${porcentaje}%`
+            verificado: `Promedio ${promedio} → Porcentaje ${porcentaje}%`,
+            conversion: `scoreToPercentage(${promedio}) = ${porcentaje}`
           });
+          
+          // Log adicional para verificar la conversión
+          if (porcentaje < 0 || porcentaje > 100) {
+            console.error(`❌ [Dashboard] ERROR: Porcentaje fuera de rango para ${dim.nombre}:`, {
+              promedio,
+              porcentaje,
+              esperado: '0-100'
+            });
+          }
           
           // Asegurar que el porcentaje sea un número válido
           const porcentajeFinal = typeof porcentaje === 'number' && !isNaN(porcentaje) ? porcentaje : 0;
@@ -268,11 +278,15 @@ const Dashboard = () => {
         });
 
         console.log('📊 [Dashboard] RadarData generado:', radarData);
-        console.log('📊 [Dashboard] Verificación de porcentajes:', radarData.map(d => ({
-          dimension: d.dimension,
-          tuEvaluacion: d.tuEvaluacion,
-          esPorcentaje: d.tuEvaluacion >= 0 && d.tuEvaluacion <= 100
-        })));
+        console.log('📊 [Dashboard] Verificación de porcentajes:');
+        radarData.forEach((d, idx) => {
+          console.log(`  Dimensión ${idx + 1} (${d.dimension}):`, {
+            tuEvaluacion: d.tuEvaluacion,
+            tipo: typeof d.tuEvaluacion,
+            esPorcentaje: d.tuEvaluacion >= 0 && d.tuEvaluacion <= 100,
+            puntaje: d.puntaje
+          });
+        });
 
         const sortedDimensions = [...radarData].sort((a, b) => b.tuEvaluacion - a.tuEvaluacion);
         const fortalezas = sortedDimensions.slice(0, 3);
