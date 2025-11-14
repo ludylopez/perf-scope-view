@@ -265,10 +265,54 @@ export const INSTRUMENT_CALCULATION_CONFIGS: Record<string, InstrumentCalculatio
     },
   },
 
+  // Instrumento OTE - Operativos Técnico Especializado
+  OTE: {
+    instrumentId: "OTE",
+    nivel: "OTE",
+    calcularDesempeno: (responses, dimensions) => {
+      // Cálculo estándar con pesos
+      let totalScore = 0;
+      for (const dimension of dimensions) {
+        const itemResponses = dimension.items
+          .map((item: any) => responses[item.id])
+          .filter((v: any) => v !== undefined);
+        if (itemResponses.length === 0) continue;
+
+        const avg = itemResponses.reduce((sum: number, val: number) => sum + val, 0) / itemResponses.length;
+        totalScore += avg * dimension.peso;
+      }
+      return Math.round(totalScore * 100) / 100;
+    },
+    calcularPotencial: (potencialResponses, potencialDimensions) => {
+      let totalScore = 0;
+      for (const dimension of potencialDimensions) {
+        const itemResponses = dimension.items
+          .map((item: any) => potencialResponses[item.id])
+          .filter((v: any) => v !== undefined);
+        if (itemResponses.length === 0) continue;
+
+        const avg = itemResponses.reduce((sum: number, val: number) => sum + val, 0) / itemResponses.length;
+        totalScore += avg * dimension.peso;
+      }
+      return Math.round(totalScore * 100) / 100;
+    },
+    calcularResultadoFinal: (desempenoAuto, desempenoJefe, potencial) => {
+      // OTE usa pesos estándar: 30% autoevaluación + 70% jefe
+      const desempenoFinal = Math.round((desempenoJefe * 0.7 + desempenoAuto * 0.3) * 100) / 100;
+      return { desempenoFinal, potencial };
+    },
+    pesoJefe: 0.7, // Pesos estándar
+    pesoAuto: 0.3,
+    thresholds9Box: {
+      desempeno: { bajo: 3, medio: 4, alto: 4.5 },
+      potencial: { bajo: 3, medio: 4, alto: 4.5 },
+    },
+  },
+
   // Se pueden agregar más instrumentos aquí
   // A2: { ... },
   // S2: { ... },
-  // D1, D2, E2, A4, OTE, OS
+  // D1, D2, E2, A4, OS
 };
 
 /**
