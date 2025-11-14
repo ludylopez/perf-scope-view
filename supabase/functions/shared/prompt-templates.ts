@@ -122,18 +122,20 @@ Genera un Plan de Desarrollo COMPLETO y ESTRUCTURADO en formato JSON con la sigu
 }
 
 🎯 CRITERIOS CLAVE:
-1. **PRIORIZACIÓN**: Las acciones de prioridad "alta" deben enfocarse en las dimensiones más débiles
-2. **ESPECIFICIDAD**: Cada acción debe ser CONCRETA y ACCIONABLE (no genérica)
-3. **REALISMO**: Solo proponer lo que ES VIABLE en el contexto de la Municipalidad de Esquipulas
-4. **FECHAS REALISTAS**: Considerar carga de trabajo y disponibilidad del colaborador
-5. **INDICADORES SIMPLES**: Que se puedan medir sin sistemas complejos
-6. **BALANCE**: Incluir desarrollo técnico Y conductual según necesidad
-7. **LENGUAJE**: Español profesional, sin tecnicismos innecesarios, sin palabras en inglés, en lenguaje sencillo y practico
+1. **PRIORIZACIÓN**: Las acciones de prioridad "alta" deben enfocarse en las dimensiones más débiles Y en los ítems críticos específicos identificados
+2. **ESPECIFICIDAD**: Cada acción debe ser CONCRETA y ACCIONABLE (no genérica). Usa la información de ítems críticos para crear acciones específicas que aborden los puntos exactos donde el colaborador tiene dificultades
+3. **ENFOQUE EN ÍTEMS CRÍTICOS**: El prompt incluye una sección de "ÍTEMS CRÍTICOS" que muestra exactamente qué preguntas/ítems tienen puntuaciones bajas. DEBES usar esta información para generar acciones específicas que aborden esos ítems concretos, no solo la dimensión general
+4. **REALISMO**: Solo proponer lo que ES VIABLE en el contexto de la Municipalidad de Esquipulas
+5. **FECHAS REALISTAS**: Considerar carga de trabajo y disponibilidad del colaborador
+6. **INDICADORES SIMPLES**: Que se puedan medir sin sistemas complejos
+7. **BALANCE**: Incluir desarrollo técnico Y conductual según necesidad
+8. **LENGUAJE**: Español profesional, sin tecnicismos innecesarios, sin palabras en inglés, en lenguaje sencillo y practico
 
 ⚠️ **IMPORTANTE SOBRE EL FORMATO Y PRIORIDADES:**
 1. **PRIMERO Y MÁS IMPORTANTE**: El campo "acciones" DEBE contener AL MENOS 3-7 acciones concretas, específicas y accionables
    - Cada acción debe tener: descripción detallada, responsable claro, fecha realista, recursos identificados, indicador medible, prioridad
-   - Las acciones de prioridad "alta" deben enfocarse en las 3 dimensiones más débiles identificadas
+   - Las acciones de prioridad "alta" deben enfocarse en las 3 dimensiones más débiles identificadas Y en los ítems críticos específicos (puntuación < 3.5)
+   - **CRÍTICO**: Usa la sección "ÍTEMS CRÍTICOS" del prompt para crear acciones que aborden los puntos exactos donde el colaborador tiene dificultades, no solo la dimensión general
    - Las acciones deben ser REALISTAS y APLICABLES al contexto de Esquipulas
    
 2. **SEGUNDO**: El campo "objetivos" debe contener 1-3 objetivos específicos, medibles y alcanzables
@@ -212,7 +214,9 @@ Genera un JSON con esta estructura EXACTA:
 - La guía (preparacion, apertura, tips, preguntas, cierre) es SOLO para el jefe, NO se comparte
 - El feedbackIndividual es para compartir directamente con el colaborador
 - Usa metodología SBI en areasDesarrollo
-- Sé específico con ejemplos concretos
+- **ENFOQUE EN ÍTEMS CRÍTICOS**: El prompt incluye una sección de "ÍTEMS CRÍTICOS" que muestra exactamente qué preguntas/ítems tienen puntuaciones bajas. DEBES usar esta información para ser específico sobre los puntos exactos donde el colaborador tiene dificultades, no solo mencionar la dimensión general
+- Sé específico con ejemplos concretos basados en los ítems críticos identificados
+- Si hay discrepancias significativas entre autoevaluación y evaluación del jefe, menciónalas constructivamente
 - Mantén un tono profesional pero cercano
 
 Responde ÚNICAMENTE con el JSON, sin texto adicional antes o después.`;

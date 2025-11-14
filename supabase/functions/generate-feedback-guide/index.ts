@@ -371,19 +371,45 @@ function buildUserPrompt(data: any): string {
 
   // Construir información detallada
   let detalleEvaluacion = "";
+  let itemsCriticosFeedback: any[] = [];
+  
   if (instrumento.dimensionesDesempeno && Array.isArray(instrumento.dimensionesDesempeno)) {
     instrumento.dimensionesDesempeno.forEach((dim: any) => {
       detalleEvaluacion += `\n**${dim.nombre || "Dimensión"}**\n`;
       if (dim.items && Array.isArray(dim.items)) {
-        dim.items.forEach((item: any) => {
+        // Ordenar ítems por puntuación del jefe (de menor a mayor) para que los más críticos aparezcan primero
+        const itemsConScore = dim.items.map((item: any) => {
           const scoreAuto = autoResponses[item.id] || 0;
           const scoreJefe = jefeResponses[item.id] || 0;
-          detalleEvaluacion += `  - ${item.texto || "Item"}\n`;
-          detalleEvaluacion += `    Auto: ${scoreAuto}/5  |  Jefe: ${scoreJefe}/5\n`;
+          return { item, scoreAuto, scoreJefe };
+        }).sort((a: any, b: any) => a.scoreJefe - b.scoreJefe);
+        
+        itemsConScore.forEach(({ item, scoreAuto, scoreJefe }: any) => {
+          const indicadorCritico = scoreJefe < 3.5 ? ' 🚨' : '';
+          detalleEvaluacion += `  - ${item.texto || "Item"}${indicadorCritico}\n`;
+          detalleEvaluacion += `    Auto: ${scoreAuto}/5  |  Jefe: ${scoreJefe}/5`;
+          if (Math.abs(scoreAuto - scoreJefe) > 0.5) {
+            detalleEvaluacion += `  ⚠️ (Discrepancia)`;
+          }
+          detalleEvaluacion += `\n`;
+          
+          // Agregar a lista de críticos si aplica
+          if (scoreJefe < 3.5) {
+            itemsCriticosFeedback.push({
+              dimension: dim.nombre || "Dimensión",
+              itemTexto: item.texto || "Item",
+              scoreJefe: scoreJefe,
+              scoreAuto: scoreAuto,
+            });
+          }
         });
       }
     });
   }
+  
+  // Ordenar ítems críticos por score del jefe
+  itemsCriticosFeedback.sort((a: any, b: any) => a.scoreJefe - b.scoreJefe);
+  const topItemsCriticosFeedback = itemsCriticosFeedback.slice(0, 10);
 
   // Información de potencial
   let detallePotencial = "";
@@ -421,7 +447,18 @@ ${top3Fuertes.map((d, i) => `${i + 1}. ${d.nombre}: ${d.scoreJefe.toFixed(2)}/5.
 ⚠️ **TOP 3 DIMENSIONES A MEJORAR:**
 ${top3Debiles.map((d, i) => `${i + 1}. ${d.nombre}: ${d.scoreJefe.toFixed(2)}/5.0`).join('\n')}
 
-📝 **DETALLE COMPLETO DE LA EVALUACIÓN:**
+${topItemsCriticosFeedback.length > 0 ? `\n🚨 **ÍTEMS CRÍTICOS QUE REQUIEREN ATENCIÓN INMEDIATA** (puntuación del jefe < 3.5/5.0):
+${topItemsCriticosFeedback.map((item: any, i: number) => {
+  const indicadorDiscrepancia = Math.abs(item.scoreAuto - item.scoreJefe) > 0.5 
+    ? ` ⚠️ Discrepancia: Auto=${item.scoreAuto.toFixed(1)} vs Jefe=${item.scoreJefe.toFixed(1)}` 
+    : '';
+  return `${i + 1}. [${item.dimension}] ${item.itemTexto}: ${item.scoreJefe.toFixed(1)}/5.0${indicadorDiscrepancia}`;
+}).join('\n')}
+
+⚠️ **IMPORTANTE**: Estos ítems específicos son donde el colaborador tiene mayores dificultades. 
+   El feedback debe ser específico sobre estos puntos, no solo sobre la dimensión general.` : ''}
+
+📝 **DETALLE COMPLETO DE LA EVALUACIÓN (ÍTEM POR ÍTEM):**
 ${detalleEvaluacion}
 
 Genera la guía y feedback individual basándote en estos datos específicos de la evaluación.`;

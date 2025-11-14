@@ -175,11 +175,28 @@ Deno.serve(async (req: Request): Promise<Response> => {
           detalleDesempeno += `Score Autoevaluación: ${avgAuto.toFixed(2)}/5.0 (${((avgAuto / 5) * 100).toFixed(1)}%)\n`;
           detalleDesempeno += `Score Evaluación Jefe: ${avgJefe.toFixed(2)}/5.0 (${((avgJefe / 5) * 100).toFixed(1)}%)\n`;
 
+          // Ordenar ítems por puntuación del jefe (de menor a mayor) para que los más críticos aparezcan primero
+          const itemsConScore = dim.items.map((item: any) => {
+            const scoreAuto = typeof autoResponses[item.id] === 'number' ? autoResponses[item.id] : 0;
+            const scoreJefe = typeof jefeResponses[item.id] === 'number' ? jefeResponses[item.id] : 0;
+            return { item, scoreAuto, scoreJefe };
+          }).sort((a: any, b: any) => a.scoreJefe - b.scoreJefe); // Ordenar de menor a mayor
+
+          itemsConScore.forEach(({ item, scoreAuto, scoreJefe }: any) => {
+            const indicadorCritico = scoreJefe < 3.5 ? ' 🚨' : '';
+            detalleDesempeno += `  - ${item.texto || 'Item sin texto'}${indicadorCritico}\n`;
+            detalleDesempeno += `    Autoevaluación: ${scoreAuto}/5  |  Jefe: ${scoreJefe}/5`;
+            if (Math.abs(scoreAuto - scoreJefe) > 0.5) {
+              detalleDesempeno += `  ⚠️ (Discrepancia significativa)`;
+            }
+            detalleDesempeno += `\n`;
+          });
+
           if (autoComments[dim.id]) {
-            detalleDesempeno += `  Comentario del colaborador: ${autoComments[dim.id]}\n`;
+            detalleDesempeno += `  📝 Comentario del colaborador: ${autoComments[dim.id]}\n`;
           }
           if (jefeComments[dim.id]) {
-            detalleDesempeno += `  Comentario del jefe: ${jefeComments[dim.id]}\n`;
+            detalleDesempeno += `  📝 Comentario del jefe: ${jefeComments[dim.id]}\n`;
           }
         });
       }

@@ -68,11 +68,21 @@ function buildUserPrompt(data: any): string {
     detalleDesempeno += `Score Autoevaluación: ${avgAuto.toFixed(2)}/5.0 (${((avgAuto / 5) * 100).toFixed(1)}%)\n`;
     detalleDesempeno += `Score Evaluación Jefe: ${avgJefe.toFixed(2)}/5.0 (${((avgJefe / 5) * 100).toFixed(1)}%)\n`;
 
-    dim.items.forEach((item: any) => {
+    // Ordenar ítems por puntuación del jefe (de menor a mayor) para que los más críticos aparezcan primero
+    const itemsConScore = dim.items.map((item: any) => {
       const scoreAuto = typeof autoResponses[item.id] === 'number' ? autoResponses[item.id] : 0;
       const scoreJefe = typeof jefeResponses[item.id] === 'number' ? jefeResponses[item.id] : 0;
-      detalleDesempeno += `  - ${item.texto || 'Item sin texto'}\n`;
-      detalleDesempeno += `    Autoevaluación: ${scoreAuto}/5  |  Jefe: ${scoreJefe}/5\n`;
+      return { item, scoreAuto, scoreJefe };
+    }).sort((a: any, b: any) => a.scoreJefe - b.scoreJefe); // Ordenar de menor a mayor
+
+    itemsConScore.forEach(({ item, scoreAuto, scoreJefe }: any) => {
+      const indicadorCritico = scoreJefe < 3.5 ? ' 🚨' : '';
+      detalleDesempeno += `  - ${item.texto || 'Item sin texto'}${indicadorCritico}\n`;
+      detalleDesempeno += `    Autoevaluación: ${scoreAuto}/5  |  Jefe: ${scoreJefe}/5`;
+      if (Math.abs(scoreAuto - scoreJefe) > 0.5) {
+        detalleDesempeno += `  ⚠️ (Discrepancia significativa)`;
+      }
+      detalleDesempeno += `\n`;
     });
 
     if (autoComments[dim.id]) {
@@ -135,6 +145,35 @@ function buildUserPrompt(data: any): string {
 
   const top3Debiles = dimensionesConScore.slice(0, 3);
 
+  // Identificar ítems individuales con puntuaciones más bajas (críticos)
+  // Esto ayuda a la IA a ver exactamente dónde está fallando el colaborador dentro de cada dimensión
+  let itemsCriticos: any[] = [];
+  instrumento.dimensionesDesempeno.forEach((dim: any) => {
+    if (!dim.items || !Array.isArray(dim.items)) return;
+    
+    dim.items.forEach((item: any) => {
+      const scoreJefe = typeof jefeResponses[item.id] === 'number' ? jefeResponses[item.id] : 0;
+      const scoreAuto = typeof autoResponses[item.id] === 'number' ? autoResponses[item.id] : 0;
+      
+      // Considerar críticos los ítems con score del jefe < 3.5
+      if (scoreJefe < 3.5) {
+        itemsCriticos.push({
+          dimension: dim.nombre || 'Dimensión sin nombre',
+          itemTexto: item.texto || 'Item sin texto',
+          scoreJefe: scoreJefe,
+          scoreAuto: scoreAuto,
+          diferencia: scoreAuto - scoreJefe, // Para ver si hay discrepancia
+        });
+      }
+    });
+  });
+
+  // Ordenar por score del jefe (de menor a mayor) para priorizar los más críticos
+  itemsCriticos.sort((a: any, b: any) => a.scoreJefe - b.scoreJefe);
+  
+  // Tomar los top 10 más críticos
+  const topItemsCriticos = itemsCriticos.slice(0, 10);
+
   // Obtener fecha actual para usar como referencia
   const fechaActual = new Date();
   const añoActual = fechaActual.getFullYear();
@@ -181,8 +220,19 @@ ${grupos.length > 0 ? `👥 Pertenece a cuadrilla(s): ${grupos.map((g: any) => g
 🎯 TOP 3 DIMENSIONES QUE REQUIEREN MAYOR ATENCIÓN (según evaluación del jefe):
 ${top3Debiles.map((d: any, i: number) => `${i + 1}. ${d.nombre}: ${d.score.toFixed(2)}/5.0 (${((d.score / 5) * 100).toFixed(1)}%)`).join('\n')}
 
+${topItemsCriticos.length > 0 ? `\n🚨 ÍTEMS CRÍTICOS QUE REQUIEREN ATENCIÓN INMEDIATA (puntuación del jefe < 3.5/5.0):
+${topItemsCriticos.map((item: any, i: number) => {
+  const indicadorDiscrepancia = Math.abs(item.diferencia) > 0.5 
+    ? ` ⚠️ Discrepancia: Auto=${item.scoreAuto.toFixed(1)} vs Jefe=${item.scoreJefe.toFixed(1)}` 
+    : '';
+  return `${i + 1}. [${item.dimension}] ${item.itemTexto}: ${item.scoreJefe.toFixed(1)}/5.0${indicadorDiscrepancia}`;
+}).join('\n')}
+
+⚠️ IMPORTANTE: Estos ítems específicos dentro de las dimensiones son donde el colaborador tiene mayores dificultades. 
+   El plan de desarrollo debe incluir acciones concretas para mejorar estos puntos específicos, no solo la dimensión general.` : ''}
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📝 EVALUACIÓN DETALLADA POR DIMENSIÓN
+📝 EVALUACIÓN DETALLADA POR DIMENSIÓN (ÍTEM POR ÍTEM)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ${detalleDesempeno}
 
