@@ -58,6 +58,7 @@ const VistaComparativa = () => {
   const [promedioGrupo, setPromedioGrupo] = useState<number | null>(null);
   const [periodoId, setPeriodoId] = useState<string>("");
   const [mostrarEditarPlan, setMostrarEditarPlan] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>("resumen");
 
   useEffect(() => {
     if (!id || !user) {
@@ -404,61 +405,311 @@ const VistaComparativa = () => {
           </div>
         </div>
 
-        {/* Resultado Final */}
-        <div className="grid gap-6 mb-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Resultado Final</CardTitle>
-              <CardDescription>
-                Resultado ponderado: 70% evaluación jefe + 30% autoevaluación
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 md:grid-cols-4">
-                <div className="text-center p-4 rounded-lg border">
-                  <p className="text-sm text-muted-foreground mb-1">Autoevaluación</p>
-                  <p className="text-3xl font-bold text-primary">
-                    {scoreToPercentage(resultadoFinal.desempenoAuto)}%
-                  </p>
-                </div>
-                <div className="text-center p-4 rounded-lg border">
-                  <p className="text-sm text-muted-foreground mb-1">Evaluación Jefe</p>
-                  <p className="text-3xl font-bold text-accent">
-                    {scoreToPercentage(resultadoFinal.desempenoJefe)}%
-                  </p>
-                </div>
-                <div className="text-center p-4 rounded-lg border bg-primary/5">
-                  <p className="text-sm text-muted-foreground mb-1">Desempeño Final</p>
-                  <p className="text-3xl font-bold text-primary">
-                    {scoreToPercentage(resultadoFinal.desempenoFinal)}%
-                  </p>
-                </div>
-                {resultadoFinal.potencial && (
-                  <div className="text-center p-4 rounded-lg border">
-                    <p className="text-sm text-muted-foreground mb-1">Potencial</p>
-                    <p className="text-3xl font-bold text-success">
-                      {scoreToPercentage(resultadoFinal.potencial)}%
+        {/* Tabs principales para organizar el contenido */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="resumen" className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4" />
+              Resumen
+            </TabsTrigger>
+            <TabsTrigger value="analisis" className="flex items-center gap-2">
+              <TrendingUp className="h-4 w-4" />
+              Análisis
+            </TabsTrigger>
+            <TabsTrigger value="plan" className="flex items-center gap-2">
+              <Target className="h-4 w-4" />
+              Plan de Desarrollo
+            </TabsTrigger>
+            <TabsTrigger value="retroalimentacion" className="flex items-center gap-2">
+              <MessageSquare className="h-4 w-4" />
+              Retroalimentación
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Tab: Resumen */}
+          <TabsContent value="resumen" className="space-y-6 mt-6">
+            {/* Resultado Final */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Resultado Final</CardTitle>
+                <CardDescription>
+                  Resultado ponderado: 70% evaluación jefe + 30% autoevaluación
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-4 md:grid-cols-4">
+                  <div className="text-center p-4 rounded-lg border bg-primary/5">
+                    <p className="text-sm text-muted-foreground mb-1">Autoevaluación</p>
+                    <p className="text-3xl font-bold text-primary">
+                      {scoreToPercentage(resultadoFinal.desempenoAuto)}%
                     </p>
                   </div>
-                )}
-              </div>
-              
-              {resultadoFinal.posicion9Box && (
-                <div className="mt-4 p-4 rounded-lg bg-muted/30">
-                  <p className="text-sm font-medium mb-2">Posición en Matriz 9-Box</p>
-                  <Badge className="text-lg px-4 py-2">
-                    {getNineBoxDescription(resultadoFinal.posicion9Box)}
-                  </Badge>
+                  <div className="text-center p-4 rounded-lg border bg-accent/5">
+                    <p className="text-sm text-muted-foreground mb-1">Evaluación Jefe</p>
+                    <p className="text-3xl font-bold text-accent">
+                      {scoreToPercentage(resultadoFinal.desempenoJefe)}%
+                    </p>
+                  </div>
+                  <div className="text-center p-4 rounded-lg border bg-primary/10">
+                    <p className="text-sm text-muted-foreground mb-1">Desempeño Final</p>
+                    <p className="text-3xl font-bold text-primary">
+                      {scoreToPercentage(resultadoFinal.desempenoFinal)}%
+                    </p>
+                  </div>
+                  {resultadoFinal.potencial && (
+                    <div className="text-center p-4 rounded-lg border bg-success/5">
+                      <p className="text-sm text-muted-foreground mb-1">Potencial</p>
+                      <p className="text-3xl font-bold text-success">
+                        {scoreToPercentage(resultadoFinal.potencial)}%
+                      </p>
+                    </div>
+                  )}
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+                
+                {resultadoFinal.posicion9Box && (
+                  <div className="mt-6 p-4 rounded-lg bg-muted/30 border">
+                    <p className="text-sm font-medium mb-2">Posición en Matriz 9-Box</p>
+                    <Badge className="text-lg px-4 py-2">
+                      {getNineBoxDescription(resultadoFinal.posicion9Box)}
+                    </Badge>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
-        {/* Generar Plan de Desarrollo y Guía de Retroalimentación con IA */}
-        {colaborador && periodoId && (
-          <div className="mb-6">
-            <div className="flex justify-center gap-4 flex-wrap">
+            {/* Acciones Rápidas */}
+            {colaborador && periodoId && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Acciones Rápidas</CardTitle>
+                  <CardDescription>
+                    Genera planes y guías de retroalimentación con IA
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-wrap gap-3">
+                    {!planDesarrollo ? (
+                      <GenerarPlanDesarrollo
+                        colaboradorId={colaborador.dpi}
+                        periodoId={periodoId}
+                        colaboradorNombre={colaborador.nombre}
+                        planExistente={null}
+                        onPlanGenerado={async (plan) => {
+                          try {
+                            const { data: planData, error: planError } = await supabase
+                              .from("development_plans")
+                              .select("*")
+                              .eq("id", plan.id)
+                              .single();
+                            
+                            if (!planError && planData) {
+                              const competencias = planData.competencias_desarrollar || {};
+                              
+                              let planEstructurado = null;
+                              let recomendaciones = [];
+                              
+                              if (typeof competencias === 'object' && competencias !== null) {
+                                if (competencias.acciones && Array.isArray(competencias.acciones)) {
+                                  planEstructurado = {
+                                    objetivos: Array.isArray(competencias.objetivos) ? competencias.objetivos : [],
+                                    acciones: competencias.acciones,
+                                    dimensionesDebiles: Array.isArray(competencias.dimensionesDebiles) ? competencias.dimensionesDebiles : [],
+                                  };
+                                  recomendaciones = Array.isArray(competencias.recomendaciones) ? competencias.recomendaciones : [];
+                                } else if (Array.isArray(competencias.objetivos) && competencias.objetivos.length > 0) {
+                                  planEstructurado = {
+                                    objetivos: competencias.objetivos,
+                                    acciones: [],
+                                    dimensionesDebiles: Array.isArray(competencias.dimensionesDebiles) ? competencias.dimensionesDebiles : [],
+                                  };
+                                  recomendaciones = Array.isArray(competencias.recomendaciones) ? competencias.recomendaciones : [];
+                                }
+                              }
+
+                              setPlanDesarrollo({
+                                id: planData.id,
+                                feedbackIndividual: planData.feedback_individual || "",
+                                feedbackGrupal: planData.feedback_grupal || null,
+                                planEstructurado: planEstructurado,
+                                recomendaciones: recomendaciones,
+                              });
+                              setActiveTab("plan"); // Cambiar a la tab del plan
+                              toast.success("Plan de desarrollo generado. Revisa la pestaña 'Plan de Desarrollo'");
+                            }
+                          } catch (error) {
+                            console.error("Error recargando plan:", error);
+                          }
+                        }}
+                      />
+                    ) : (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="lg"
+                          onClick={() => {
+                            setMostrarEditarPlan(true);
+                            setActiveTab("plan");
+                          }}
+                          className="gap-2"
+                        >
+                          <Edit className="h-4 w-4" />
+                          Editar Plan
+                        </Button>
+                        <GenerarPlanDesarrollo
+                          colaboradorId={colaborador.dpi}
+                          periodoId={periodoId}
+                          colaboradorNombre={colaborador.nombre}
+                          planExistente={planDesarrollo}
+                          onPlanGenerado={async (planNuevo) => {
+                            if (planDesarrollo?.id && planDesarrollo.id !== planNuevo.id) {
+                              try {
+                                await supabase
+                                  .from("development_plans")
+                                  .delete()
+                                  .eq("id", planDesarrollo.id);
+                              } catch (error) {
+                                console.error("Error al eliminar plan anterior:", error);
+                              }
+                            }
+                            try {
+                              const { data: planData, error: planError } = await supabase
+                                .from("development_plans")
+                                .select("*")
+                                .eq("id", planNuevo.id)
+                                .single();
+                              
+                              if (!planError && planData) {
+                                const competencias = planData.competencias_desarrollar || {};
+                                
+                                let planEstructurado = null;
+                                let recomendaciones = [];
+                                
+                                if (typeof competencias === 'object' && competencias !== null) {
+                                  if (competencias.acciones && Array.isArray(competencias.acciones)) {
+                                    planEstructurado = {
+                                      objetivos: Array.isArray(competencias.objetivos) ? competencias.objetivos : [],
+                                      acciones: competencias.acciones,
+                                      dimensionesDebiles: Array.isArray(competencias.dimensionesDebiles) ? competencias.dimensionesDebiles : [],
+                                    };
+                                    recomendaciones = Array.isArray(competencias.recomendaciones) ? competencias.recomendaciones : [];
+                                  }
+                                }
+
+                                setPlanDesarrollo({
+                                  id: planData.id,
+                                  feedbackIndividual: planData.feedback_individual || "",
+                                  feedbackGrupal: planData.feedback_grupal || null,
+                                  planEstructurado: planEstructurado,
+                                  recomendaciones: recomendaciones,
+                                });
+                                setActiveTab("plan");
+                                toast.success("Plan regenerado. Revisa la pestaña 'Plan de Desarrollo'");
+                              }
+                            } catch (error) {
+                              console.error("Error recargando plan:", error);
+                            }
+                          }}
+                        />
+                      </>
+                    )}
+                    <GenerarGuiaRetroalimentacion
+                      colaboradorId={colaborador.dpi}
+                      periodoId={periodoId}
+                      colaboradorNombre={colaborador.nombre}
+                      onGuiaGenerada={async () => {
+                        try {
+                          const { data: guiaData, error: guiaError } = await supabase
+                            .from("feedback_guides")
+                            .select("*")
+                            .eq("colaborador_id", colaborador.dpi)
+                            .eq("periodo_id", periodoId)
+                            .eq("tipo", "individual")
+                            .order("created_at", { ascending: false })
+                            .limit(1)
+                            .maybeSingle();
+
+                          if (!guiaError && guiaData) {
+                            setGuiaFeedback({
+                              id: guiaData.id,
+                              preparacion: guiaData.preparacion || "",
+                              apertura: guiaData.apertura || "",
+                              fortalezas: guiaData.fortalezas || [],
+                              areasDesarrollo: guiaData.areas_desarrollo || [],
+                              preguntasDialogo: guiaData.preguntas_dialogo || [],
+                              tipsConduccion: guiaData.tips_conduccion || [],
+                              cierre: guiaData.cierre || "",
+                              fechaGeneracion: guiaData.fecha_generacion,
+                            });
+                            setActiveTab("retroalimentacion");
+                            toast.success("Guía generada. Revisa la pestaña 'Retroalimentación'");
+                          }
+                        } catch (error) {
+                          console.error("Error recargando guía:", error);
+                        }
+                      }}
+                    />
+                    {perteneceCuadrilla && (
+                      <GenerarFeedbackGrupal
+                        colaboradorId={colaborador.dpi}
+                        periodoId={periodoId}
+                        colaboradorNombre={colaborador.nombre}
+                      />
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Toggle Individual/Grupal */}
+            {perteneceCuadrilla && gruposColaborador.length > 0 && (
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Users2 className="h-5 w-5 text-info" />
+                      <div>
+                        <p className="font-medium">Vista de Comparación</p>
+                        <p className="text-sm text-muted-foreground">
+                          Este colaborador pertenece a {gruposColaborador.length} cuadrilla{gruposColaborador.length > 1 ? 's' : ''}: {gruposColaborador.map(g => g.nombre).join(', ')}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 border rounded-lg p-1">
+                      <Button
+                        variant={vistaModo === "individual" ? "default" : "ghost"}
+                        size="sm"
+                        onClick={() => setVistaModo("individual")}
+                      >
+                        <User className="mr-2 h-4 w-4" />
+                        Individual
+                      </Button>
+                      <Button
+                        variant={vistaModo === "grupal" ? "default" : "ghost"}
+                        size="sm"
+                        onClick={() => setVistaModo("grupal")}
+                      >
+                        <Users2 className="mr-2 h-4 w-4" />
+                        Grupal
+                      </Button>
+                    </div>
+                  </div>
+                  {promedioGrupo !== null && (
+                    <div className="mt-4 p-3 bg-info/10 border border-info/20 rounded-lg">
+                      <p className="text-sm">
+                        <strong>Promedio del Equipo:</strong> {Math.round(promedioGrupo)}% 
+                        <span className="text-muted-foreground ml-2">
+                          (Comparar con el desempeño individual del colaborador: {scoreToPercentage(resultadoFinal.desempenoFinal)}%)
+                        </span>
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          {/* Tab: Análisis */}
+          <TabsContent value="analisis" className="space-y-6 mt-6">
               {!planDesarrollo ? (
                 <>
                   <GenerarPlanDesarrollo
