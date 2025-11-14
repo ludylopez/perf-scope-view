@@ -184,11 +184,29 @@ const Dashboard = () => {
 
     const loadResultadosData = async () => {
       try {
+        console.log('🔍 [Dashboard] Iniciando carga de resultados para:', { dpi: user.dpi, nivel: user.nivel, periodo: activePeriodId });
+        
         const instrument = await getInstrumentForUser(user.nivel);
-        if (!instrument) return;
+        if (!instrument) {
+          console.error('❌ [Dashboard] No se encontró instrumento para nivel:', user.nivel);
+          return;
+        }
+        console.log('✅ [Dashboard] Instrumento cargado:', { 
+          id: instrument.id, 
+          nombre: instrument.nombre,
+          dimensionesDesempeno: instrument.dimensionesDesempeno?.length || 0 
+        });
 
         const submitted = await getSubmittedEvaluation(user.dpi, activePeriodId);
-        if (!submitted) return;
+        if (!submitted) {
+          console.warn('⚠️ [Dashboard] No se encontró autoevaluación enviada para:', { dpi: user.dpi, periodo: activePeriodId });
+          return;
+        }
+        console.log('✅ [Dashboard] Autoevaluación encontrada:', { 
+          id: submitted.id, 
+          respuestasCount: Object.keys(submitted.responses || {}).length,
+          respuestas: submitted.responses 
+        });
 
         const jefeId = await getColaboradorJefe(user.dpi);
         let jefeCompleto = false;
@@ -196,25 +214,56 @@ const Dashboard = () => {
 
         if (jefeId) {
           jefeCompleto = await hasJefeEvaluation(jefeId, user.dpi, activePeriodId);
+          console.log('📊 [Dashboard] Estado evaluación jefe:', { jefeId, jefeCompleto });
           if (jefeCompleto) {
             const jefeEval = await getJefeEvaluationDraft(jefeId, user.dpi, activePeriodId);
             if (jefeEval) {
               responsesToUse = calculateConsolidatedResponses(submitted.responses, jefeEval.responses);
+              console.log('✅ [Dashboard] Usando respuestas consolidadas:', { 
+                autoCount: Object.keys(submitted.responses).length,
+                jefeCount: Object.keys(jefeEval.responses).length,
+                consolidadasCount: Object.keys(responsesToUse).length
+              });
             }
           }
         }
 
+        console.log('📊 [Dashboard] Respuestas a usar:', { 
+          count: Object.keys(responsesToUse).length,
+          sample: Object.entries(responsesToUse).slice(0, 5)
+        });
+
         const performanceScore = calculatePerformanceScore(responsesToUse, instrument.dimensionesDesempeno);
         const performancePercentage = scoreToPercentage(performanceScore);
+        console.log('📊 [Dashboard] Score calculado:', { performanceScore, performancePercentage });
 
-        const radarData = instrument.dimensionesDesempeno.map((dim, idx) => ({
-          dimension: getDimensionFriendlyTitle(dim),
-          nombreCompleto: dim.nombre,
-          numero: idx + 1,
-          tuEvaluacion: calculateDimensionPercentage(responsesToUse, dim),
-          puntaje: calculateDimensionAverage(responsesToUse, dim),
-          dimensionData: dim
-        }));
+        const radarData = instrument.dimensionesDesempeno.map((dim, idx) => {
+          const porcentaje = calculateDimensionPercentage(responsesToUse, dim);
+          const promedio = calculateDimensionAverage(responsesToUse, dim);
+          
+          // Log detallado para cada dimensión
+          const itemIds = dim.items.map(item => item.id);
+          const itemValues = itemIds.map(id => responsesToUse[id]).filter(v => v !== undefined);
+          console.log(`📊 [Dashboard] Dimensión ${idx + 1} (${dim.nombre}):`, {
+            id: dim.id,
+            itemsCount: dim.items.length,
+            itemIds: itemIds,
+            itemValues: itemValues,
+            promedio: promedio,
+            porcentaje: porcentaje
+          });
+          
+          return {
+            dimension: getDimensionFriendlyTitle(dim),
+            nombreCompleto: dim.nombre,
+            numero: idx + 1,
+            tuEvaluacion: porcentaje,
+            puntaje: promedio,
+            dimensionData: dim
+          };
+        });
+
+        console.log('📊 [Dashboard] RadarData generado:', radarData);
 
         const sortedDimensions = [...radarData].sort((a, b) => b.tuEvaluacion - a.tuEvaluacion);
         const fortalezas = sortedDimensions.slice(0, 3);

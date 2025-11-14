@@ -26,6 +26,36 @@ export const PerformanceRadarAnalysis = ({
   description = "Vista integral de tu desempeño por dimensión comparado con el promedio municipal"
 }: PerformanceRadarAnalysisProps) => {
   
+  // Log para debug
+  console.log('📊 [PerformanceRadarAnalysis] Datos recibidos:', {
+    radarDataLength: radarData?.length || 0,
+    radarData: radarData,
+    dimensionAnalysisLength: dimensionAnalysis?.length || 0,
+    dimensionAnalysis: dimensionAnalysis
+  });
+  
+  // Validar que hay datos
+  if (!radarData || radarData.length === 0) {
+    console.warn('⚠️ [PerformanceRadarAnalysis] No hay datos para mostrar en el radar');
+    return (
+      <Card className="overflow-hidden border-2">
+        <CardHeader className="bg-gradient-to-r from-primary/5 via-accent/5 to-primary/5">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-primary" />
+            <CardTitle className="text-xl">{title}</CardTitle>
+          </div>
+          <CardDescription>{description}</CardDescription>
+        </CardHeader>
+        <CardContent className="p-8">
+          <div className="text-center text-muted-foreground py-8">
+            <p className="font-medium mb-2">No hay datos disponibles para mostrar</p>
+            <p className="text-sm">Asegúrate de haber completado tu autoevaluación.</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+  
   // Ordenar dimensiones: primero fortalezas (descendente), luego oportunidades (ascendente)
   const sortedDimensions = [...dimensionAnalysis].sort((a, b) => {
     if (a.isFortaleza && !b.isFortaleza) return -1;
