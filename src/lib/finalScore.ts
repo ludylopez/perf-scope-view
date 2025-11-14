@@ -3,15 +3,18 @@ import { EvaluationDraft } from "@/lib/storage";
 import { calculatePerformanceScore, scoreToPercentage } from "@/lib/calculations";
 import { calculatePotencialScore } from "./groupStats";
 import { callCalculateFinalResult } from "./backendCalculations";
+import { getInstrumentCalculationConfig } from "./instrumentCalculations";
 
 /**
- * Calcula el resultado final ponderado: 70% jefe + 30% colaborador
+ * Calcula el resultado final ponderado
+ * Intenta usar los pesos del instrumento si están disponibles, sino usa 70% jefe + 30% colaborador por defecto
  * Retorna tanto los scores (1-5) como los porcentajes (0-100%)
  */
 export const calculateFinalScore = (
   autoevaluacion: EvaluationDraft,
   evaluacionJefe: EvaluationDraft,
-  dimensions: Dimension[]
+  dimensions: Dimension[],
+  instrumentId?: string
 ): FinalScore => {
   // Calcular desempeño de autoevaluación (score 1-5)
   const desempenoAuto = calculatePerformanceScore(autoevaluacion.responses, dimensions);
@@ -19,8 +22,25 @@ export const calculateFinalScore = (
   // Calcular desempeño del jefe (score 1-5)
   const desempenoJefe = calculatePerformanceScore(evaluacionJefe.responses, dimensions);
   
-  // Calcular resultado final ponderado (70% jefe + 30% colaborador) - score 1-5
-  const desempenoFinal = Math.round((desempenoJefe * 0.7 + desempenoAuto * 0.3) * 100) / 100;
+  // Intentar obtener pesos del instrumento si está disponible
+  let pesoJefe = 0.7; // Por defecto
+  let pesoAuto = 0.3; // Por defecto
+  
+  if (instrumentId) {
+    try {
+      const instrumentConfig = getInstrumentCalculationConfig(instrumentId);
+      if (instrumentConfig?.pesoJefe && instrumentConfig?.pesoAuto) {
+        pesoJefe = instrumentConfig.pesoJefe;
+        pesoAuto = instrumentConfig.pesoAuto;
+        console.log(`📊 [FinalScore] Usando pesos del instrumento ${instrumentId}:`, { pesoJefe, pesoAuto });
+      }
+    } catch (error) {
+      console.warn(`⚠️ [FinalScore] No se pudo obtener configuración del instrumento ${instrumentId}, usando pesos por defecto`);
+    }
+  }
+  
+  // Calcular resultado final ponderado - score 1-5
+  const desempenoFinal = Math.round((desempenoJefe * pesoJefe + desempenoAuto * pesoAuto) * 100) / 100;
   
   // Calcular potencial (solo del jefe) - score 1-5
   let potencial: number | undefined;
@@ -112,6 +132,18 @@ export const calculateCompleteFinalScore = async (
   evaluacionJefeId?: string,
   instrumentConfig?: any
 ): Promise<FinalScore> => {
+  const logPrefix = "📊 [FinalScore]";
+  
+  // Validar inputs básicos
+  if (!autoevaluacion || !evaluacionJefe || !dimensions || dimensions.length === 0) {
+    console.error(`${logPrefix} ❌ Datos inválidos:`, {
+      tieneAutoevaluacion: !!autoevaluacion,
+      tieneEvaluacionJefe: !!evaluacionJefe,
+      numDimensiones: dimensions?.length || 0,
+    });
+    throw new Error("Datos de evaluación incompletos");
+  }
+
   // Intentar usar backend si tenemos los IDs y la configuración
   if (
     useBackend &&
@@ -119,6 +151,14 @@ export const calculateCompleteFinalScore = async (
     evaluacionJefeId &&
     instrumentConfig
   ) {
+    console.log(`${logPrefix} Intentando cálculo desde backend...`, {
+      autoevaluacionId,
+      evaluacionJefeId,
+      instrumentId: instrumentConfig?.id || instrumentConfig?.nivel || "desconocido",
+      numDimensiones: dimensions.length,
+      numPotencialDimensions: potencialDimensions?.length || 0,
+    });
+
     try {
       const backendResult = await callCalculateFinalResult(
         autoevaluacionId,
@@ -127,15 +167,52 @@ export const calculateCompleteFinalScore = async (
       );
 
       if (backendResult) {
+        console.log(`${logPrefix} ✅ Resultado obtenido desde backend:`, {
+          desempenoFinal: backendResult.desempenoFinal,
+          posicion9Box: backendResult.posicion9Box,
+        });
         return backendResult;
+      } else {
+        console.warn(`${logPrefix} ⚠️ Backend retornó null, usando cálculo local como fallback`);
       }
     } catch (error) {
-      console.warn("Error al calcular en backend, usando cálculo local:", error);
+      console.warn(`${logPrefix} ⚠️ Error al calcular en backend, usando cálculo local:`, {
+        error: error instanceof Error ? error.message : String(error),
+        autoevaluacionId,
+        evaluacionJefeId,
+      });
     }
+  } else {
+    const razonFallback = !useBackend 
+      ? "useBackend=false" 
+      : !autoevaluacionId 
+        ? "falta autoevaluacionId" 
+        : !evaluacionJefeId 
+          ? "falta evaluacionJefeId" 
+          : !instrumentConfig 
+            ? "falta instrumentConfig" 
+            : "desconocido";
+    
+    console.log(`${logPrefix} Usando cálculo local (${razonFallback})`, {
+      useBackend,
+      tieneAutoevaluacionId: !!autoevaluacionId,
+      tieneEvaluacionJefeId: !!evaluacionJefeId,
+      tieneInstrumentConfig: !!instrumentConfig,
+    });
   }
 
   // Fallback a cálculo local
-  const resultado = calculateFinalScore(autoevaluacion, evaluacionJefe, dimensions);
+  console.log(`${logPrefix} Calculando localmente...`);
+  
+  // Intentar obtener el ID del instrumento desde la configuración si está disponible
+  const instrumentId = instrumentConfig?.id || instrumentConfig?.nivel;
+  
+  const resultado = calculateFinalScore(
+    autoevaluacion, 
+    evaluacionJefe, 
+    dimensions,
+    instrumentId // Pasar ID del instrumento para usar pesos correctos
+  );
   
   // Si hay dimensiones de potencial, calcular correctamente
   if (potencialDimensions && evaluacionJefe.evaluacionPotencial?.responses) {
@@ -148,9 +225,19 @@ export const calculateCompleteFinalScore = async (
   // Calcular 9-box usando los scores (la función internamente los convierte a porcentajes)
   const posicion9Box = calculateNineBoxPosition(resultado.desempenoFinal, resultado.potencial);
   
-  return {
+  const resultadoFinal = {
     ...resultado,
     posicion9Box,
   };
+
+  console.log(`${logPrefix} ✅ Resultado calculado localmente:`, {
+    desempenoAuto: resultadoFinal.desempenoAuto,
+    desempenoJefe: resultadoFinal.desempenoJefe,
+    desempenoFinal: resultadoFinal.desempenoFinal,
+    potencial: resultadoFinal.potencial,
+    posicion9Box: resultadoFinal.posicion9Box,
+  });
+  
+  return resultadoFinal;
 };
 

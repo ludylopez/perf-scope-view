@@ -10,6 +10,13 @@ export const callCalculateFinalResult = async (
   evaluacionJefeId: string,
   instrumentConfig: any
 ): Promise<FinalScore | null> => {
+  console.log("🔧 [Backend] Iniciando cálculo desde backend:", {
+    autoevaluacionId,
+    evaluacionJefeId,
+    instrumentId: instrumentConfig?.id || instrumentConfig?.nivel || "desconocido",
+    tieneConfiguracion: !!instrumentConfig,
+  });
+
   try {
     const { data, error } = await supabase.rpc("calculate_complete_final_result", {
       autoevaluacion_id: autoevaluacionId,
@@ -18,24 +25,53 @@ export const callCalculateFinalResult = async (
     });
 
     if (error) {
-      console.error("Error calling calculate_complete_final_result:", error);
+      console.error("❌ [Backend] Error en calculate_complete_final_result:", {
+        error: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+        autoevaluacionId,
+        evaluacionJefeId,
+      });
       return null;
     }
 
     if (!data) {
+      console.warn("⚠️ [Backend] calculate_complete_final_result retornó null/undefined");
+      return null;
+    }
+
+    // Validar que los datos sean correctos
+    if (typeof data.desempenoFinal !== 'number' || isNaN(data.desempenoFinal)) {
+      console.error("❌ [Backend] Resultado inválido: desempenoFinal no es un número válido", data);
       return null;
     }
 
     // Convertir resultado JSONB a FinalScore
-    return {
+    const resultado: FinalScore = {
       desempenoAuto: data.desempenoAuto,
       desempenoJefe: data.desempenoJefe,
       desempenoFinal: data.desempenoFinal,
       potencial: data.potencial,
       posicion9Box: data.posicion9Box,
     };
+
+    console.log("✅ [Backend] Cálculo exitoso:", {
+      desempenoAuto: resultado.desempenoAuto,
+      desempenoJefe: resultado.desempenoJefe,
+      desempenoFinal: resultado.desempenoFinal,
+      potencial: resultado.potencial,
+      posicion9Box: resultado.posicion9Box,
+    });
+
+    return resultado;
   } catch (error) {
-    console.error("Error in callCalculateFinalResult:", error);
+    console.error("❌ [Backend] Excepción en callCalculateFinalResult:", {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      autoevaluacionId,
+      evaluacionJefeId,
+    });
     return null;
   }
 };
@@ -159,19 +195,47 @@ export const getInstrumentConfigFromBackend = async (
 export const getInstrumentConfigForUser = async (
   userDpi: string
 ): Promise<any | null> => {
+  console.log("🔍 [Backend] Obteniendo configuración de instrumento para usuario:", userDpi);
+  
   try {
     const { data, error } = await supabase.rpc("get_instrument_config_from_user", {
       user_dpi: userDpi,
     });
 
     if (error) {
-      console.error("Error calling get_instrument_config_from_user:", error);
+      console.error("❌ [Backend] Error obteniendo configuración de instrumento:", {
+        error: error.message,
+        code: error.code,
+        userDpi,
+      });
       return null;
     }
 
+    if (!data) {
+      console.warn("⚠️ [Backend] No se encontró configuración de instrumento para:", userDpi);
+      return null;
+    }
+
+    // Validar estructura básica
+    if (!data.id && !data.nivel) {
+      console.error("❌ [Backend] Configuración de instrumento inválida (falta id/nivel):", data);
+      return null;
+    }
+
+    console.log("✅ [Backend] Configuración obtenida:", {
+      instrumentId: data.id || data.nivel,
+      nivel: data.nivel,
+      tieneDimensionesDesempeno: !!data.dimensionesDesempeno,
+      numDimensiones: Array.isArray(data.dimensionesDesempeno) ? data.dimensionesDesempeno.length : 0,
+      configuracion_calculo: data.configuracion_calculo,
+    });
+
     return data;
   } catch (error) {
-    console.error("Error in getInstrumentConfigForUser:", error);
+    console.error("❌ [Backend] Excepción en getInstrumentConfigForUser:", {
+      error: error instanceof Error ? error.message : String(error),
+      userDpi,
+    });
     return null;
   }
 };

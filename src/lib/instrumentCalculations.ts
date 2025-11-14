@@ -185,11 +185,25 @@ export const INSTRUMENT_CALCULATION_CONFIGS: Record<string, InstrumentCalculatio
 
 /**
  * Obtiene la configuración de cálculo para un instrumento
+ * Si no se encuentra, retorna la configuración de A1 como fallback
  */
 export const getInstrumentCalculationConfig = (
   instrumentId: string
 ): InstrumentCalculationConfig => {
-  return INSTRUMENT_CALCULATION_CONFIGS[instrumentId] || INSTRUMENT_CALCULATION_CONFIGS.A1;
+  // Intentar por ID completo primero (ej: "A1_2025_V1")
+  const byFullId = Object.values(INSTRUMENT_CALCULATION_CONFIGS).find(
+    config => config.instrumentId === instrumentId
+  );
+  if (byFullId) return byFullId;
+  
+  // Intentar por ID corto (ej: "A1")
+  if (INSTRUMENT_CALCULATION_CONFIGS[instrumentId]) {
+    return INSTRUMENT_CALCULATION_CONFIGS[instrumentId];
+  }
+  
+  // Fallback a A1
+  console.warn(`⚠️ [InstrumentCalculations] Instrumento ${instrumentId} no encontrado, usando A1 como fallback`);
+  return INSTRUMENT_CALCULATION_CONFIGS.A1;
 };
 
 /**
