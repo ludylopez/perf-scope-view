@@ -247,12 +247,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
       fechaGeneracion: new Date().toISOString(),
     };
 
-    // 9. Guardar guía en tabla feedback_guides
+    // 9. Guardar guía en tabla feedback_guides (tipo "individual")
     const { data: guiaInsertada, error: errorGuia } = await supabase
       .from("feedback_guides")
       .insert({
         colaborador_id: colaborador_id,
         periodo_id: periodo_id,
+        tipo: "individual",
         preparacion: guia.preparacion,
         apertura: guia.apertura,
         fortalezas: guia.fortalezas,
