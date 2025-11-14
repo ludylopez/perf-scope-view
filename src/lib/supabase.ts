@@ -468,3 +468,41 @@ export const getEvaluationFromSupabase = async (
     return null;
   }
 };
+
+// OBTENER ID DE EVALUACIÓN DESDE SUPABASE
+export const getEvaluationIdFromSupabase = async (
+  usuarioId: string,
+  periodoId: string,
+  tipo: "auto" | "jefe",
+  evaluadorId?: string,
+  colaboradorId?: string
+): Promise<string | null> => {
+  if (!isSupabaseAvailable()) return null;
+  
+  // Validar que periodoId sea un UUID válido
+  if (!isValidUUID(periodoId)) {
+    console.warn('⚠️ periodoId inválido en getEvaluationIdFromSupabase:', periodoId);
+    return null;
+  }
+  
+  try {
+    let query = supabase
+      .from('evaluations')
+      .select('id')
+      .eq('usuario_id', usuarioId)
+      .eq('periodo_id', periodoId)
+      .eq('tipo', tipo);
+    
+    if (tipo === 'jefe' && evaluadorId && colaboradorId) {
+      query = query.eq('evaluador_id', evaluadorId).eq('colaborador_id', colaboradorId);
+    }
+    
+    const { data, error } = await query.maybeSingle();
+    
+    if (error || !data) return null;
+    
+    return data.id;
+  } catch {
+    return null;
+  }
+};

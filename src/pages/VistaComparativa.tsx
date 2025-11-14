@@ -17,8 +17,9 @@ import { getNineBoxDescription, calculateCompleteFinalScore } from "@/lib/finalS
 import { scoreToPercentage } from "@/lib/calculations";
 import { perteneceACuadrilla, getGruposDelColaborador, getEquipoStats } from "@/lib/jerarquias";
 import { supabase } from "@/integrations/supabase/client";
-import { getActivePeriod } from "@/lib/supabase";
+import { getActivePeriod, getEvaluationIdFromSupabase } from "@/lib/supabase";
 import { getFinalResultFromSupabase } from "@/lib/finalResultSupabase";
+import { getInstrumentConfigForUser } from "@/lib/backendCalculations";
 import { GenerarPlanDesarrollo } from "@/components/development/GenerarPlanDesarrollo";
 import { GenerarGuiaRetroalimentacion } from "@/components/development/GuiaRetroalimentacion";
 import { GenerarFeedbackGrupal } from "@/components/development/GenerarFeedbackGrupal";
@@ -321,16 +322,68 @@ const VistaComparativa = () => {
         // Intentar cargar resultado final desde Supabase primero (calculado por trigger)
         let resultado = await getFinalResultFromSupabase(colaboradorFormatted.dpi, currentPeriodoId);
         
-        // Si no existe en Supabase, calcularlo localmente
+        // Si no existe en Supabase, intentar calcularlo desde el backend
         if (!resultado) {
-          console.log('📊 Resultado final no encontrado en Supabase, calculando localmente...');
-          // IMPORTANTE: calculateCompleteFinalScore es async, necesitamos await
-          resultado = await calculateCompleteFinalScore(
-            auto,
-            jefe,
-            userInstrument.dimensionesDesempeno,
-            userInstrument.dimensionesPotencial
+          console.log('📊 Resultado final no encontrado en Supabase, intentando calcular desde backend...');
+          
+          // Obtener IDs de las evaluaciones
+          const autoevaluacionId = await getEvaluationIdFromSupabase(
+            colaboradorFormatted.dpi,
+            currentPeriodoId,
+            "auto"
           );
+          const evaluacionJefeId = await getEvaluationIdFromSupabase(
+            colaboradorFormatted.dpi,
+            currentPeriodoId,
+            "jefe",
+            user.dpi,
+            colaboradorFormatted.dpi
+          );
+          
+          // Obtener configuración del instrumento desde el backend
+          const instrumentConfig = await getInstrumentConfigForUser(colaboradorFormatted.dpi);
+          
+          // Si tenemos todos los datos necesarios, intentar calcular desde backend
+          if (autoevaluacionId && evaluacionJefeId && instrumentConfig) {
+            console.log('✅ Datos completos para cálculo en backend, intentando calcular...');
+            try {
+              resultado = await calculateCompleteFinalScore(
+                auto,
+                jefe,
+                userInstrument.dimensionesDesempeno,
+                userInstrument.dimensionesPotencial,
+                true, // useBackend
+                autoevaluacionId,
+                evaluacionJefeId,
+                instrumentConfig
+              );
+              console.log('✅ Resultado calculado desde backend:', resultado);
+            } catch (error) {
+              console.warn('⚠️ Error al calcular desde backend, usando cálculo local:', error);
+              // Fallback a cálculo local
+              resultado = await calculateCompleteFinalScore(
+                auto,
+                jefe,
+                userInstrument.dimensionesDesempeno,
+                userInstrument.dimensionesPotencial,
+                false // useBackend = false
+              );
+            }
+          } else {
+            console.warn('⚠️ Faltan datos para cálculo en backend, usando cálculo local:', {
+              autoevaluacionId: !!autoevaluacionId,
+              evaluacionJefeId: !!evaluacionJefeId,
+              instrumentConfig: !!instrumentConfig
+            });
+            // Fallback a cálculo local
+            resultado = await calculateCompleteFinalScore(
+              auto,
+              jefe,
+              userInstrument.dimensionesDesempeno,
+              userInstrument.dimensionesPotencial,
+              false // useBackend = false
+            );
+          }
         } else {
           console.log('✅ Resultado final cargado desde Supabase:', resultado);
         }

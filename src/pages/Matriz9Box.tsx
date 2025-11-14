@@ -8,12 +8,13 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Grid3x3, Users, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { getActivePeriod } from "@/lib/supabase";
+import { getActivePeriod, getEvaluationIdFromSupabase } from "@/lib/supabase";
 import { calculateCompleteFinalScore, getNineBoxDescription } from "@/lib/finalScore";
 import { getInstrumentForUser } from "@/lib/instruments";
 import { scoreToPercentage } from "@/lib/calculations";
 import { getFinalResultFromSupabase } from "@/lib/finalResultSupabase";
 import { hasJefeEvaluation, getJefeEvaluationDraft, getSubmittedEvaluation } from "@/lib/storage";
+import { getInstrumentConfigForUser } from "@/lib/backendCalculations";
 
 interface TeamMember9Box {
   dpi: string;
@@ -131,13 +132,54 @@ const Matriz9Box = () => {
           const instrument = await getInstrumentForUser(colaborador.nivel);
           if (!instrument) continue;
 
-          // Calcular resultado final
-          resultadoFinal = await calculateCompleteFinalScore(
-            autoevaluacion,
-            evaluacionJefe,
-            instrument.dimensionesDesempeno,
-            instrument.dimensionesPotencial
+          // Obtener IDs de las evaluaciones y configuración del instrumento
+          const autoevaluacionId = await getEvaluationIdFromSupabase(
+            colaboradorDpi,
+            periodoId,
+            "auto"
           );
+          const evaluacionJefeId = await getEvaluationIdFromSupabase(
+            colaboradorDpi,
+            periodoId,
+            "jefe",
+            user.dpi,
+            colaboradorDpi
+          );
+          const instrumentConfig = await getInstrumentConfigForUser(colaboradorDpi);
+
+          // Calcular resultado final (intentar backend primero, fallback a local)
+          if (autoevaluacionId && evaluacionJefeId && instrumentConfig) {
+            try {
+              resultadoFinal = await calculateCompleteFinalScore(
+                autoevaluacion,
+                evaluacionJefe,
+                instrument.dimensionesDesempeno,
+                instrument.dimensionesPotencial,
+                true, // useBackend
+                autoevaluacionId,
+                evaluacionJefeId,
+                instrumentConfig
+              );
+            } catch (error) {
+              console.warn(`⚠️ Error calculando resultado para ${colaboradorDpi}, usando cálculo local:`, error);
+              resultadoFinal = await calculateCompleteFinalScore(
+                autoevaluacion,
+                evaluacionJefe,
+                instrument.dimensionesDesempeno,
+                instrument.dimensionesPotencial,
+                false // useBackend = false
+              );
+            }
+          } else {
+            // Fallback a cálculo local si faltan datos
+            resultadoFinal = await calculateCompleteFinalScore(
+              autoevaluacion,
+              evaluacionJefe,
+              instrument.dimensionesDesempeno,
+              instrument.dimensionesPotencial,
+              false // useBackend = false
+            );
+          }
 
           if (!resultadoFinal.posicion9Box) continue;
         }
