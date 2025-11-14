@@ -71,7 +71,7 @@ const Autoevaluacion = () => {
   const dimensions = instrument?.dimensionesDesempeno || [];
   const totalItems = dimensions.reduce((sum, dim) => sum + dim.items.length, 0);
   const answeredItems = Object.keys(responses).length;
-  const progressPercentage = totalItems > 0 ? (answeredItems / totalItems) * 100 : 0;
+  const progressPercentage = totalItems > 0 ? Math.round((answeredItems / totalItems) * 100) : 0;
 
   // Wizard steps: dimensiones + NPS + preguntas abiertas
   const wizardSteps = useMemo(() => {

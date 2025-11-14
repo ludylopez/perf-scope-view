@@ -167,8 +167,21 @@ const Dashboard = () => {
         setProgress(100);
         
         // Cargar datos de resultados si está enviada
+        // IMPORTANTE: Solo cargar resultados si el jefe completó su evaluación
         if (isColaborador) {
-          await loadResultadosData();
+          const jefeId = await getColaboradorJefe(user.dpi);
+          if (jefeId) {
+            const jefeCompleto = await hasJefeEvaluation(jefeId, user.dpi, activePeriodId);
+            if (jefeCompleto) {
+              await loadResultadosData();
+            } else {
+              console.log('⏳ [Dashboard] Autoevaluación enviada, pero jefe aún no ha completado. No se mostrarán resultados.');
+              setResultadoData(null);
+            }
+          } else {
+            // Si no tiene jefe, cargar resultados de autoevaluación
+            await loadResultadosData();
+          }
         }
       } else {
         const draft = await getEvaluationDraft(user.dpi, activePeriodId);
@@ -700,8 +713,8 @@ const Dashboard = () => {
         {/* Colaborador Dashboard */}
         {isColaborador && (
           <div className="space-y-6">
-            {/* Mostrar resultados si están disponibles */}
-            {evaluationStatus === "submitted" && resultadoData && (
+            {/* Mostrar resultados si están disponibles Y el jefe completó */}
+            {evaluationStatus === "submitted" && resultadoData && resultadoData.jefeCompleto && (
               <div id="resultados-evaluacion-container">
                 {/* Título y Badge */}
                 <div className="mb-6">
@@ -1102,6 +1115,36 @@ const Dashboard = () => {
                   </Card>
                 </div>
               </div>
+            )}
+
+            {/* Mostrar mensaje si autoevaluación enviada pero jefe no completó */}
+            {evaluationStatus === "submitted" && (!resultadoData || !resultadoData.jefeCompleto) && (
+              <Card className="md:col-span-2 border-blue-200 bg-blue-50 dark:bg-blue-950/20">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <AlertCircle className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                    Autoevaluación Enviada
+                  </CardTitle>
+                  <CardDescription>
+                    Su autoevaluación ha sido recibida exitosamente
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950/20">
+                    <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    <AlertDescription className="text-blue-800 dark:text-blue-200">
+                      <strong>Su autoevaluación fue enviada correctamente.</strong> Cuando su jefe complete la evaluación, 
+                      aquí aparecerá su resultado consolidado con el gráfico radar, fortalezas y áreas de mejora.
+                    </AlertDescription>
+                  </Alert>
+                  <div className="flex items-center justify-center p-4">
+                    <Badge className="bg-success text-success-foreground px-4 py-2 text-base">
+                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                      Autoevaluación Completada
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
             )}
 
             {/* Mostrar formulario o mensaje si no está completada */}
