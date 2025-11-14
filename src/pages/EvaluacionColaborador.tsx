@@ -528,6 +528,32 @@ const EvaluacionColaborador = () => {
           </div>
         </div>
 
+        {/* Banner informativo cuando desempeño está completo pero potencial no */}
+        {desempenoComplete && !potencialComplete && !jefeAlreadyEvaluated && (
+          <div className="mb-4 p-4 bg-success/10 border border-success/20 rounded-lg">
+            <div className="flex items-start gap-3">
+              <CheckCircle2 className="h-5 w-5 text-success mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <h3 className="font-semibold text-success mb-1">
+                  ¡Evaluación de Desempeño Completada!
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Ahora debe completar la <strong>Evaluación de Potencial</strong> para poder enviar la evaluación completa. 
+                  Haga clic en la pestaña "Evaluación de Potencial" o use el botón de continuación al final de esta sección.
+                </p>
+              </div>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => setEvaluacionTab("potencial")}
+              >
+                Ir a Potencial
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Tabs principales */}
         <Tabs value={evaluacionTab} onValueChange={(v) => setEvaluacionTab(v as any)} className="mb-6">
           <TabsList className="w-full">
@@ -543,12 +569,24 @@ const EvaluacionColaborador = () => {
             <TabsTrigger value="desempeno" className="flex-1">
               <FileEdit className="mr-2 h-4 w-4" />
               Evaluación de Desempeño
-              {desempenoComplete && <CheckCircle2 className="ml-2 h-4 w-4 text-success" />}
+              {desempenoComplete ? (
+                <CheckCircle2 className="ml-2 h-4 w-4 text-success" />
+              ) : (
+                <Badge variant="secondary" className="ml-2 text-xs">
+                  {Math.round(desempenoProgress)}%
+                </Badge>
+              )}
             </TabsTrigger>
             <TabsTrigger value="potencial" className="flex-1">
               <FileEdit className="mr-2 h-4 w-4" />
               Evaluación de Potencial
-              {potencialComplete && <CheckCircle2 className="ml-2 h-4 w-4 text-success" />}
+              {potencialComplete ? (
+                <CheckCircle2 className="ml-2 h-4 w-4 text-success" />
+              ) : (
+                <Badge variant="secondary" className="ml-2 text-xs">
+                  {Math.round(potencialProgress)}%
+                </Badge>
+              )}
             </TabsTrigger>
           </TabsList>
 
@@ -634,6 +672,16 @@ const EvaluacionColaborador = () => {
                     <CardDescription className="mt-2">
                       Evalúe el desempeño del colaborador en cada dimensión
                     </CardDescription>
+                    {!jefeAlreadyEvaluated && (
+                      <div className="mt-3 p-3 bg-info/10 border border-info/20 rounded-lg">
+                        <p className="text-sm text-info flex items-center gap-2">
+                          <AlertTriangle className="h-4 w-4" />
+                          <span>
+                            <strong>Importante:</strong> Después de completar esta evaluación, deberá completar también la <strong>Evaluación de Potencial</strong> para poder enviar la evaluación completa.
+                          </span>
+                        </p>
+                      </div>
+                    )}
                   </div>
                   <DimensionProgress
                     answered={desempenoAnsweredItems}
@@ -734,28 +782,56 @@ const EvaluacionColaborador = () => {
                   })}
                 </Tabs>
 
-                <div className="mt-8 flex gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => setCurrentDesempenoDimension(Math.max(0, currentDesempenoDimension - 1))}
-                    disabled={currentDesempenoDimension === 0 || jefeAlreadyEvaluated}
-                  >
-                    <ArrowLeft className="mr-2 h-4 w-4" />
-                    Anterior
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() =>
-                      setCurrentDesempenoDimension(Math.min(desempenoDimensions.length - 1, currentDesempenoDimension + 1))
-                    }
-                    disabled={currentDesempenoDimension === desempenoDimensions.length - 1 || jefeAlreadyEvaluated}
-                  >
-                    Siguiente
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
+                <div className="mt-8 flex flex-col gap-3">
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setCurrentDesempenoDimension(Math.max(0, currentDesempenoDimension - 1))}
+                      disabled={currentDesempenoDimension === 0 || jefeAlreadyEvaluated}
+                    >
+                      <ArrowLeft className="mr-2 h-4 w-4" />
+                      Anterior
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() =>
+                        setCurrentDesempenoDimension(Math.min(desempenoDimensions.length - 1, currentDesempenoDimension + 1))
+                      }
+                      disabled={currentDesempenoDimension === desempenoDimensions.length - 1 || jefeAlreadyEvaluated}
+                    >
+                      Siguiente
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  {/* Botón para continuar a Potencial cuando esté en la última dimensión */}
+                  {currentDesempenoDimension === desempenoDimensions.length - 1 && !jefeAlreadyEvaluated && (
+                    <div className="pt-4 border-t">
+                      <Button
+                        variant="default"
+                        onClick={() => setEvaluacionTab("potencial")}
+                        className="w-full sm:w-auto"
+                        disabled={!desempenoComplete}
+                      >
+                        Continuar a Evaluación de Potencial
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </Button>
+                      {!desempenoComplete && (
+                        <p className="mt-2 text-xs text-muted-foreground text-center sm:text-left">
+                          Complete todos los ítems de esta dimensión para continuar
+                        </p>
+                      )}
+                      {desempenoComplete && (
+                        <p className="mt-2 text-sm text-success text-center sm:text-left flex items-center justify-center sm:justify-start gap-1">
+                          <CheckCircle2 className="h-4 w-4" />
+                          Desempeño completado. Continúe con la evaluación de potencial.
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
 
-                {!desempenoComplete && !jefeAlreadyEvaluated && (
+                {!desempenoComplete && !jefeAlreadyEvaluated && currentDesempenoDimension !== desempenoDimensions.length - 1 && (
                   <div className="mt-4 flex items-center gap-2 text-sm text-warning">
                     <AlertTriangle className="h-4 w-4" />
                     <span>

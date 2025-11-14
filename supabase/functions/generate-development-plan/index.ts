@@ -417,10 +417,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const desempenoAuto = calcularPromedioDesempeno(autoevaluacion.responses, instrumentConfig.dimensionesDesempeno);
     const desempenoJefe = calcularPromedioDesempeno(evaluacionJefe.responses, instrumentConfig.dimensionesDesempeno);
 
-    // Aplicar pesos según instrumento (A1 tiene pesos especiales 45/55)
-    const pesoAuto = instrumentId === "A1" ? 0.45 : 0.30;
-    const pesoJefe = instrumentId === "A1" ? 0.55 : 0.70;
+    // Obtener pesos desde la configuración del instrumento (A1 tiene pesos especiales 45/55)
+    const configCalculo = instrumentConfig.configuracion_calculo || {};
+    const pesoAuto = configCalculo.pesoAuto || (instrumentId === "A1" ? 0.45 : 0.30);
+    const pesoJefe = configCalculo.pesoJefe || (instrumentId === "A1" ? 0.55 : 0.70);
     const desempenoFinal = desempenoJefe * pesoJefe + desempenoAuto * pesoAuto;
+    
+    console.log(`📊 [DevelopmentPlan] Pesos aplicados para ${instrumentId}:`, { pesoJefe, pesoAuto, desempenoFinal });
 
     // Normalizar evaluacion_potencial (puede venir como evaluacionPotencial o evaluacion_potencial)
     const evaluacionPotencial = evaluacionJefe.evaluacion_potencial || evaluacionJefe.evaluacionPotencial || null;
