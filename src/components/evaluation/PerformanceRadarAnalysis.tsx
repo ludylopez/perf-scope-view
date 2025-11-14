@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from "recharts";
+import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip, Legend } from "recharts";
 import { TrendingUp, Target, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -86,6 +86,12 @@ export const PerformanceRadarAnalysis = ({
                   <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.8}/>
                   <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
                 </linearGradient>
+                {radarData.some(d => d.promedioMunicipal !== undefined && d.promedioMunicipal > 0) && (
+                  <linearGradient id="promedioGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#82ca9d" stopOpacity={0.8}/>
+                    <stop offset="100%" stopColor="#82ca9d" stopOpacity={0.3}/>
+                  </linearGradient>
+                )}
               </defs>
               <PolarGrid 
                 stroke="hsl(var(--border))" 
@@ -108,6 +114,42 @@ export const PerformanceRadarAnalysis = ({
                 fill="url(#radarGradient)"
                 fillOpacity={0.6}
                 strokeWidth={3}
+              />
+              {radarData.some(d => d.promedioMunicipal !== undefined && d.promedioMunicipal > 0) && (
+                <Radar
+                  name="Promedio Municipal (mismo nivel)"
+                  dataKey="promedioMunicipal"
+                  stroke="#82ca9d"
+                  fill="url(#promedioGradient)"
+                  fillOpacity={0.4}
+                  strokeWidth={2}
+                  strokeDasharray="5 5"
+                />
+              )}
+              <Tooltip 
+                content={({ active, payload }) => {
+                  if (active && payload && payload.length) {
+                    return (
+                      <div className="bg-background border border-border rounded-lg p-3 shadow-lg">
+                        <p className="font-semibold mb-2">{payload[0].payload.dimension}</p>
+                        {payload.map((entry, index) => (
+                          <p key={index} className="text-sm" style={{ color: entry.color }}>
+                            {entry.name}: {typeof entry.value === 'number' ? `${entry.value}%` : entry.value}
+                          </p>
+                        ))}
+                      </div>
+                    );
+                  }
+                  return null;
+                }}
+              />
+              <Legend 
+                wrapperStyle={{ paddingTop: '20px' }}
+                formatter={(value) => {
+                  if (value === 'Tu Resultado') return 'Tu Resultado';
+                  if (value === 'Promedio Municipal (mismo nivel)') return 'Promedio Municipal (mismo nivel)';
+                  return value;
+                }}
               />
             </RadarChart>
           </ResponsiveContainer>

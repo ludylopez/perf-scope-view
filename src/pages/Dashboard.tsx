@@ -269,53 +269,79 @@ const Dashboard = () => {
         const fortalezas = sortedDimensions.slice(0, 3);
         const areasOportunidad = sortedDimensions.slice(-3).reverse();
 
-        // Calcular promedio municipal de resultados finales consolidados
+        // Calcular promedio municipal de resultados finales consolidados SOLO para el mismo nivel de puesto
         let promedioMunicipal: Record<string, number> = {};
         try {
-          const { data: finalResults } = await supabase
-            .from('final_evaluation_results')
-            .select('colaborador_id, resultado_final, autoevaluacion_id, evaluacion_jefe_id')
-            .eq('periodo_id', activePeriodId);
+          // Primero obtener los DPIs de colaboradores del mismo nivel
+          const { data: usuariosMismoNivel } = await supabase
+            .from('users')
+            .select('dpi')
+            .eq('nivel', user.nivel)
+            .eq('estado', 'activo')
+            .in('rol', ['colaborador', 'jefe']);
 
-          if (finalResults && finalResults.length > 0) {
-            const autoevaluacionIds = finalResults.map(r => r.autoevaluacion_id).filter(id => id);
-            const jefeEvaluacionIds = finalResults.map(r => r.evaluacion_jefe_id).filter(id => id);
-            
-            const { data: autoEvals } = await supabase
-              .from('evaluations')
-              .select('id, responses')
-              .in('id', autoevaluacionIds)
-              .eq('tipo', 'auto');
+          const dpisMismoNivel = usuariosMismoNivel?.map(u => u.dpi) || [];
+          
+          console.log('📊 [Dashboard] Calculando promedio municipal para nivel:', {
+            nivel: user.nivel,
+            totalUsuariosMismoNivel: dpisMismoNivel.length
+          });
 
-            const { data: jefeEvals } = await supabase
-              .from('evaluations')
-              .select('id, responses')
-              .in('id', jefeEvaluacionIds)
-              .eq('tipo', 'jefe');
+          if (dpisMismoNivel.length > 0) {
+            const { data: finalResults } = await supabase
+              .from('final_evaluation_results')
+              .select('colaborador_id, resultado_final, autoevaluacion_id, evaluacion_jefe_id')
+              .eq('periodo_id', activePeriodId)
+              .in('colaborador_id', dpisMismoNivel); // Filtrar solo mismo nivel
 
-            const autoEvalMap = new Map((autoEvals || []).map(e => [e.id, (e.responses as Record<string, number>) || {}]));
-            const jefeEvalMap = new Map((jefeEvals || []).map(e => [e.id, (e.responses as Record<string, number>) || {}]));
+            console.log('📊 [Dashboard] Resultados finales encontrados para mismo nivel:', finalResults?.length || 0);
 
-            instrument.dimensionesDesempeno.forEach((dim) => {
-              let sumaPorcentajes = 0;
-              let contador = 0;
+            if (finalResults && finalResults.length > 0) {
+              const autoevaluacionIds = finalResults.map(r => r.autoevaluacion_id).filter(id => id);
+              const jefeEvaluacionIds = finalResults.map(r => r.evaluacion_jefe_id).filter(id => id);
+              
+              const { data: autoEvals } = await supabase
+                .from('evaluations')
+                .select('id, responses')
+                .in('id', autoevaluacionIds)
+                .eq('tipo', 'auto');
 
-              finalResults.forEach((resultado) => {
-                const autoResponses = autoEvalMap.get(resultado.autoevaluacion_id) || {};
-                const jefeResponses = jefeEvalMap.get(resultado.evaluacion_jefe_id) || {};
-                const consolidadas = calculateConsolidatedResponses(autoResponses, jefeResponses);
-                const porcentaje = calculateDimensionPercentage(consolidadas, dim);
-                if (porcentaje > 0) {
-                  sumaPorcentajes += porcentaje;
-                  contador++;
-                }
+              const { data: jefeEvals } = await supabase
+                .from('evaluations')
+                .select('id, responses')
+                .in('id', jefeEvaluacionIds)
+                .eq('tipo', 'jefe');
+
+              const autoEvalMap = new Map((autoEvals || []).map(e => [e.id, (e.responses as Record<string, number>) || {}]));
+              const jefeEvalMap = new Map((jefeEvals || []).map(e => [e.id, (e.responses as Record<string, number>) || {}]));
+
+              instrument.dimensionesDesempeno.forEach((dim) => {
+                let sumaPorcentajes = 0;
+                let contador = 0;
+
+                finalResults.forEach((resultado) => {
+                  const autoResponses = autoEvalMap.get(resultado.autoevaluacion_id) || {};
+                  const jefeResponses = jefeEvalMap.get(resultado.evaluacion_jefe_id) || {};
+                  const consolidadas = calculateConsolidatedResponses(autoResponses, jefeResponses);
+                  const porcentaje = calculateDimensionPercentage(consolidadas, dim);
+                  if (porcentaje > 0) {
+                    sumaPorcentajes += porcentaje;
+                    contador++;
+                  }
+                });
+
+                promedioMunicipal[dim.id] = contador > 0 ? Math.round(sumaPorcentajes / contador) : 0;
               });
 
-              promedioMunicipal[dim.id] = contador > 0 ? Math.round(sumaPorcentajes / contador) : 0;
-            });
+              console.log('📊 [Dashboard] Promedio municipal calculado:', promedioMunicipal);
+            } else {
+              console.warn('⚠️ [Dashboard] No se encontraron resultados finales para calcular promedio municipal');
+            }
+          } else {
+            console.warn('⚠️ [Dashboard] No se encontraron usuarios del mismo nivel para calcular promedio');
           }
         } catch (error) {
-          console.error('Error calculando promedio municipal:', error);
+          console.error('❌ Error calculando promedio municipal:', error);
         }
 
         // Agregar promedio municipal a radarData
@@ -323,6 +349,8 @@ const Dashboard = () => {
           ...d,
           promedioMunicipal: promedioMunicipal[d.dimensionData.id] || 0
         }));
+
+        console.log('📊 [Dashboard] RadarData final con promedios:', radarDataWithPromedio);
 
         setResultadoData({
           performancePercentage,
