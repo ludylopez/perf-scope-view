@@ -135,6 +135,14 @@ function buildUserPrompt(data: any): string {
 
   const top3Debiles = dimensionesConScore.slice(0, 3);
 
+  // Obtener fecha actual para usar como referencia
+  const fechaActual = new Date();
+  const añoActual = fechaActual.getFullYear();
+  const mesActual = fechaActual.getMonth() + 1; // getMonth() devuelve 0-11
+  const diaActual = fechaActual.getDate();
+  const fechaActualFormato = `${añoActual}-${String(mesActual).padStart(2, '0')}-${String(diaActual).padStart(2, '0')}`;
+  const mesActualTexto = fechaActual.toLocaleDateString('es-GT', { month: 'long', year: 'numeric' });
+
   return `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📋 INFORMACIÓN DEL COLABORADOR
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -146,6 +154,16 @@ function buildUserPrompt(data: any): string {
 📅 Fecha de ingreso: ${colaborador.fecha_ingreso ? new Date(colaborador.fecha_ingreso).toLocaleDateString('es-GT') : "No registrada"}
 🎓 Profesión: ${colaborador.profesion || "No registrada"}
 ${grupos.length > 0 ? `👥 Pertenece a cuadrilla(s): ${grupos.map((g: any) => g.nombre).join(", ")}` : ""}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📅 INFORMACIÓN TEMPORAL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📆 FECHA ACTUAL: ${fechaActualFormato} (${mesActualTexto})
+⚠️ IMPORTANTE: Todas las fechas del plan deben ser POSTERIORES a esta fecha. 
+   - Usa fechas del año ${añoActual} o ${añoActual + 1}
+   - NO uses fechas del 2024 o anteriores
+   - Las acciones deben tener fechas realistas considerando que hoy es ${fechaActualFormato}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📊 RESULTADOS DE EVALUACIÓN
@@ -173,7 +191,8 @@ ${detallePotencial ? `━━━━━━━━━━━━━━━━━━━�
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ${detallePotencial}` : ''}
 
-Genera el Plan de Desarrollo basándote en estos datos específicos de la evaluación.`;
+Genera el Plan de Desarrollo basándote en estos datos específicos de la evaluación. 
+⚠️ RECUERDA: Usa fechas del ${añoActual} o ${añoActual + 1}, NO uses fechas del 2024 o anteriores.`;
 }
 
 Deno.serve(async (req: Request): Promise<Response> => {

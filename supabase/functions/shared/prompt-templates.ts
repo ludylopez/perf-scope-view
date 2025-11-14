@@ -95,7 +95,7 @@ Genera un Plan de Desarrollo COMPLETO y ESTRUCTURADO en formato JSON con la sigu
     {
       "descripcion": "Descripción detallada y específica de la acción concreta a tomar",
       "responsable": "Jefe inmediato" | "Colaborador" | "RRHH" | "Gerencia Municipal" | "Otro específico",
-      "fecha": "Fecha tentativa en formato YYYY-MM-DD o período como '2025-02 al 2025-04'",
+      "fecha": "Fecha tentativa en formato YYYY-MM-DD o período como 'YYYY-MM al YYYY-MM'. IMPORTANTE: Usa fechas ACTUALES o FUTURAS, nunca fechas pasadas. El prompt incluirá la fecha actual como referencia.",
       "recursos": ["Recurso 1 necesario", "Recurso 2", ...],
       "indicador": "Indicador simple y medible de cumplimiento (ej: 'Completar curso', 'Aplicar en 3 casos', 'Reducir errores en 30%')",
       "prioridad": "alta" | "media" | "baja"
