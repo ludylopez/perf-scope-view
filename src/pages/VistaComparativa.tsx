@@ -890,7 +890,7 @@ const VistaComparativa = () => {
                               </div>
 
                               {/* Comparación visual mejorada */}
-                              <div className="space-y-3">
+                              <div className="space-y-2">
                                 {/* Autoevaluación */}
                                 <div className="flex items-center gap-4">
                                   <div className="flex items-center gap-2 min-w-[140px]">
@@ -898,14 +898,14 @@ const VistaComparativa = () => {
                                     <span className="text-sm font-medium text-muted-foreground">Autoevaluación</span>
                                   </div>
                                   <div className="flex-1 relative">
-                                    <div className="h-8 bg-muted rounded-lg overflow-hidden relative">
+                                    <div className="h-4 bg-muted rounded-lg overflow-hidden relative">
                                       <div 
                                         className="absolute top-0 left-0 h-full bg-primary rounded-lg transition-all"
                                         style={{ width: `${porcentajeAuto}%` }}
                                       ></div>
                                     </div>
                                   </div>
-                                  <span className="text-lg font-bold text-foreground min-w-[50px] text-right">
+                                  <span className="text-base font-bold text-foreground min-w-[50px] text-right">
                                     {porcentajeAuto}%
                                   </span>
                                 </div>
@@ -917,14 +917,14 @@ const VistaComparativa = () => {
                                     <span className="text-sm font-medium text-muted-foreground">Evaluación Jefe</span>
                                   </div>
                                   <div className="flex-1 relative">
-                                    <div className="h-8 bg-muted rounded-lg overflow-hidden relative">
+                                    <div className="h-4 bg-muted rounded-lg overflow-hidden relative">
                                       <div 
                                         className="absolute top-0 left-0 h-full bg-accent rounded-lg transition-all"
                                         style={{ width: `${porcentajeJefe}%` }}
                                       ></div>
                                     </div>
                                   </div>
-                                  <span className="text-lg font-bold text-foreground min-w-[50px] text-right">
+                                  <span className="text-base font-bold text-foreground min-w-[50px] text-right">
                                     {porcentajeJefe}%
                                   </span>
                                 </div>
@@ -937,14 +937,14 @@ const VistaComparativa = () => {
                                       <span className="text-sm font-medium text-muted-foreground">Promedio Cuadrilla</span>
                                     </div>
                                     <div className="flex-1 relative">
-                                      <div className="h-8 bg-muted rounded-lg overflow-hidden relative">
+                                      <div className="h-4 bg-muted rounded-lg overflow-hidden relative">
                                         <div 
                                           className="absolute top-0 left-0 h-full bg-info rounded-lg transition-all"
                                           style={{ width: `${promedioGrupo}%` }}
                                         ></div>
                                       </div>
                                     </div>
-                                    <span className="text-lg font-bold text-info min-w-[50px] text-right">
+                                    <span className="text-base font-bold text-info min-w-[50px] text-right">
                                       {Math.round(promedioGrupo)}%
                                     </span>
                                   </div>
