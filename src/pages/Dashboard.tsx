@@ -238,8 +238,8 @@ const Dashboard = () => {
         console.log('📊 [Dashboard] Score calculado:', { performanceScore, performancePercentage });
 
         const radarData = instrument.dimensionesDesempeno.map((dim, idx) => {
-          const porcentaje = calculateDimensionPercentage(responsesToUse, dim);
           const promedio = calculateDimensionAverage(responsesToUse, dim);
+          const porcentaje = calculateDimensionPercentage(responsesToUse, dim);
           
           // Log detallado para cada dimensión
           const itemIds = dim.items.map(item => item.id);
@@ -250,20 +250,29 @@ const Dashboard = () => {
             itemIds: itemIds,
             itemValues: itemValues,
             promedio: promedio,
-            porcentaje: porcentaje
+            porcentaje: porcentaje,
+            verificado: `Promedio ${promedio} → Porcentaje ${porcentaje}%`
           });
+          
+          // Asegurar que el porcentaje sea un número válido
+          const porcentajeFinal = typeof porcentaje === 'number' && !isNaN(porcentaje) ? porcentaje : 0;
           
           return {
             dimension: getDimensionFriendlyTitle(dim),
             nombreCompleto: dim.nombre,
             numero: idx + 1,
-            tuEvaluacion: porcentaje,
-            puntaje: promedio,
+            tuEvaluacion: porcentajeFinal, // Asegurar que es porcentaje (0-100)
+            puntaje: promedio, // Mantener el promedio para referencia
             dimensionData: dim
           };
         });
 
         console.log('📊 [Dashboard] RadarData generado:', radarData);
+        console.log('📊 [Dashboard] Verificación de porcentajes:', radarData.map(d => ({
+          dimension: d.dimension,
+          tuEvaluacion: d.tuEvaluacion,
+          esPorcentaje: d.tuEvaluacion >= 0 && d.tuEvaluacion <= 100
+        })));
 
         const sortedDimensions = [...radarData].sort((a, b) => b.tuEvaluacion - a.tuEvaluacion);
         const fortalezas = sortedDimensions.slice(0, 3);

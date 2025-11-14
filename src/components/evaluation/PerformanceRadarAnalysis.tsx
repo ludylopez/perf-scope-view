@@ -34,6 +34,17 @@ export const PerformanceRadarAnalysis = ({
     dimensionAnalysis: dimensionAnalysis
   });
   
+  // Verificar valores de tuResultado
+  if (radarData && radarData.length > 0) {
+    console.log('📊 [PerformanceRadarAnalysis] Valores tuResultado:', radarData.map(d => ({
+      dimension: d.dimension,
+      tuResultado: d.tuResultado,
+      tipo: typeof d.tuResultado,
+      esPorcentaje: d.tuResultado >= 0 && d.tuResultado <= 100,
+      promedioMunicipal: d.promedioMunicipal
+    })));
+  }
+  
   // Validar que hay datos
   if (!radarData || radarData.length === 0) {
     console.warn('⚠️ [PerformanceRadarAnalysis] No hay datos para mostrar en el radar');
