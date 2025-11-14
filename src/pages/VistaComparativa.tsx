@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, BarChart3, TrendingUp, TrendingDown, Minus, Users2, User, Target, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, BarChart3, TrendingUp, TrendingDown, Minus, Users2, User, Target, CheckCircle2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, Cell } from "recharts";
 import { getSubmittedEvaluation, getJefeEvaluationDraft, getMockColaboradorEvaluation } from "@/lib/storage";
@@ -185,12 +185,14 @@ const VistaComparativa = () => {
 
         if (planData) {
           console.log('✅ Plan de desarrollo encontrado:', planData);
-          // Extraer la estructura del plan desde competencias_desarrollar
+          // Extraer la estructura del plan desde competencias_desarrollar o plan_estructurado
           const competencias = planData.competencias_desarrollar || {};
+          const planEstructuradoBD = planData.plan_estructurado || null;
           
           // Manejar diferentes formatos de competencias_desarrollar
-          let planEstructurado = null;
-          if (typeof competencias === 'object' && competencias !== null) {
+          let planEstructurado = planEstructuradoBD;
+          
+          if (!planEstructurado && typeof competencias === 'object' && competencias !== null) {
             // Si tiene acciones, es la estructura completa
             if (competencias.acciones && Array.isArray(competencias.acciones)) {
               planEstructurado = {
@@ -209,9 +211,11 @@ const VistaComparativa = () => {
             }
           }
           
-          const recomendaciones = typeof competencias === 'object' && competencias !== null && Array.isArray(competencias.recomendaciones)
-            ? competencias.recomendaciones
-            : [];
+          const recomendaciones = planData.recomendaciones 
+            ? (Array.isArray(planData.recomendaciones) ? planData.recomendaciones : [])
+            : (typeof competencias === 'object' && competencias !== null && Array.isArray(competencias.recomendaciones)
+              ? competencias.recomendaciones
+              : []);
 
           const planCargado = {
             id: planData.id,
@@ -418,15 +422,73 @@ const VistaComparativa = () => {
                     periodoId={periodoId}
                     colaboradorNombre={colaborador.nombre}
                     planExistente={null}
-                    onPlanGenerado={(plan) => {
-                      setPlanDesarrollo({
-                        id: plan.id,
-                        feedbackIndividual: plan.feedbackIndividual,
-                        feedbackGrupal: plan.feedbackGrupal,
-                        planEstructurado: plan.planEstructurado,
-                        recomendaciones: plan.recomendaciones,
-                      });
-                      toast.success("Plan de desarrollo guardado");
+                    onPlanGenerado={async (plan) => {
+                      // Recargar el plan desde la BD para asegurar que tenemos la estructura correcta
+                      try {
+                        const { data: planData, error: planError } = await supabase
+                          .from("development_plans")
+                          .select("*")
+                          .eq("id", plan.id)
+                          .single();
+                        
+                        if (!planError && planData) {
+                          const competencias = planData.competencias_desarrollar || {};
+                          const planEstructuradoBD = planData.plan_estructurado || null;
+                          
+                          let planEstructurado = planEstructuradoBD;
+                          if (!planEstructurado && typeof competencias === 'object' && competencias !== null) {
+                            if (competencias.acciones && Array.isArray(competencias.acciones)) {
+                              planEstructurado = {
+                                objetivos: Array.isArray(competencias.objetivos) ? competencias.objetivos : [],
+                                acciones: competencias.acciones,
+                                dimensionesDebiles: Array.isArray(competencias.dimensionesDebiles) ? competencias.dimensionesDebiles : [],
+                              };
+                            } else if (Array.isArray(competencias.objetivos) && competencias.objetivos.length > 0) {
+                              planEstructurado = {
+                                objetivos: competencias.objetivos,
+                                acciones: [],
+                                dimensionesDebiles: Array.isArray(competencias.dimensionesDebiles) ? competencias.dimensionesDebiles : [],
+                              };
+                            }
+                          }
+                          
+                          const recomendaciones = planData.recomendaciones 
+                            ? (Array.isArray(planData.recomendaciones) ? planData.recomendaciones : [])
+                            : (typeof competencias === 'object' && competencias !== null && Array.isArray(competencias.recomendaciones)
+                              ? competencias.recomendaciones
+                              : []);
+
+                          setPlanDesarrollo({
+                            id: planData.id,
+                            feedbackIndividual: planData.feedback_individual || "",
+                            feedbackGrupal: planData.feedback_grupal || null,
+                            planEstructurado: planEstructurado,
+                            recomendaciones: recomendaciones,
+                          });
+                          toast.success("Plan de desarrollo guardado");
+                        } else {
+                          // Fallback al plan recibido
+                          setPlanDesarrollo({
+                            id: plan.id,
+                            feedbackIndividual: plan.feedbackIndividual,
+                            feedbackGrupal: plan.feedbackGrupal,
+                            planEstructurado: plan.planEstructurado,
+                            recomendaciones: plan.recomendaciones,
+                          });
+                          toast.success("Plan de desarrollo guardado");
+                        }
+                      } catch (error) {
+                        console.error("Error recargando plan:", error);
+                        // Fallback al plan recibido
+                        setPlanDesarrollo({
+                          id: plan.id,
+                          feedbackIndividual: plan.feedbackIndividual,
+                          feedbackGrupal: plan.feedbackGrupal,
+                          planEstructurado: plan.planEstructurado,
+                          recomendaciones: plan.recomendaciones,
+                        });
+                        toast.success("Plan de desarrollo guardado");
+                      }
                     }}
                   />
                   <GenerarGuiaRetroalimentacion
@@ -468,15 +530,72 @@ const VistaComparativa = () => {
                           console.error("Error al eliminar plan anterior:", error);
                         }
                       }
-                      // Actualizar con el nuevo plan
-                      setPlanDesarrollo({
-                        id: planNuevo.id,
-                        feedbackIndividual: planNuevo.feedbackIndividual,
-                        feedbackGrupal: planNuevo.feedbackGrupal,
-                        planEstructurado: planNuevo.planEstructurado,
-                        recomendaciones: planNuevo.recomendaciones,
-                      });
-                      toast.success("Plan de desarrollo regenerado exitosamente");
+                      // Recargar el plan desde la BD para asegurar que tenemos la estructura correcta
+                      try {
+                        const { data: planData, error: planError } = await supabase
+                          .from("development_plans")
+                          .select("*")
+                          .eq("id", planNuevo.id)
+                          .single();
+                        
+                        if (!planError && planData) {
+                          const competencias = planData.competencias_desarrollar || {};
+                          const planEstructuradoBD = planData.plan_estructurado || null;
+                          
+                          let planEstructurado = planEstructuradoBD;
+                          if (!planEstructurado && typeof competencias === 'object' && competencias !== null) {
+                            if (competencias.acciones && Array.isArray(competencias.acciones)) {
+                              planEstructurado = {
+                                objetivos: Array.isArray(competencias.objetivos) ? competencias.objetivos : [],
+                                acciones: competencias.acciones,
+                                dimensionesDebiles: Array.isArray(competencias.dimensionesDebiles) ? competencias.dimensionesDebiles : [],
+                              };
+                            } else if (Array.isArray(competencias.objetivos) && competencias.objetivos.length > 0) {
+                              planEstructurado = {
+                                objetivos: competencias.objetivos,
+                                acciones: [],
+                                dimensionesDebiles: Array.isArray(competencias.dimensionesDebiles) ? competencias.dimensionesDebiles : [],
+                              };
+                            }
+                          }
+                          
+                          const recomendaciones = planData.recomendaciones 
+                            ? (Array.isArray(planData.recomendaciones) ? planData.recomendaciones : [])
+                            : (typeof competencias === 'object' && competencias !== null && Array.isArray(competencias.recomendaciones)
+                              ? competencias.recomendaciones
+                              : []);
+
+                          setPlanDesarrollo({
+                            id: planData.id,
+                            feedbackIndividual: planData.feedback_individual || "",
+                            feedbackGrupal: planData.feedback_grupal || null,
+                            planEstructurado: planEstructurado,
+                            recomendaciones: recomendaciones,
+                          });
+                          toast.success("Plan de desarrollo regenerado exitosamente");
+                        } else {
+                          // Fallback al plan recibido
+                          setPlanDesarrollo({
+                            id: planNuevo.id,
+                            feedbackIndividual: planNuevo.feedbackIndividual,
+                            feedbackGrupal: planNuevo.feedbackGrupal,
+                            planEstructurado: planNuevo.planEstructurado,
+                            recomendaciones: planNuevo.recomendaciones,
+                          });
+                          toast.success("Plan de desarrollo regenerado exitosamente");
+                        }
+                      } catch (error) {
+                        console.error("Error recargando plan:", error);
+                        // Fallback al plan recibido
+                        setPlanDesarrollo({
+                          id: planNuevo.id,
+                          feedbackIndividual: planNuevo.feedbackIndividual,
+                          feedbackGrupal: planNuevo.feedbackGrupal,
+                          planEstructurado: planNuevo.planEstructurado,
+                          recomendaciones: planNuevo.recomendaciones,
+                        });
+                        toast.success("Plan de desarrollo regenerado exitosamente");
+                      }
                     }}
                   />
                   <GenerarGuiaRetroalimentacion
@@ -743,6 +862,59 @@ const VistaComparativa = () => {
                         </div>
                       ))}
                   </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Dimensiones que Requieren Atención */}
+            {planDesarrollo.planEstructurado.dimensionesDebiles && Array.isArray(planDesarrollo.planEstructurado.dimensionesDebiles) && planDesarrollo.planEstructurado.dimensionesDebiles.length > 0 && (
+              <Card className="border-warning">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <AlertCircle className="h-5 w-5 text-warning" />
+                    Dimensiones que Requieren Atención
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {planDesarrollo.planEstructurado.dimensionesDebiles.map((dim: any, idx: number) => (
+                      <div key={idx} className="border-l-4 border-warning pl-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="font-semibold">{dim.dimension}</h4>
+                          <Badge variant="outline">
+                            Score: {dim.score?.toFixed(2) || "N/A"}/5.0 ({dim.score ? ((dim.score / 5) * 100).toFixed(0) : "N/A"}%)
+                          </Badge>
+                        </div>
+                        <ul className="space-y-1 text-sm">
+                          {dim.accionesEspecificas && Array.isArray(dim.accionesEspecificas) && dim.accionesEspecificas.map((accion: string, i: number) => (
+                            <li key={i} className="flex items-start gap-2">
+                              <span className="text-warning mt-1">•</span>
+                              <span>{accion}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Recomendaciones */}
+            {planDesarrollo.recomendaciones && Array.isArray(planDesarrollo.recomendaciones) && planDesarrollo.recomendaciones.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Recomendaciones Generales</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-2">
+                    {planDesarrollo.recomendaciones.map((rec: string, idx: number) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <span className="text-primary mt-1">→</span>
+                        <span>{rec}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </CardContent>
               </Card>
             )}
