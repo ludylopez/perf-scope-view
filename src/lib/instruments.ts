@@ -1,17 +1,17 @@
 import { Instrument } from "@/types/evaluation";
-import { INSTRUMENT_A1, INSTRUMENT_A3, INSTRUMENT_O2 } from "@/data/instruments";
+import { INSTRUMENT_A1, INSTRUMENT_A3, INSTRUMENT_O2, INSTRUMENT_E1 } from "@/data/instruments";
 import { InstrumentCalculationConfig, getInstrumentCalculationConfig } from "./instrumentCalculations";
 
 const INSTRUMENTS: Record<string, Instrument> = {
   A1: INSTRUMENT_A1,
   A3: INSTRUMENT_A3,
   O2: INSTRUMENT_O2,
+  E1: INSTRUMENT_E1,
   // Se pueden agregar más instrumentos aquí cuando estén disponibles
   // A2: INSTRUMENT_A2,
   // S2: INSTRUMENT_S2,
   // D1: INSTRUMENT_D1,
   // D2: INSTRUMENT_D2,
-  // E1: INSTRUMENT_E1,
   // E2: INSTRUMENT_E2,
   // A4: INSTRUMENT_A4,
   // OTE: INSTRUMENT_OTE,
