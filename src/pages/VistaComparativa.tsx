@@ -185,21 +185,29 @@ const VistaComparativa = () => {
 
         if (planData) {
           console.log('✅ Plan de desarrollo encontrado:', planData);
-          // Extraer la estructura del plan desde competencias_desarrollar o plan_estructurado
+          // El plan se guarda en competencias_desarrollar como JSONB con estructura:
+          // { objetivos: [], acciones: [], dimensionesDebiles: [], recomendaciones: [] }
           const competencias = planData.competencias_desarrollar || {};
-          const planEstructuradoBD = planData.plan_estructurado || null;
           
-          // Manejar diferentes formatos de competencias_desarrollar
-          let planEstructurado = planEstructuradoBD;
+          console.log('🔍 Plan raw desde BD:', { 
+            id: planData.id, 
+            competencias_desarrollar: competencias,
+            tipo: typeof competencias 
+          });
           
-          if (!planEstructurado && typeof competencias === 'object' && competencias !== null) {
-            // Si tiene acciones, es la estructura completa
+          // Extraer estructura del plan desde competencias_desarrollar
+          let planEstructurado = null;
+          let recomendaciones = [];
+          
+          if (typeof competencias === 'object' && competencias !== null) {
+            // Verificar si tiene la estructura completa
             if (competencias.acciones && Array.isArray(competencias.acciones)) {
               planEstructurado = {
                 objetivos: Array.isArray(competencias.objetivos) ? competencias.objetivos : [],
                 acciones: competencias.acciones,
                 dimensionesDebiles: Array.isArray(competencias.dimensionesDebiles) ? competencias.dimensionesDebiles : [],
               };
+              recomendaciones = Array.isArray(competencias.recomendaciones) ? competencias.recomendaciones : [];
             }
             // Si tiene objetivos pero no acciones, crear estructura básica
             else if (Array.isArray(competencias.objetivos) && competencias.objetivos.length > 0) {
@@ -208,14 +216,9 @@ const VistaComparativa = () => {
                 acciones: [],
                 dimensionesDebiles: Array.isArray(competencias.dimensionesDebiles) ? competencias.dimensionesDebiles : [],
               };
+              recomendaciones = Array.isArray(competencias.recomendaciones) ? competencias.recomendaciones : [];
             }
           }
-          
-          const recomendaciones = planData.recomendaciones 
-            ? (Array.isArray(planData.recomendaciones) ? planData.recomendaciones : [])
-            : (typeof competencias === 'object' && competencias !== null && Array.isArray(competencias.recomendaciones)
-              ? competencias.recomendaciones
-              : []);
 
           const planCargado = {
             id: planData.id,
@@ -225,7 +228,7 @@ const VistaComparativa = () => {
             recomendaciones: recomendaciones,
           };
           
-          console.log('📋 Plan procesado:', planCargado);
+          console.log('📋 Plan procesado en VistaComparativa:', planCargado);
           setPlanDesarrollo(planCargado);
         } else {
           console.log('⚠️ No se encontró plan de desarrollo para este colaborador');
@@ -433,30 +436,27 @@ const VistaComparativa = () => {
                         
                         if (!planError && planData) {
                           const competencias = planData.competencias_desarrollar || {};
-                          const planEstructuradoBD = planData.plan_estructurado || null;
                           
-                          let planEstructurado = planEstructuradoBD;
-                          if (!planEstructurado && typeof competencias === 'object' && competencias !== null) {
+                          let planEstructurado = null;
+                          let recomendaciones = [];
+                          
+                          if (typeof competencias === 'object' && competencias !== null) {
                             if (competencias.acciones && Array.isArray(competencias.acciones)) {
                               planEstructurado = {
                                 objetivos: Array.isArray(competencias.objetivos) ? competencias.objetivos : [],
                                 acciones: competencias.acciones,
                                 dimensionesDebiles: Array.isArray(competencias.dimensionesDebiles) ? competencias.dimensionesDebiles : [],
                               };
+                              recomendaciones = Array.isArray(competencias.recomendaciones) ? competencias.recomendaciones : [];
                             } else if (Array.isArray(competencias.objetivos) && competencias.objetivos.length > 0) {
                               planEstructurado = {
                                 objetivos: competencias.objetivos,
                                 acciones: [],
                                 dimensionesDebiles: Array.isArray(competencias.dimensionesDebiles) ? competencias.dimensionesDebiles : [],
                               };
+                              recomendaciones = Array.isArray(competencias.recomendaciones) ? competencias.recomendaciones : [];
                             }
                           }
-                          
-                          const recomendaciones = planData.recomendaciones 
-                            ? (Array.isArray(planData.recomendaciones) ? planData.recomendaciones : [])
-                            : (typeof competencias === 'object' && competencias !== null && Array.isArray(competencias.recomendaciones)
-                              ? competencias.recomendaciones
-                              : []);
 
                           setPlanDesarrollo({
                             id: planData.id,
@@ -540,30 +540,27 @@ const VistaComparativa = () => {
                         
                         if (!planError && planData) {
                           const competencias = planData.competencias_desarrollar || {};
-                          const planEstructuradoBD = planData.plan_estructurado || null;
                           
-                          let planEstructurado = planEstructuradoBD;
-                          if (!planEstructurado && typeof competencias === 'object' && competencias !== null) {
+                          let planEstructurado = null;
+                          let recomendaciones = [];
+                          
+                          if (typeof competencias === 'object' && competencias !== null) {
                             if (competencias.acciones && Array.isArray(competencias.acciones)) {
                               planEstructurado = {
                                 objetivos: Array.isArray(competencias.objetivos) ? competencias.objetivos : [],
                                 acciones: competencias.acciones,
                                 dimensionesDebiles: Array.isArray(competencias.dimensionesDebiles) ? competencias.dimensionesDebiles : [],
                               };
+                              recomendaciones = Array.isArray(competencias.recomendaciones) ? competencias.recomendaciones : [];
                             } else if (Array.isArray(competencias.objetivos) && competencias.objetivos.length > 0) {
                               planEstructurado = {
                                 objetivos: competencias.objetivos,
                                 acciones: [],
                                 dimensionesDebiles: Array.isArray(competencias.dimensionesDebiles) ? competencias.dimensionesDebiles : [],
                               };
+                              recomendaciones = Array.isArray(competencias.recomendaciones) ? competencias.recomendaciones : [];
                             }
                           }
-                          
-                          const recomendaciones = planData.recomendaciones 
-                            ? (Array.isArray(planData.recomendaciones) ? planData.recomendaciones : [])
-                            : (typeof competencias === 'object' && competencias !== null && Array.isArray(competencias.recomendaciones)
-                              ? competencias.recomendaciones
-                              : []);
 
                           setPlanDesarrollo({
                             id: planData.id,

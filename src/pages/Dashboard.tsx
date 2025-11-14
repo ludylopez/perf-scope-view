@@ -307,18 +307,38 @@ const Dashboard = () => {
             }
 
             // Procesar el plan de desarrollo
-            const competencias = planData.competencias_desarrollar || planData.plan_estructurado;
+            // El plan se guarda en competencias_desarrollar como JSONB con estructura:
+            // { objetivos: [], acciones: [], dimensionesDebiles: [], recomendaciones: [] }
+            const competencias = planData.competencias_desarrollar || {};
+            
+            console.log('🔍 Plan raw desde BD:', { 
+              id: planData.id, 
+              competencias_desarrollar: competencias,
+              tipo: typeof competencias 
+            });
+            
+            // Extraer estructura del plan desde competencias_desarrollar
             let planEstructurado = null;
-
-            if (competencias) {
-              if (typeof competencias === 'object' && competencias.acciones) {
-                planEstructurado = competencias;
-              } else if (typeof competencias === 'string') {
-                try {
-                  planEstructurado = JSON.parse(competencias);
-                } catch (e) {
-                  console.error('Error parseando plan estructurado:', e);
-                }
+            let recomendaciones = [];
+            
+            if (typeof competencias === 'object' && competencias !== null) {
+              // Verificar si tiene la estructura completa
+              if (competencias.acciones && Array.isArray(competencias.acciones)) {
+                planEstructurado = {
+                  objetivos: Array.isArray(competencias.objetivos) ? competencias.objetivos : [],
+                  acciones: competencias.acciones,
+                  dimensionesDebiles: Array.isArray(competencias.dimensionesDebiles) ? competencias.dimensionesDebiles : [],
+                };
+                recomendaciones = Array.isArray(competencias.recomendaciones) ? competencias.recomendaciones : [];
+              }
+              // Si tiene objetivos pero no acciones, crear estructura básica
+              else if (Array.isArray(competencias.objetivos) && competencias.objetivos.length > 0) {
+                planEstructurado = {
+                  objetivos: competencias.objetivos,
+                  acciones: [],
+                  dimensionesDebiles: Array.isArray(competencias.dimensionesDebiles) ? competencias.dimensionesDebiles : [],
+                };
+                recomendaciones = Array.isArray(competencias.recomendaciones) ? competencias.recomendaciones : [];
               }
             }
 
@@ -328,12 +348,14 @@ const Dashboard = () => {
               colaborador_id: planData.colaborador_id,
               periodo_id: planData.periodo_id,
               planEstructurado: planEstructurado,
-              feedbackIndividual: planData.feedback_individual,
-              feedbackGrupal: planData.feedback_grupal,
+              recomendaciones: recomendaciones,
+              feedbackIndividual: planData.feedback_individual || "",
+              feedbackGrupal: planData.feedback_grupal || null,
               generado_por_ia: planData.generado_por_ia,
               editable: planData.editable
             };
 
+            console.log('📋 Plan procesado en Dashboard:', planCargado);
             setPlanDesarrollo(planCargado);
           } else {
             setPlanDesarrollo(null);
@@ -740,6 +762,59 @@ const Dashboard = () => {
                               </TableBody>
                             </Table>
                           </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Dimensiones que Requieren Atención */}
+                    {planDesarrollo.planEstructurado.dimensionesDebiles && Array.isArray(planDesarrollo.planEstructurado.dimensionesDebiles) && planDesarrollo.planEstructurado.dimensionesDebiles.length > 0 && (
+                      <Card className="border-warning">
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2">
+                            <AlertCircle className="h-5 w-5 text-warning" />
+                            Dimensiones que Requieren Atención
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-4">
+                            {planDesarrollo.planEstructurado.dimensionesDebiles.map((dim: any, idx: number) => (
+                              <div key={idx} className="border-l-4 border-warning pl-4">
+                                <div className="flex items-center justify-between mb-2">
+                                  <h4 className="font-semibold">{dim.dimension}</h4>
+                                  <Badge variant="outline">
+                                    Score: {dim.score?.toFixed(2) || "N/A"}/5.0 ({dim.score ? ((dim.score / 5) * 100).toFixed(0) : "N/A"}%)
+                                  </Badge>
+                                </div>
+                                <ul className="space-y-1 text-sm">
+                                  {dim.accionesEspecificas && Array.isArray(dim.accionesEspecificas) && dim.accionesEspecificas.map((accion: string, i: number) => (
+                                    <li key={i} className="flex items-start gap-2">
+                                      <span className="text-warning mt-1">•</span>
+                                      <span>{accion}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Recomendaciones */}
+                    {planDesarrollo.recomendaciones && Array.isArray(planDesarrollo.recomendaciones) && planDesarrollo.recomendaciones.length > 0 && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="text-lg">Recomendaciones Generales</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <ul className="space-y-2">
+                            {planDesarrollo.recomendaciones.map((rec: string, idx: number) => (
+                              <li key={idx} className="flex items-start gap-2">
+                                <span className="text-primary mt-1">→</span>
+                                <span>{rec}</span>
+                              </li>
+                            ))}
+                          </ul>
                         </CardContent>
                       </Card>
                     )}
