@@ -1396,16 +1396,16 @@ export const exportEvaluacionCompletaPDFReact = async (
     // Importar componente PDF dinámicamente
     const { EvaluacionPDF } = await import("@/components/pdf/EvaluacionPDF");
     
-    // Generar PDF
+    // Generar PDF usando React.createElement para evitar problemas con JSX en archivo .ts
     const blob = await pdf(
-      <EvaluacionPDF
-        empleado={empleado}
-        periodo={periodo}
-        fechaGeneracion={fechaGeneracion}
-        resultadoData={resultadoData}
-        planDesarrollo={planDesarrollo}
-        radarImage={radarImage || undefined}
-      />
+      React.createElement(EvaluacionPDF, {
+        empleado,
+        periodo,
+        fechaGeneracion,
+        resultadoData,
+        planDesarrollo,
+        radarImage: radarImage || undefined,
+      })
     ).toBlob();
     
     // Crear URL y descargar
