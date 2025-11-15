@@ -32,7 +32,7 @@ import { TrendingUp, Award, Lightbulb, FileDown, Target, User } from "lucide-rea
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PerformanceRadarAnalysis } from "@/components/evaluation/PerformanceRadarAnalysis";
 import { supabase } from "@/integrations/supabase/client";
-import { exportEvaluacionCompletaPDF, exportEvaluacionCompletaPDFFromElement } from "@/lib/exports";
+import { exportEvaluacionCompletaPDF, exportEvaluacionCompletaPDFFromElement, exportEvaluacionCompletaPDFReact } from "@/lib/exports";
 
 // Helper para calcular respuestas consolidadas (70% jefe + 30% auto)
 const calculateConsolidatedResponses = (
@@ -845,7 +845,7 @@ const Dashboard = () => {
                 </Card>
 
                 {/* Gráfico de Radar */}
-                <div className="mb-6">
+                <div className="mb-6" data-radar-chart>
                   <PerformanceRadarAnalysis
                     radarData={resultadoData.radarData.map(d => ({
                       dimension: d.dimension,
@@ -1092,8 +1092,7 @@ const Dashboard = () => {
                               return;
                             }
                             try {
-                              await exportEvaluacionCompletaPDFFromElement(
-                                "resultados-evaluacion-container",
+                              await exportEvaluacionCompletaPDFReact(
                                 {
                                   nombre: user?.nombre || "N/A",
                                   apellidos: user?.apellidos,
@@ -1108,7 +1107,29 @@ const Dashboard = () => {
                                   telefono: user?.telefono
                                 },
                                 activePeriod?.nombre || "N/A",
-                                new Date()
+                                new Date(),
+                                {
+                                  performancePercentage: resultadoData.performancePercentage,
+                                  jefeCompleto: resultadoData.jefeCompleto,
+                                  fortalezas: resultadoData.fortalezas.map(f => ({
+                                    dimension: f.dimension,
+                                    nombreCompleto: f.nombreCompleto,
+                                    tuEvaluacion: f.tuEvaluacion,
+                                    promedioMunicipal: f.promedioMunicipal
+                                  })),
+                                  areasOportunidad: resultadoData.areasOportunidad.map(a => ({
+                                    dimension: a.dimension,
+                                    nombreCompleto: a.nombreCompleto,
+                                    tuEvaluacion: a.tuEvaluacion,
+                                    promedioMunicipal: a.promedioMunicipal
+                                  })),
+                                  radarData: resultadoData.radarData.map(r => ({
+                                    dimension: r.dimension,
+                                    tuEvaluacion: r.tuEvaluacion,
+                                    promedioMunicipal: r.promedioMunicipal
+                                  }))
+                                },
+                                planDesarrollo
                               );
                             } catch (error) {
                               console.error("Error al exportar:", error);

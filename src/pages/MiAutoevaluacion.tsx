@@ -29,7 +29,7 @@ import { ArrowLeft, CheckCircle2, FileDown, Sparkles, TrendingUp, Target, Award,
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
-import { exportEvaluacionCompletaPDF } from "@/lib/exports";
+import { exportEvaluacionCompletaPDF, exportEvaluacionCompletaPDFReact } from "@/lib/exports";
 import { supabase } from "@/integrations/supabase/client";
 import {
   RadarChart,
@@ -544,7 +544,7 @@ const MiAutoevaluacion = () => {
           </CardContent>
         </Card>
 
-<div className="mb-6">
+<div className="mb-6" data-radar-chart>
   <PerformanceRadarAnalysis
     radarData={radarData.map(d => ({
       dimension: d.dimension,
@@ -605,34 +605,50 @@ const MiAutoevaluacion = () => {
                 </div>
               </div>
               <Button 
-                onClick={() => {
+                onClick={async () => {
                   try {
-                    exportEvaluacionCompletaPDF(
+                    await exportEvaluacionCompletaPDFReact(
                       {
                         nombre: user?.nombre || "N/A",
+                        apellidos: user?.apellidos,
                         dpi: user?.dpi,
                         cargo: user?.cargo,
                         area: user?.area,
-                        nivel: user?.nivel
+                        nivel: user?.nivel,
+                        direccionUnidad: user?.direccionUnidad,
+                        departamentoDependencia: user?.departamentoDependencia,
+                        profesion: user?.profesion,
+                        correo: user?.correo,
+                        telefono: user?.telefono
                       },
                       activePeriod?.nombre || "N/A",
                       new Date(),
                       {
                         performancePercentage,
                         jefeCompleto,
-                        fortalezas,
-                        areasDeOportunidad,
-                        radarData: radarData.map(d => ({
-                          ...d,
-                          promedioMunicipal: promedioMunicipal[d.dimensionData.id] || 0
+                        fortalezas: fortalezas.map(f => ({
+                          dimension: f.dimension,
+                          nombreCompleto: f.nombreCompleto,
+                          tuEvaluacion: f.tuEvaluacion,
+                          promedioMunicipal: f.promedioMunicipal
                         })),
-                        promedioMunicipal
-                      }
+                        areasOportunidad: areasDeOportunidad.map(a => ({
+                          dimension: a.dimension,
+                          nombreCompleto: a.nombreCompleto,
+                          tuEvaluacion: a.tuEvaluacion,
+                          promedioMunicipal: a.promedioMunicipal
+                        })),
+                        radarData: radarData.map(d => ({
+                          dimension: d.dimension,
+                          tuEvaluacion: d.tuEvaluacion,
+                          promedioMunicipal: promedioMunicipal[d.dimensionData.id] || 0
+                        }))
+                      },
+                      null // planDesarrollo no está disponible en esta vista
                     );
-                    toast.success("Evaluación exportada a PDF exitosamente");
                   } catch (error) {
                     console.error("Error al exportar:", error);
-                    toast.error("Error al exportar la evaluación");
+                    // El toast de error ya se maneja en la función
                   }
                 }}
                 className="w-full sm:w-auto bg-green-600 hover:bg-green-700"

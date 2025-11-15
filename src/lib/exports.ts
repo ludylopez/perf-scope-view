@@ -5,6 +5,8 @@ import { format } from "date-fns";
 import html2canvas from "html2canvas";
 import { es } from "date-fns/locale";
 import { scoreToPercentage } from "./calculations";
+import { pdf } from "@react-pdf/renderer";
+import React from "react";
 
 // Tipos para exportación
 export interface ExportData {
@@ -1267,5 +1269,185 @@ export const exportPlanDesarrolloPDF = (
 
   const filename = `plan_desarrollo_${colaboradorNombre.replace(/\s+/g, "_")}_${periodo}.pdf`;
   doc.save(filename);
+};
+
+// Capturar gráfico radar como imagen para embebido en PDF
+export const captureRadarChart = async (): Promise<string | null> => {
+  try {
+    // Buscar el elemento del gráfico radar usando diferentes selectores
+    let radarElement: HTMLElement | null = null;
+    
+    // Intentar con data-attribute primero
+    radarElement = document.querySelector('[data-radar-chart]') as HTMLElement;
+    
+    // Si no se encuentra, buscar por clase o estructura del componente PerformanceRadarAnalysis
+    if (!radarElement) {
+      const responsiveContainer = document.querySelector('.recharts-responsive-container');
+      if (responsiveContainer) {
+        radarElement = responsiveContainer as HTMLElement;
+      }
+    }
+    
+    // Si aún no se encuentra, buscar cualquier canvas o svg dentro de un Card que contenga "radar"
+    if (!radarElement) {
+      const cards = document.querySelectorAll('[class*="Card"]');
+      for (const card of cards) {
+        const hasRadar = card.querySelector('svg') || card.querySelector('canvas');
+        if (hasRadar && card.textContent?.toLowerCase().includes('radar')) {
+          radarElement = card as HTMLElement;
+          break;
+        }
+      }
+    }
+    
+    if (!radarElement) {
+      console.warn('No se encontró el elemento del gráfico radar para capturar');
+      return null;
+    }
+    
+    // Capturar el elemento como imagen con alta calidad
+    const canvas = await html2canvas(radarElement, {
+      scale: 3, // Alta resolución para mejor calidad en PDF
+      useCORS: true,
+      logging: false,
+      backgroundColor: '#ffffff',
+      width: radarElement.scrollWidth,
+      height: radarElement.scrollHeight,
+      windowWidth: radarElement.scrollWidth,
+      windowHeight: radarElement.scrollHeight,
+    });
+    
+    return canvas.toDataURL('image/png');
+  } catch (error) {
+    console.error('Error al capturar gráfico radar:', error);
+    return null;
+  }
+};
+
+// Exportar evaluación completa usando React-PDF
+export const exportEvaluacionCompletaPDFReact = async (
+  empleado: {
+    nombre: string;
+    apellidos?: string;
+    dpi?: string;
+    cargo?: string;
+    area?: string;
+    nivel?: string;
+    direccionUnidad?: string;
+    departamentoDependencia?: string;
+    profesion?: string;
+    correo?: string;
+    telefono?: string;
+  },
+  periodo: string,
+  fechaGeneracion: Date,
+  resultadoData: {
+    performancePercentage: number;
+    jefeCompleto: boolean;
+    fortalezas: Array<{
+      dimension: string;
+      nombreCompleto?: string;
+      tuEvaluacion: number;
+      promedioMunicipal?: number;
+    }>;
+    areasOportunidad: Array<{
+      dimension: string;
+      nombreCompleto?: string;
+      tuEvaluacion: number;
+      promedioMunicipal?: number;
+    }>;
+    radarData: Array<{
+      dimension: string;
+      tuEvaluacion: number;
+      promedioMunicipal?: number;
+    }>;
+  },
+  planDesarrollo?: {
+    planEstructurado?: {
+      objetivos?: string[];
+      acciones?: Array<{
+        descripcion: string;
+        responsable: string;
+        fecha: string;
+        recursos?: string[];
+        indicador: string;
+        prioridad: 'alta' | 'media' | 'baja';
+      }>;
+      dimensionesDebiles?: Array<{
+        dimension: string;
+        score?: number;
+        accionesEspecificas?: string[];
+      }>;
+    };
+    recomendaciones?: string[];
+  } | null
+) => {
+  try {
+    // Mostrar mensaje de carga
+    const toast = (await import("@/hooks/use-toast")).toast;
+    toast({
+      title: "Generando PDF...",
+      description: "Por favor espere mientras se genera el documento"
+    });
+    
+    // Capturar gráfico radar como imagen
+    const radarImage = await captureRadarChart();
+    
+    // Importar componente PDF dinámicamente
+    const { EvaluacionPDF } = await import("@/components/pdf/EvaluacionPDF");
+    
+    // Generar PDF
+    const blob = await pdf(
+      <EvaluacionPDF
+        empleado={empleado}
+        periodo={periodo}
+        fechaGeneracion={fechaGeneracion}
+        resultadoData={resultadoData}
+        planDesarrollo={planDesarrollo}
+        radarImage={radarImage || undefined}
+      />
+    ).toBlob();
+    
+    // Crear URL y descargar
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `evaluacion_${empleado.nombre.replace(/\s+/g, "_")}_${periodo.replace(/\s+/g, "_")}_${format(fechaGeneracion, "yyyy-MM-dd")}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    toast({
+      title: "Éxito",
+      description: "PDF generado exitosamente"
+    });
+  } catch (error) {
+    console.error("Error al exportar PDF con React-PDF:", error);
+    const toast = (await import("@/hooks/use-toast")).toast;
+    toast({
+      title: "Error",
+      description: "Error al generar el PDF. Intentando método alternativo...",
+      variant: "destructive"
+    });
+    
+    // Fallback a método anterior
+    try {
+      await exportEvaluacionCompletaPDFFromElement(
+        "resultados-evaluacion-container",
+        empleado,
+        periodo,
+        fechaGeneracion
+      );
+    } catch (fallbackError) {
+      console.error("Error en fallback:", fallbackError);
+      toast({
+        title: "Error",
+        description: "No se pudo generar el PDF. Por favor, intente nuevamente.",
+        variant: "destructive"
+      });
+      throw fallbackError;
+    }
+  }
 };
 
