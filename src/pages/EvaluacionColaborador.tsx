@@ -213,7 +213,8 @@ const EvaluacionColaborador = () => {
         if (colaboradorFormatted.nivel) {
           const userInstrument = await getInstrumentForUser(
             colaboradorFormatted.nivel,
-            instrumentoOverride
+            instrumentoOverride,
+            colaboradorFormatted.cargo
           );
           if (userInstrument) {
             setInstrument(userInstrument);

@@ -198,7 +198,7 @@ const Autoevaluacion = () => {
         });
 
         // Cargar instrumento según nivel del usuario
-        const userInstrument = await getInstrumentForUser(user.nivel);
+        const userInstrument = await getInstrumentForUser(user.nivel, undefined, user.cargo);
         if (!userInstrument) {
           toast.error("No se encontró un instrumento de evaluación para su nivel");
           return;
