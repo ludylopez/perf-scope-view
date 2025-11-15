@@ -26,11 +26,21 @@ export const ResultadoSectionPDF = ({ performancePercentage }: ResultadoSectionP
 
   return (
     <View style={pdfStyles.resultadoSection}>
-      <Text style={pdfStyles.percentage}>{performancePercentage}%</Text>
-      <Text style={[pdfStyles.interpretation, interpretation.color]}>
-        Tu desempeño es {interpretation.label}
-      </Text>
-      <Text style={pdfStyles.description}>{description}</Text>
+      <View style={pdfStyles.resultadoSectionInner}>
+        <View style={pdfStyles.resultadoLeft}>
+          <Text style={pdfStyles.resultadoTitle}>Resultado General</Text>
+          <Text style={[pdfStyles.interpretation, interpretation.color]}>
+            Tu desempeño es {interpretation.label}
+          </Text>
+          <Text style={pdfStyles.description}>{description}</Text>
+        </View>
+        <View style={pdfStyles.resultadoRight}>
+          <View style={pdfStyles.percentageContainer}>
+            <Text style={pdfStyles.percentage}>{performancePercentage}</Text>
+            <Text style={pdfStyles.percentageLabel}>%</Text>
+          </View>
+        </View>
+      </View>
     </View>
   );
 };

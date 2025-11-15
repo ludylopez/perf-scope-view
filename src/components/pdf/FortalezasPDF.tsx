@@ -23,11 +23,11 @@ export const FortalezasPDF = ({ fortalezas }: FortalezasPDFProps) => {
       {fortalezas.map((fortaleza, index) => (
         <View key={index} style={pdfStyles.fortalezaCard}>
           <Text style={pdfStyles.cardTitle}>
-            {fortaleza.dimension}
+            {index + 1}. {fortaleza.dimension}
           </Text>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 5 }}>
+          <View style={pdfStyles.cardValuesRow}>
             <Text style={pdfStyles.cardValue}>
-              Puntaje: {fortaleza.tuEvaluacion.toFixed(1)}%
+              Puntaje: <Text style={pdfStyles.cardPercentage}>{fortaleza.tuEvaluacion.toFixed(1)}%</Text>
             </Text>
             {fortaleza.promedioMunicipal !== undefined && fortaleza.promedioMunicipal > 0 && (
               <Text style={pdfStyles.cardValue}>

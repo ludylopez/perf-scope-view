@@ -23,11 +23,11 @@ export const AreasOportunidadPDF = ({ areasOportunidad }: AreasOportunidadPDFPro
       {areasOportunidad.map((area, index) => (
         <View key={index} style={pdfStyles.oportunidadCard}>
           <Text style={pdfStyles.cardTitle}>
-            {area.dimension}
+            {index + 1}. {area.dimension}
           </Text>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 5 }}>
+          <View style={pdfStyles.cardValuesRow}>
             <Text style={pdfStyles.cardValue}>
-              Puntaje: {area.tuEvaluacion.toFixed(1)}%
+              Puntaje: <Text style={pdfStyles.cardPercentage}>{area.tuEvaluacion.toFixed(1)}%</Text>
             </Text>
             {area.promedioMunicipal !== undefined && area.promedioMunicipal > 0 && (
               <Text style={pdfStyles.cardValue}>
