@@ -1390,9 +1390,6 @@ export const exportEvaluacionCompletaPDFReact = async (
       description: "Por favor espere mientras se genera el documento"
     });
     
-    // Capturar gráfico radar como imagen
-    const radarImage = await captureRadarChart();
-    
     // Importar componente PDF dinámicamente
     const { EvaluacionPDF } = await import("@/components/pdf/EvaluacionPDF");
     
@@ -1404,7 +1401,6 @@ export const exportEvaluacionCompletaPDFReact = async (
         fechaGeneracion,
         resultadoData,
         planDesarrollo,
-        radarImage: radarImage || undefined,
       })
     ).toBlob();
     

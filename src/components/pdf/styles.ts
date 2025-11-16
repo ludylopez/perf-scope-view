@@ -92,16 +92,6 @@ export const pdfStyles = StyleSheet.create({
   resultadoCenter: {
     flex: 1,
   },
-  resultadoRight: {
-    width: 130,
-    height: 130,
-    backgroundColor: '#e0f2fe',
-    border: '1px solid #bae6fd',
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 8,
-  },
   percentageContainer: {
     width: 70,
     height: 70,
@@ -226,9 +216,15 @@ export const pdfStyles = StyleSheet.create({
     borderLeft: '3px solid #f59e0b',
     borderRadius: 4,
   },
+  oportunidadesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 10,
+  },
   oportunidadCard: {
+    width: '32%',
     padding: 6,
-    marginBottom: 8,
     backgroundColor: '#fef2f2',
     borderLeft: '3px solid #ef4444',
     borderRadius: 4,

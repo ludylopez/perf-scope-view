@@ -1,7 +1,7 @@
 import { Document, Page, View, Text } from '@react-pdf/renderer';
 import { HeaderPDF } from './HeaderPDF';
 import { ResultadoSectionPDF } from './ResultadoSectionPDF';
-import { PanoramaCompetenciasPDF } from './PanoramaCompetenciasPDF';
+import { BarChartPDF } from './BarChartPDF';
 import { FortalezasPDF } from './FortalezasPDF';
 import { AreasOportunidadPDF } from './AreasOportunidadPDF';
 import { PlanDesarrolloPDF } from './PlanDesarrolloPDF';
@@ -65,7 +65,6 @@ interface EvaluacionPDFProps {
     };
     recomendaciones?: string[];
   } | null;
-  radarImage?: string;
 }
 
 export const EvaluacionPDF = ({
@@ -98,14 +97,13 @@ export const EvaluacionPDF = ({
           jefeCompleto={resultadoData.jefeCompleto}
         />
 
-        {/* Resultado General con gráfico */}
+        {/* Resultado General */}
         <ResultadoSectionPDF 
           performancePercentage={resultadoData.performancePercentage}
-          radarImage={radarImage}
         />
 
-        {/* Panorama de Competencias */}
-        <PanoramaCompetenciasPDF competencias={resultadoData.radarData} />
+        {/* Panorama de Competencias - Gráfico de Barras */}
+        <BarChartPDF competencias={resultadoData.radarData} />
 
         {/* Fortalezas */}
         <FortalezasPDF fortalezas={resultadoData.fortalezas} />
