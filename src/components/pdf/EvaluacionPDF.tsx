@@ -2,8 +2,6 @@ import { Document, Page, View, Text } from '@react-pdf/renderer';
 import { HeaderPDF } from './HeaderPDF';
 import { ResultadoSectionPDF } from './ResultadoSectionPDF';
 import { CompetenciasCardsPDF } from './CompetenciasCardsPDF';
-import { FortalezasPDF } from './FortalezasPDF';
-import { AreasOportunidadPDF } from './AreasOportunidadPDF';
 import { PlanDesarrolloPDF } from './PlanDesarrolloPDF';
 import { FirmasPDF } from './FirmasPDF';
 import { pdfStyles } from './styles';
@@ -75,7 +73,6 @@ export const EvaluacionPDF = ({
   fechaGeneracion,
   resultadoData,
   planDesarrollo,
-  radarImage,
 }: EvaluacionPDFProps) => {
   const nombreCompleto = empleado.apellidos 
     ? `${empleado.nombre} ${empleado.apellidos}` 
@@ -110,12 +107,6 @@ export const EvaluacionPDF = ({
           fortalezas={resultadoData.fortalezas}
           areasOportunidad={resultadoData.areasOportunidad}
         />
-
-        {/* Fortalezas */}
-        <FortalezasPDF fortalezas={resultadoData.fortalezas} />
-
-        {/* Áreas de Oportunidad */}
-        <AreasOportunidadPDF areasOportunidad={resultadoData.areasOportunidad} />
 
         {/* Footer */}
         <Text

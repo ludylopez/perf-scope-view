@@ -13,8 +13,8 @@ export const pdfStyles = StyleSheet.create({
   header: {
     backgroundColor: '#2563eb',
     color: '#ffffff',
-    padding: 12,
-    marginBottom: 10,
+    padding: 10,
+    marginBottom: 8,
     textAlign: 'center',
     borderRadius: 6,
   },
@@ -34,7 +34,7 @@ export const pdfStyles = StyleSheet.create({
   infoCard: {
     backgroundColor: '#ffffff',
     padding: 0,
-    marginBottom: 10,
+    marginBottom: 8,
   },
   infoCardTitle: {
     fontSize: 0,
@@ -71,14 +71,14 @@ export const pdfStyles = StyleSheet.create({
   
   // Resultado Section
   resultadoSection: {
-    marginBottom: 10,
-    padding: 10,
+    marginBottom: 8,
+    padding: 8,
     backgroundColor: '#f8f9fa',
     borderLeft: '4px solid #2563eb',
     borderRadius: 4,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 15,
+    gap: 12,
   },
   resultadoSectionInner: {
     flexDirection: 'row',
@@ -93,16 +93,16 @@ export const pdfStyles = StyleSheet.create({
     flex: 1,
   },
   percentageContainer: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: '#2563eb',
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
   },
   percentage: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#ffffff',
     lineHeight: 1,
@@ -149,14 +149,14 @@ export const pdfStyles = StyleSheet.create({
   
   // Radar Chart
   radarSection: {
-    marginBottom: 10,
+    marginBottom: 8,
   },
   radarTitle: {
     fontSize: 11,
     fontWeight: 'bold',
-    marginBottom: 6,
+    marginBottom: 4,
     color: '#1f2937',
-    paddingBottom: 3,
+    paddingBottom: 2,
     borderBottom: '1px solid #e5e7eb',
   },
   radarDescription: {
@@ -197,17 +197,17 @@ export const pdfStyles = StyleSheet.create({
   sectionTitle: {
     fontSize: 11,
     fontWeight: 'bold',
-    marginBottom: 6,
-    marginTop: 10,
+    marginBottom: 4,
+    marginTop: 6,
     color: '#1f2937',
-    paddingBottom: 3,
+    paddingBottom: 2,
     borderBottom: '1px solid #e5e7eb',
   },
   fortalezasGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
-    marginBottom: 10,
+    marginBottom: 6,
   },
   fortalezaCard: {
     width: '32%',
@@ -220,7 +220,7 @@ export const pdfStyles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
-    marginBottom: 10,
+    marginBottom: 6,
   },
   oportunidadCard: {
     width: '32%',
