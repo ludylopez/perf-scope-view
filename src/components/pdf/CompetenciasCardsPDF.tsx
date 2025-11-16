@@ -8,6 +8,7 @@ interface CompetenciaData {
   promedioMunicipal?: number;
   dimensionId?: string; // ID de la dimensión del instrumento (ej: dim1_a1)
   descripcion?: string; // Descripción de la dimensión del instrumento
+  explicacion?: string; // Explicación pre-cargada desde la base de datos
 }
 
 interface CompetenciasCardsPDFProps {
@@ -208,10 +209,14 @@ const ExplanationBox = ({ competencia, nivel, barColor }: {
   nivel?: string;
   barColor: string;
 }) => {
-  // Para React-PDF, usamos la descripción del instrumento si está disponible, o la función genérica
+  // Usar explicación pre-cargada de la base de datos si está disponible
   let explicacion = '';
   
-  if (competencia.descripcion) {
+  if (competencia.explicacion) {
+    // Usar explicación de la base de datos (ya incluye comparación si corresponde)
+    explicacion = competencia.explicacion;
+  } else if (competencia.descripcion) {
+    // Fallback: adaptar descripción del instrumento
     explicacion = adaptDescriptionToResultFallback(
       competencia.descripcion,
       competencia.tuEvaluacion,
@@ -219,6 +224,7 @@ const ExplanationBox = ({ competencia, nivel, barColor }: {
       competencia.promedioMunicipal
     );
   } else {
+    // Fallback genérico
     explicacion = getResultExplanation(
       competencia.dimension,
       competencia.tuEvaluacion,

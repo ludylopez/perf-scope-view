@@ -1126,7 +1126,9 @@ const Dashboard = () => {
                                   radarData: resultadoData.radarData.map(r => ({
                                     dimension: r.dimension,
                                     tuEvaluacion: r.tuEvaluacion,
-                                    promedioMunicipal: r.promedioMunicipal
+                                    promedioMunicipal: r.promedioMunicipal,
+                                    dimensionId: r.dimensionData?.id,
+                                    descripcion: r.dimensionData?.descripcion
                                   }))
                                 },
                                 planDesarrollo

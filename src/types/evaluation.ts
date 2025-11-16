@@ -55,7 +55,9 @@ export interface FinalScore {
   desempenoJefe: number;
   desempenoFinal: number;
   potencial?: number;
-  posicion9Box?: string;
+  posicion9Box?: string; // Formato: "alto-alto", "medio-bajo", etc. - Ver nineBoxMetadata.ts para detalles
+  desempenoPorcentaje?: number; // Porcentaje de desempeño (0-100)
+  potencialPorcentaje?: number; // Porcentaje de potencial (0-100)
 }
 
 export interface AccionDesarrollo {

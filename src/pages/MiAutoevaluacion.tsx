@@ -641,7 +641,9 @@ const MiAutoevaluacion = () => {
                         radarData: radarData.map(d => ({
                           dimension: d.dimension,
                           tuEvaluacion: d.tuEvaluacion,
-                          promedioMunicipal: promedioMunicipal[d.dimensionData.id] || 0
+                          promedioMunicipal: promedioMunicipal[d.dimensionData.id] || 0,
+                          dimensionId: d.dimensionData?.id,
+                          descripcion: d.dimensionData?.descripcion
                         }))
                       },
                       null // planDesarrollo no está disponible en esta vista

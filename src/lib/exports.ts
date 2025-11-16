@@ -1362,6 +1362,8 @@ export const exportEvaluacionCompletaPDFReact = async (
       dimension: string;
       tuEvaluacion: number;
       promedioMunicipal?: number;
+      dimensionId?: string;
+      descripcion?: string;
     }>;
   },
   planDesarrollo?: {
@@ -1502,6 +1504,36 @@ export const exportEvaluacionCompletaPDFReact = async (
       }
     }
     
+    // Pre-cargar explicaciones de la base de datos para cada dimensión
+    const { getDimensionExplanation } = await import("@/lib/generateDimensionExplanations");
+    const radarDataWithExplanations = await Promise.all(
+      resultadoData.radarData.map(async (r) => {
+        let explicacion = null;
+        if (r.dimensionId && empleado.nivel) {
+          try {
+            explicacion = await getDimensionExplanation(
+              r.dimensionId,
+              empleado.nivel,
+              r.tuEvaluacion,
+              r.promedioMunicipal
+            );
+          } catch (error) {
+            console.warn(`No se pudo obtener explicación para ${r.dimensionId}:`, error);
+          }
+        }
+        return {
+          ...r,
+          explicacion: explicacion || undefined
+        };
+      })
+    );
+    
+    // Crear resultadoData con explicaciones pre-cargadas
+    const resultadoDataWithExplanations = {
+      ...resultadoData,
+      radarData: radarDataWithExplanations
+    };
+    
     // Importar componente PDF dinámicamente
     const { EvaluacionPDF } = await import("@/components/pdf/EvaluacionPDF");
     
@@ -1515,7 +1547,7 @@ export const exportEvaluacionCompletaPDFReact = async (
         },
         periodo,
         fechaGeneracion,
-        resultadoData,
+        resultadoData: resultadoDataWithExplanations,
         planDesarrollo,
       })
     ).toBlob();
