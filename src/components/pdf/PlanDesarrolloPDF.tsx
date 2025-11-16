@@ -64,12 +64,12 @@ export const PlanDesarrolloPDF = ({ planDesarrollo }: PlanDesarrolloPDFProps) =>
 
   return (
     <View style={pdfStyles.planSection}>
-      <Text style={pdfStyles.planTitle}>Plan de Desarrollo Personalizado</Text>
+      <Text style={pdfStyles.planTitle}>PLAN DE DESARROLLO PERSONALIZADO</Text>
 
       {/* Objetivos */}
       {planEstructurado.objetivos && planEstructurado.objetivos.length > 0 && (
-        <View style={{ marginBottom: 15 }}>
-          <Text style={pdfStyles.planSubtitle}>Objetivos de Desarrollo</Text>
+        <View style={pdfStyles.objetivosSection}>
+          <Text style={pdfStyles.planSubtitle}>OBJETIVOS DE DESARROLLO</Text>
           <View style={pdfStyles.objetivosList}>
             {planEstructurado.objetivos.map((objetivo, idx) => (
               <Text key={idx} style={pdfStyles.objetivoItem}>
@@ -82,9 +82,9 @@ export const PlanDesarrolloPDF = ({ planDesarrollo }: PlanDesarrolloPDFProps) =>
 
       {/* Acciones en tabla */}
       {planEstructurado.acciones && planEstructurado.acciones.length > 0 && (
-        <View style={{ marginBottom: 15 }}>
-          <Text style={pdfStyles.planSubtitle}>Plan de Acción Detallado</Text>
-          <Text style={{ fontSize: 9, color: '#6b7280', marginBottom: 8 }}>
+        <View>
+          <Text style={pdfStyles.planSubtitle}>PLAN DE ACCIÓN DETALLADO</Text>
+          <Text style={pdfStyles.planSubtitleDescription}>
             Acciones concretas con responsables, fechas e indicadores
           </Text>
           
@@ -133,11 +133,11 @@ export const PlanDesarrolloPDF = ({ planDesarrollo }: PlanDesarrolloPDFProps) =>
 
       {/* Dimensiones Débiles */}
       {planEstructurado.dimensionesDebiles && planEstructurado.dimensionesDebiles.length > 0 && (
-        <View style={{ marginBottom: 15 }}>
-          <Text style={pdfStyles.planSubtitle}>Dimensiones que Requieren Atención</Text>
+        <View>
+          <Text style={pdfStyles.sectionTitle}>DIMENSIONES QUE REQUIEREN ATENCIÓN</Text>
           {planEstructurado.dimensionesDebiles.map((dim, idx) => (
             <View key={idx} style={pdfStyles.dimensionDebilCard}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
+              <View style={pdfStyles.dimensionDebilHeader}>
                 <Text style={pdfStyles.dimensionDebilTitle}>{dim.dimension}</Text>
                 {dim.score !== undefined && (
                   <Text style={pdfStyles.dimensionDebilScore}>
@@ -146,9 +146,9 @@ export const PlanDesarrolloPDF = ({ planDesarrollo }: PlanDesarrolloPDFProps) =>
                 )}
               </View>
               {dim.accionesEspecificas && dim.accionesEspecificas.length > 0 && (
-                <View style={pdfStyles.dimensionDebilActions}>
+                <View>
                   {dim.accionesEspecificas.map((accion, i) => (
-                    <Text key={i} style={pdfStyles.listItem}>
+                    <Text key={i} style={pdfStyles.dimensionDebilActions}>
                       • {accion}
                     </Text>
                   ))}
@@ -161,12 +161,12 @@ export const PlanDesarrolloPDF = ({ planDesarrollo }: PlanDesarrolloPDFProps) =>
 
       {/* Recomendaciones */}
       {recomendaciones && recomendaciones.length > 0 && (
-        <View style={{ marginBottom: 15 }}>
-          <Text style={pdfStyles.planSubtitle}>Recomendaciones Generales</Text>
+        <View>
+          <Text style={pdfStyles.sectionTitle}>RECOMENDACIONES GENERALES</Text>
           <View style={pdfStyles.recomendacionesList}>
             {recomendaciones.map((rec, idx) => (
               <Text key={idx} style={pdfStyles.recomendacionItem}>
-                → {rec}
+                • {rec}
               </Text>
             ))}
           </View>

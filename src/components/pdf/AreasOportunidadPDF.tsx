@@ -19,22 +19,15 @@ export const AreasOportunidadPDF = ({ areasOportunidad }: AreasOportunidadPDFPro
 
   return (
     <View>
-      <Text style={pdfStyles.sectionTitle}>Áreas de Oportunidad</Text>
+      <Text style={pdfStyles.sectionTitle}>ÁREAS DE OPORTUNIDAD</Text>
       {areasOportunidad.map((area, index) => (
         <View key={index} style={pdfStyles.oportunidadCard}>
-          <Text style={pdfStyles.cardTitle}>
+          <Text style={pdfStyles.oportunidadTitle}>
             {index + 1}. {area.dimension}
           </Text>
-          <View style={pdfStyles.cardValuesRow}>
-            <Text style={pdfStyles.cardValue}>
-              Puntaje: <Text style={pdfStyles.cardPercentage}>{area.tuEvaluacion.toFixed(1)}%</Text>
-            </Text>
-            {area.promedioMunicipal !== undefined && area.promedioMunicipal > 0 && (
-              <Text style={pdfStyles.cardValue}>
-                Promedio Municipal: {area.promedioMunicipal.toFixed(1)}%
-              </Text>
-            )}
-          </View>
+          <Text style={pdfStyles.oportunidadValue}>
+            Puntaje: {area.tuEvaluacion.toFixed(1)}%
+          </Text>
         </View>
       ))}
     </View>

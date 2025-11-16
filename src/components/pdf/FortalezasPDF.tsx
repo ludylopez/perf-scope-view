@@ -19,24 +19,19 @@ export const FortalezasPDF = ({ fortalezas }: FortalezasPDFProps) => {
 
   return (
     <View>
-      <Text style={pdfStyles.sectionTitle}>Fortalezas Identificadas</Text>
-      {fortalezas.map((fortaleza, index) => (
-        <View key={index} style={pdfStyles.fortalezaCard}>
-          <Text style={pdfStyles.cardTitle}>
-            {index + 1}. {fortaleza.dimension}
-          </Text>
-          <View style={pdfStyles.cardValuesRow}>
-            <Text style={pdfStyles.cardValue}>
-              Puntaje: <Text style={pdfStyles.cardPercentage}>{fortaleza.tuEvaluacion.toFixed(1)}%</Text>
+      <Text style={pdfStyles.sectionTitle}>FORTALEZAS IDENTIFICADAS</Text>
+      <View style={pdfStyles.fortalezasGrid}>
+        {fortalezas.map((fortaleza, index) => (
+          <View key={index} style={pdfStyles.fortalezaCard}>
+            <Text style={pdfStyles.cardTitle}>
+              {index + 1}. {fortaleza.dimension}
             </Text>
-            {fortaleza.promedioMunicipal !== undefined && fortaleza.promedioMunicipal > 0 && (
-              <Text style={pdfStyles.cardValue}>
-                Promedio Municipal: {fortaleza.promedioMunicipal.toFixed(1)}%
-              </Text>
-            )}
+            <Text style={pdfStyles.cardValue}>
+              Puntaje: {fortaleza.tuEvaluacion.toFixed(1)}%
+            </Text>
           </View>
-        </View>
-      ))}
+        ))}
+      </View>
     </View>
   );
 };
