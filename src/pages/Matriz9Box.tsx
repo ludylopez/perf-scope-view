@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Grid3x3, Users, Info, BookOpen, Target } from "lucide-react";
+import { ArrowLeft, Grid3x3, Users, Info, BookOpen, Target, Download, List, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { getActivePeriod, getEvaluationIdFromSupabase } from "@/lib/supabase";
@@ -17,6 +17,9 @@ import { hasJefeEvaluation, getJefeEvaluationDraft, getSubmittedEvaluation } fro
 import { getInstrumentConfigForUser } from "@/lib/backendCalculations";
 import { QuadrantLegend } from "@/components/ninebox/QuadrantLegend";
 import { QuadrantInfo } from "@/components/ninebox/QuadrantInfo";
+import { NineBoxFilters, FilterOptions } from "@/components/ninebox/NineBoxFilters";
+import { UrgentAlerts } from "@/components/ninebox/UrgentAlerts";
+import { AdvancedList } from "@/components/ninebox/AdvancedList";
 import {
   NINE_BOX_METADATA,
   NineBoxPosition,
@@ -25,6 +28,11 @@ import {
   getPositionsByImportance,
   getPositionsByRetentionPriority
 } from "@/lib/nineBoxMetadata";
+import {
+  exportNineBoxToPDF,
+  exportNineBoxToExcel,
+  exportNineBoxToJSON
+} from "@/lib/nineBoxExport";
 import {
   Dialog,
   DialogContent,
@@ -39,6 +47,13 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 
 interface TeamMember9Box {
   dpi: string;
@@ -70,8 +85,11 @@ const Matriz9Box = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [teamMembers, setTeamMembers] = useState<TeamMember9Box[]>([]);
-  const [selectedPosition, setSelectedPosition] = useState<NineBoxPosition | null>(null);
   const [showLegend, setShowLegend] = useState(false);
+  const [activePeriodName, setActivePeriodName] = useState<string>("");
+  const [filters, setFilters] = useState<FilterOptions>({
+    searchTerm: "",
+  });
   const [nineBoxData, setNineBoxData] = useState<NineBoxData>({
     "alto-alto": [],
     "alto-medio": [],
@@ -96,15 +114,14 @@ const Matriz9Box = () => {
     try {
       setLoading(true);
 
-      // Obtener período activo
       const activePeriod = await getActivePeriod();
       if (!activePeriod) {
         toast.error("No se encontró un período de evaluación activo");
         return;
       }
       const periodoId = activePeriod.id;
+      setActivePeriodName(activePeriod.nombre);
 
-      // Cargar colaboradores asignados desde Supabase
       const { data: assignments, error: assignmentsError } = await supabase
         .from("user_assignments")
         .select(`
@@ -125,78 +142,43 @@ const Matriz9Box = () => {
 
       const members: TeamMember9Box[] = [];
 
-      // Para cada colaborador, calcular su posición 9-box
       for (const assignment of assignments || []) {
         const colaborador = Array.isArray(assignment.users) ? assignment.users[0] : assignment.users;
         if (!colaborador) continue;
 
         const colaboradorDpi = colaborador.dpi;
-
-        // Verificar si el jefe completó la evaluación
         const jefeEvaluado = await hasJefeEvaluation(user.dpi, colaboradorDpi, periodoId);
 
-        if (!jefeEvaluado) {
-          continue;
-        }
+        if (!jefeEvaluado) continue;
 
-        // Primero intentar cargar desde Supabase
         let resultadoFinal = await getFinalResultFromSupabase(colaboradorDpi, periodoId);
 
-        // Si no está en Supabase, calcular sobre la marcha
         if (!resultadoFinal) {
           const evaluacionJefe = await getJefeEvaluationDraft(user.dpi, colaboradorDpi, periodoId);
           const autoevaluacion = await getSubmittedEvaluation(colaboradorDpi, periodoId);
 
-          if (!evaluacionJefe || evaluacionJefe.estado !== "enviado" || !autoevaluacion) {
-            continue;
-          }
+          if (!evaluacionJefe || evaluacionJefe.estado !== "enviado" || !autoevaluacion) continue;
 
           const instrument = await getInstrumentForUser(colaborador.nivel);
           if (!instrument) continue;
 
-          const autoevaluacionId = await getEvaluationIdFromSupabase(
-            colaboradorDpi,
-            periodoId,
-            "auto"
-          );
-          const evaluacionJefeId = await getEvaluationIdFromSupabase(
-            colaboradorDpi,
-            periodoId,
-            "jefe",
-            user.dpi,
-            colaboradorDpi
-          );
+          const autoevaluacionId = await getEvaluationIdFromSupabase(colaboradorDpi, periodoId, "auto");
+          const evaluacionJefeId = await getEvaluationIdFromSupabase(colaboradorDpi, periodoId, "jefe", user.dpi, colaboradorDpi);
           const instrumentConfig = await getInstrumentConfigForUser(colaboradorDpi);
 
           if (autoevaluacionId && evaluacionJefeId && instrumentConfig) {
             try {
               resultadoFinal = await calculateCompleteFinalScore(
-                autoevaluacion,
-                evaluacionJefe,
-                instrument.dimensionesDesempeno,
-                instrument.dimensionesPotencial,
-                true,
-                autoevaluacionId,
-                evaluacionJefeId,
-                instrumentConfig
+                autoevaluacion, evaluacionJefe, instrument.dimensionesDesempeno, instrument.dimensionesPotencial, true, autoevaluacionId, evaluacionJefeId, instrumentConfig
               );
             } catch (error) {
-              console.warn(`⚠️ Error calculando resultado para ${colaboradorDpi}, usando cálculo local:`, error);
               resultadoFinal = await calculateCompleteFinalScore(
-                autoevaluacion,
-                evaluacionJefe,
-                instrument.dimensionesDesempeno,
-                instrument.dimensionesPotencial,
-                false
+                autoevaluacion, evaluacionJefe, instrument.dimensionesDesempeno, instrument.dimensionesPotencial, false
               );
             }
           } else {
             resultadoFinal = await calculateCompleteFinalScore(
-              autoevaluacion,
-              evaluacionJefe,
-              instrument.dimensionesDesempeno,
-              instrument.dimensionesPotencial,
-              false
+              autoevaluacion, evaluacionJefe, instrument.dimensionesDesempeno, instrument.dimensionesPotencial, false
             );
           }
 
@@ -213,25 +195,16 @@ const Matriz9Box = () => {
           potencial: resultadoFinal.potencial,
           posicion9Box: resultadoFinal.posicion9Box || "medio-medio",
           desempenoPorcentaje: scoreToPercentage(resultadoFinal.desempenoFinal),
-          potencialPorcentaje: resultadoFinal.potencial
-            ? scoreToPercentage(resultadoFinal.potencial)
-            : undefined,
+          potencialPorcentaje: resultadoFinal.potencial ? scoreToPercentage(resultadoFinal.potencial) : undefined,
         });
       }
 
       setTeamMembers(members);
 
-      // Organizar por posición 9-box
       const organized: NineBoxData = {
-        "alto-alto": [],
-        "alto-medio": [],
-        "alto-bajo": [],
-        "medio-alto": [],
-        "medio-medio": [],
-        "medio-bajo": [],
-        "bajo-alto": [],
-        "bajo-medio": [],
-        "bajo-bajo": [],
+        "alto-alto": [], "alto-medio": [], "alto-bajo": [],
+        "medio-alto": [], "medio-medio": [], "medio-bajo": [],
+        "bajo-alto": [], "bajo-medio": [], "bajo-bajo": [],
       };
 
       members.forEach(member => {
@@ -249,34 +222,133 @@ const Matriz9Box = () => {
     }
   };
 
+  // Filtrado de miembros
+  const filteredMembers = useMemo(() => {
+    return teamMembers.filter(member => {
+      // Búsqueda por texto
+      if (filters.searchTerm) {
+        const searchLower = filters.searchTerm.toLowerCase();
+        const matchesSearch =
+          member.nombre.toLowerCase().includes(searchLower) ||
+          member.cargo.toLowerCase().includes(searchLower) ||
+          member.area.toLowerCase().includes(searchLower);
+        if (!matchesSearch) return false;
+      }
+
+      // Filtro por posición
+      if (filters.position && member.posicion9Box !== filters.position) return false;
+
+      // Filtro por área
+      if (filters.area && member.area !== filters.area) return false;
+
+      // Filtro por nivel
+      if (filters.nivel && member.nivel !== filters.nivel) return false;
+
+      // Filtro por cargo
+      if (filters.cargo && member.cargo !== filters.cargo) return false;
+
+      // Filtro por importancia estratégica
+      if (filters.importancia) {
+        const metadata = getQuadrantMetadata(member.posicion9Box);
+        if (metadata?.strategicImportance !== filters.importancia) return false;
+      }
+
+      // Filtro por prioridad de retención
+      if (filters.retencion) {
+        const metadata = getQuadrantMetadata(member.posicion9Box);
+        if (metadata?.retentionPriority !== filters.retencion) return false;
+      }
+
+      return true;
+    });
+  }, [teamMembers, filters]);
+
+  // Reorganizar datos filtrados
+  const filteredNineBoxData = useMemo(() => {
+    const organized: NineBoxData = {
+      "alto-alto": [], "alto-medio": [], "alto-bajo": [],
+      "medio-alto": [], "medio-medio": [], "medio-bajo": [],
+      "bajo-alto": [], "bajo-medio": [], "bajo-bajo": [],
+    };
+
+    filteredMembers.forEach(member => {
+      if (member.posicion9Box && organized[member.posicion9Box as keyof NineBoxData]) {
+        organized[member.posicion9Box as keyof NineBoxData].push(member);
+      }
+    });
+
+    return organized;
+  }, [filteredMembers]);
+
+  // Opciones para filtros
+  const availableAreas = useMemo(() => [...new Set(teamMembers.map(m => m.area))].sort(), [teamMembers]);
+  const availableNiveles = useMemo(() => [...new Set(teamMembers.map(m => m.nivel))].sort(), [teamMembers]);
+  const availableCargos = useMemo(() => [...new Set(teamMembers.map(m => m.cargo))].sort(), [teamMembers]);
+
   const positions: Array<{ key: keyof NineBoxData; row: number; col: number }> = [
-    // Fila superior (Alto Potencial)
-    { key: "bajo-alto", row: 0, col: 0 },
-    { key: "medio-alto", row: 0, col: 1 },
-    { key: "alto-alto", row: 0, col: 2 },
-    // Fila media (Medio Potencial)
-    { key: "bajo-medio", row: 1, col: 0 },
-    { key: "medio-medio", row: 1, col: 1 },
-    { key: "alto-medio", row: 1, col: 2 },
-    // Fila inferior (Bajo Potencial)
-    { key: "bajo-bajo", row: 2, col: 0 },
-    { key: "medio-bajo", row: 2, col: 1 },
-    { key: "alto-bajo", row: 2, col: 2 },
+    { key: "bajo-alto", row: 0, col: 0 }, { key: "medio-alto", row: 0, col: 1 }, { key: "alto-alto", row: 0, col: 2 },
+    { key: "bajo-medio", row: 1, col: 0 }, { key: "medio-medio", row: 1, col: 1 }, { key: "alto-medio", row: 1, col: 2 },
+    { key: "bajo-bajo", row: 2, col: 0 }, { key: "medio-bajo", row: 2, col: 1 }, { key: "alto-bajo", row: 2, col: 2 },
   ];
 
   const totalEvaluados = teamMembers.length;
   const criticalTalent = getPositionsByImportance("critical");
   const urgentRetention = getPositionsByRetentionPriority("urgent");
 
-  // Calcular estadísticas estratégicas
   const criticalTalentCount = criticalTalent.reduce(
-    (sum, metadata) => sum + (nineBoxData[metadata.key as keyof NineBoxData]?.length || 0),
-    0
+    (sum, metadata) => sum + (filteredNineBoxData[metadata.key as keyof NineBoxData]?.length || 0), 0
   );
   const urgentRetentionCount = urgentRetention.reduce(
-    (sum, metadata) => sum + (nineBoxData[metadata.key as keyof NineBoxData]?.length || 0),
-    0
+    (sum, metadata) => sum + (filteredNineBoxData[metadata.key as keyof NineBoxData]?.length || 0), 0
   );
+
+  // Handlers de exportación
+  const handleExportPDF = async () => {
+    try {
+      toast.loading("Generando PDF...");
+      const fileName = await exportNineBoxToPDF(
+        filteredMembers,
+        filteredNineBoxData,
+        user?.nombre || "Manager",
+        activePeriodName
+      );
+      toast.success(`PDF generado: ${fileName}`);
+    } catch (error) {
+      toast.error("Error al generar PDF");
+      console.error(error);
+    }
+  };
+
+  const handleExportExcel = () => {
+    try {
+      toast.loading("Generando Excel...");
+      const fileName = exportNineBoxToExcel(
+        filteredMembers,
+        filteredNineBoxData,
+        user?.nombre || "Manager",
+        activePeriodName
+      );
+      toast.success(`Excel generado: ${fileName}`);
+    } catch (error) {
+      toast.error("Error al generar Excel");
+      console.error(error);
+    }
+  };
+
+  const handleExportJSON = () => {
+    try {
+      const fileName = exportNineBoxToJSON(
+        filteredMembers,
+        filteredNineBoxData,
+        user?.nombre || "Manager",
+        activePeriodName
+      );
+      toast.success(`JSON exportado: ${fileName}`);
+    } catch (error) {
+      toast.error("Error al exportar JSON");
+      console.error(error);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -290,6 +362,27 @@ const Matriz9Box = () => {
           </Button>
 
           <div className="flex gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                  <Download className="mr-2 h-4 w-4" />
+                  Exportar
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleExportPDF}>
+                  📄 Exportar a PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportExcel}>
+                  📊 Exportar a Excel
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleExportJSON}>
+                  💾 Exportar datos JSON
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             <Dialog open={showLegend} onOpenChange={setShowLegend}>
               <DialogTrigger asChild>
                 <Button variant="outline">
@@ -337,267 +430,275 @@ const Matriz9Box = () => {
             </CardContent>
           </Card>
         ) : (
-          <Tabs defaultValue="matriz" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="matriz">
-                <Grid3x3 className="h-4 w-4 mr-2" />
-                Matriz Visual
-              </TabsTrigger>
-              <TabsTrigger value="prioridades">
-                <Target className="h-4 w-4 mr-2" />
-                Prioridades Estratégicas
-              </TabsTrigger>
-              <TabsTrigger value="guia">
-                <Info className="h-4 w-4 mr-2" />
-                Guía de Uso
-              </TabsTrigger>
-            </TabsList>
+          <div className="space-y-6">
+            {/* Filtros */}
+            <NineBoxFilters
+              filters={filters}
+              onFiltersChange={setFilters}
+              availableAreas={availableAreas}
+              availableNiveles={availableNiveles}
+              availableCargos={availableCargos}
+              totalCount={totalEvaluados}
+              filteredCount={filteredMembers.length}
+            />
 
-            {/* Tab: Matriz Visual */}
-            <TabsContent value="matriz" className="space-y-6">
-              {/* Resumen Estratégico */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Resumen Estratégico del Talento</CardTitle>
-                  <CardDescription>
-                    Indicadores clave para la toma de decisiones
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid gap-4 md:grid-cols-4">
-                    <div className="p-4 rounded-lg border bg-blue-50 border-blue-200">
-                      <p className="text-sm text-blue-700 mb-1">Total Evaluados</p>
-                      <p className="text-2xl font-bold text-blue-900">{totalEvaluados}</p>
-                    </div>
-                    <div className="p-4 rounded-lg border bg-red-50 border-red-200">
-                      <p className="text-sm text-red-700 mb-1">Talento Crítico ⭐</p>
-                      <p className="text-2xl font-bold text-red-900">{criticalTalentCount}</p>
-                      <p className="text-xs text-red-600 mt-1">Máxima prioridad</p>
-                    </div>
-                    <div className="p-4 rounded-lg border bg-orange-50 border-orange-200">
-                      <p className="text-sm text-orange-700 mb-1">Retención Urgente 🔒</p>
-                      <p className="text-2xl font-bold text-orange-900">{urgentRetentionCount}</p>
-                      <p className="text-xs text-orange-600 mt-1">Acción inmediata</p>
-                    </div>
-                    <div className="p-4 rounded-lg border bg-green-50 border-green-200">
-                      <p className="text-sm text-green-700 mb-1">Alto Potencial 💎</p>
-                      <p className="text-2xl font-bold text-green-900">
-                        {nineBoxData["alto-alto"].length +
-                         nineBoxData["medio-alto"].length +
-                         nineBoxData["bajo-alto"].length}
-                      </p>
-                      <p className="text-xs text-green-600 mt-1">Líderes futuros</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+            {/* Alertas Urgentes */}
+            <UrgentAlerts teamMembers={filteredMembers} />
 
-              {/* Matriz 9-Box Visual */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Matriz 9-Box del Equipo</CardTitle>
-                  <CardDescription>
-                    Haga clic en cualquier cuadrante para ver información detallada y recomendaciones
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {/* Etiquetas de ejes */}
-                    <div className="flex items-center justify-between text-sm font-medium mb-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground">Eje Vertical:</span>
-                        <Badge variant="outline">Potencial (Capacidad Futura)</Badge>
+            <Tabs defaultValue="matriz" className="space-y-6">
+              <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="matriz">
+                  <Grid3x3 className="h-4 w-4 mr-2" />
+                  Matriz Visual
+                </TabsTrigger>
+                <TabsTrigger value="lista">
+                  <List className="h-4 w-4 mr-2" />
+                  Vista de Lista
+                </TabsTrigger>
+                <TabsTrigger value="prioridades">
+                  <Target className="h-4 w-4 mr-2" />
+                  Prioridades
+                </TabsTrigger>
+                <TabsTrigger value="guia">
+                  <Info className="h-4 w-4 mr-2" />
+                  Guía
+                </TabsTrigger>
+              </TabsList>
+
+              {/* Tab: Matriz Visual */}
+              <TabsContent value="matriz" className="space-y-6">
+                {/* Resumen Estratégico */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Resumen Estratégico del Talento</CardTitle>
+                    <CardDescription>Indicadores clave para la toma de decisiones</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid gap-4 md:grid-cols-4">
+                      <div className="p-4 rounded-lg border bg-blue-50 border-blue-200">
+                        <p className="text-sm text-blue-700 mb-1">Total Evaluados</p>
+                        <p className="text-2xl font-bold text-blue-900">{filteredMembers.length}</p>
+                        {filteredMembers.length < totalEvaluados && (
+                          <p className="text-xs text-blue-600 mt-1">de {totalEvaluados} totales</p>
+                        )}
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline">Desempeño (Resultados Actuales)</Badge>
-                        <span className="text-muted-foreground">:Eje Horizontal</span>
+                      <div className="p-4 rounded-lg border bg-red-50 border-red-200">
+                        <p className="text-sm text-red-700 mb-1">Talento Crítico ⭐</p>
+                        <p className="text-2xl font-bold text-red-900">{criticalTalentCount}</p>
+                        <p className="text-xs text-red-600 mt-1">Máxima prioridad</p>
+                      </div>
+                      <div className="p-4 rounded-lg border bg-orange-50 border-orange-200">
+                        <p className="text-sm text-orange-700 mb-1">Retención Urgente 🔒</p>
+                        <p className="text-2xl font-bold text-orange-900">{urgentRetentionCount}</p>
+                        <p className="text-xs text-orange-600 mt-1">Acción inmediata</p>
+                      </div>
+                      <div className="p-4 rounded-lg border bg-green-50 border-green-200">
+                        <p className="text-sm text-green-700 mb-1">Alto Potencial 💎</p>
+                        <p className="text-2xl font-bold text-green-900">
+                          {filteredNineBoxData["alto-alto"].length +
+                           filteredNineBoxData["medio-alto"].length +
+                           filteredNineBoxData["bajo-alto"].length}
+                        </p>
+                        <p className="text-xs text-green-600 mt-1">Líderes futuros</p>
                       </div>
                     </div>
+                  </CardContent>
+                </Card>
 
-                    {/* Grid 3x3 */}
-                    <div className="grid grid-cols-3 gap-3">
-                      {positions.map((pos) => {
-                        const members = nineBoxData[pos.key];
-                        const metadata = getQuadrantMetadata(pos.key);
+                {/* Matriz 9-Box Visual */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Matriz 9-Box del Equipo</CardTitle>
+                    <CardDescription>
+                      Haga clic en cualquier cuadrante para ver información detallada y recomendaciones
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between text-sm font-medium mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground">Eje Vertical:</span>
+                          <Badge variant="outline">Potencial (Capacidad Futura)</Badge>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline">Desempeño (Resultados Actuales)</Badge>
+                          <span className="text-muted-foreground">:Eje Horizontal</span>
+                        </div>
+                      </div>
 
-                        return (
-                          <Dialog key={pos.key}>
-                            <DialogTrigger asChild>
-                              <div
-                                className={`min-h-[180px] p-4 rounded-lg border-2 cursor-pointer hover:shadow-lg transition-all ${getPositionColor(pos.key as NineBoxPosition)}`}
-                              >
-                                <div className="mb-3">
-                                  <div className="flex items-center justify-between mb-2">
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-xl">{metadata?.icon}</span>
-                                      <Badge variant="outline" className="text-xs font-semibold">
-                                        {metadata?.shortName}
+                      <div className="grid grid-cols-3 gap-3">
+                        {positions.map((pos) => {
+                          const members = filteredNineBoxData[pos.key];
+                          const metadata = getQuadrantMetadata(pos.key);
+
+                          return (
+                            <Dialog key={pos.key}>
+                              <DialogTrigger asChild>
+                                <div
+                                  className={`min-h-[180px] p-4 rounded-lg border-2 cursor-pointer hover:shadow-lg transition-all ${getPositionColor(pos.key as NineBoxPosition)}`}
+                                >
+                                  <div className="mb-3">
+                                    <div className="flex items-center justify-between mb-2">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-xl">{metadata?.icon}</span>
+                                        <Badge variant="outline" className="text-xs font-semibold">
+                                          {metadata?.shortName}
+                                        </Badge>
+                                      </div>
+                                      <Badge className="bg-primary/20 text-primary border-primary/30">
+                                        {members.length}
                                       </Badge>
                                     </div>
-                                    <Badge className="bg-primary/20 text-primary border-primary/30">
-                                      {members.length}
-                                    </Badge>
+                                    <p className="text-xs font-medium line-clamp-2">{metadata?.label}</p>
                                   </div>
-                                  <p className="text-xs font-medium line-clamp-2">
-                                    {metadata?.label}
-                                  </p>
-                                </div>
 
-                                <div className="space-y-1.5 max-h-[100px] overflow-y-auto">
-                                  {members.length === 0 ? (
-                                    <p className="text-xs text-muted-foreground text-center py-4">
-                                      Sin colaboradores
-                                    </p>
-                                  ) : (
-                                    members.slice(0, 3).map((member) => (
-                                      <div
-                                        key={member.dpi}
-                                        className="p-1.5 rounded bg-background/60 text-xs"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          navigate(`/evaluacion-equipo/${member.dpi}/comparativa`);
-                                        }}
-                                      >
-                                        <p className="font-medium truncate text-xs">{member.nombre}</p>
-                                        <div className="flex items-center gap-2 text-[10px] text-muted-foreground mt-0.5">
-                                          <span>D: {member.desempenoPorcentaje}%</span>
-                                          {member.potencialPorcentaje !== undefined && (
-                                            <span>P: {member.potencialPorcentaje}%</span>
-                                          )}
-                                        </div>
-                                      </div>
-                                    ))
-                                  )}
-                                  {members.length > 3 && (
-                                    <p className="text-xs text-center text-muted-foreground pt-1">
-                                      +{members.length - 3} más...
-                                    </p>
-                                  )}
-                                </div>
-                              </div>
-                            </DialogTrigger>
-                            <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
-                              <DialogHeader>
-                                <DialogTitle className="flex items-center gap-2">
-                                  <span className="text-2xl">{metadata?.icon}</span>
-                                  {metadata?.label}
-                                </DialogTitle>
-                                <DialogDescription>
-                                  {members.length} colaborador{members.length !== 1 ? "es" : ""} en este cuadrante
-                                </DialogDescription>
-                              </DialogHeader>
-
-                              <QuadrantInfo position={pos.key} showActions={true} />
-
-                              {members.length > 0 && (
-                                <div className="mt-6">
-                                  <h4 className="font-semibold mb-3">Colaboradores en este cuadrante:</h4>
-                                  <div className="grid gap-3 md:grid-cols-2">
-                                    {members.map((member) => (
-                                      <Card
-                                        key={member.dpi}
-                                        className="cursor-pointer hover:shadow-md transition-shadow"
-                                        onClick={() => {
-                                          navigate(`/evaluacion-equipo/${member.dpi}/comparativa`);
-                                        }}
-                                      >
-                                        <CardContent className="p-4">
-                                          <p className="font-medium text-sm mb-1">{member.nombre}</p>
-                                          <p className="text-xs text-muted-foreground mb-2">
-                                            {member.cargo} • {member.area}
-                                          </p>
-                                          <div className="flex items-center gap-4 text-xs">
-                                            <div>
-                                              <span className="text-muted-foreground">Desempeño: </span>
-                                              <span className="font-medium">
-                                                {member.desempenoPorcentaje}%
-                                              </span>
-                                            </div>
+                                  <div className="space-y-1.5 max-h-[100px] overflow-y-auto">
+                                    {members.length === 0 ? (
+                                      <p className="text-xs text-muted-foreground text-center py-4">Sin colaboradores</p>
+                                    ) : (
+                                      members.slice(0, 3).map((member) => (
+                                        <div
+                                          key={member.dpi}
+                                          className="p-1.5 rounded bg-background/60 text-xs"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            navigate(`/evaluacion-equipo/${member.dpi}/comparativa`);
+                                          }}
+                                        >
+                                          <p className="font-medium truncate text-xs">{member.nombre}</p>
+                                          <div className="flex items-center gap-2 text-[10px] text-muted-foreground mt-0.5">
+                                            <span>D: {member.desempenoPorcentaje}%</span>
                                             {member.potencialPorcentaje !== undefined && (
-                                              <div>
-                                                <span className="text-muted-foreground">Potencial: </span>
-                                                <span className="font-medium">
-                                                  {member.potencialPorcentaje}%
-                                                </span>
-                                              </div>
+                                              <span>P: {member.potencialPorcentaje}%</span>
                                             )}
                                           </div>
-                                        </CardContent>
-                                      </Card>
-                                    ))}
+                                        </div>
+                                      ))
+                                    )}
+                                    {members.length > 3 && (
+                                      <p className="text-xs text-center text-muted-foreground pt-1">
+                                        +{members.length - 3} más...
+                                      </p>
+                                    )}
                                   </div>
                                 </div>
-                              )}
-                            </DialogContent>
-                          </Dialog>
-                        );
-                      })}
-                    </div>
+                              </DialogTrigger>
+                              <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+                                <DialogHeader>
+                                  <DialogTitle className="flex items-center gap-2">
+                                    <span className="text-2xl">{metadata?.icon}</span>
+                                    {metadata?.label}
+                                  </DialogTitle>
+                                  <DialogDescription>
+                                    {members.length} colaborador{members.length !== 1 ? "es" : ""} en este cuadrante
+                                  </DialogDescription>
+                                </DialogHeader>
 
-                    {/* Etiquetas inferiores */}
-                    <div className="flex justify-between items-end pt-2">
-                      <div className="flex flex-col gap-1 text-xs text-muted-foreground">
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 bg-green-500 rounded"></div>
-                          <span>Alto ↑</span>
+                                <QuadrantInfo position={pos.key} showActions={true} />
+
+                                {members.length > 0 && (
+                                  <div className="mt-6">
+                                    <h4 className="font-semibold mb-3">Colaboradores en este cuadrante:</h4>
+                                    <div className="grid gap-3 md:grid-cols-2">
+                                      {members.map((member) => (
+                                        <Card
+                                          key={member.dpi}
+                                          className="cursor-pointer hover:shadow-md transition-shadow"
+                                          onClick={() => navigate(`/evaluacion-equipo/${member.dpi}/comparativa`)}
+                                        >
+                                          <CardContent className="p-4">
+                                            <p className="font-medium text-sm mb-1">{member.nombre}</p>
+                                            <p className="text-xs text-muted-foreground mb-2">
+                                              {member.cargo} • {member.area}
+                                            </p>
+                                            <div className="flex items-center gap-4 text-xs">
+                                              <div>
+                                                <span className="text-muted-foreground">Desempeño: </span>
+                                                <span className="font-medium">{member.desempenoPorcentaje}%</span>
+                                              </div>
+                                              {member.potencialPorcentaje !== undefined && (
+                                                <div>
+                                                  <span className="text-muted-foreground">Potencial: </span>
+                                                  <span className="font-medium">{member.potencialPorcentaje}%</span>
+                                                </div>
+                                              )}
+                                            </div>
+                                          </CardContent>
+                                        </Card>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </DialogContent>
+                            </Dialog>
+                          );
+                        })}
+                      </div>
+
+                      <div className="flex justify-between items-end pt-2">
+                        <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 bg-green-500 rounded"></div>
+                            <span>Alto ↑</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 bg-yellow-500 rounded"></div>
+                            <span>Medio</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 bg-red-500 rounded"></div>
+                            <span>Bajo ↓</span>
+                          </div>
+                          <span className="font-semibold mt-1">POTENCIAL</span>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 bg-yellow-500 rounded"></div>
-                          <span>Medio</span>
-                        </div>
-                        <div className="flex items-center gap-2">
+
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span className="font-semibold">DESEMPEÑO</span>
+                          <span>← Bajo</span>
                           <div className="w-3 h-3 bg-red-500 rounded"></div>
-                          <span>Bajo ↓</span>
+                          <div className="w-3 h-3 bg-yellow-500 rounded"></div>
+                          <div className="w-3 h-3 bg-green-500 rounded"></div>
+                          <span>Alto →</span>
                         </div>
-                        <span className="font-semibold mt-1">POTENCIAL</span>
-                      </div>
-
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span className="font-semibold">DESEMPEÑO</span>
-                        <span>← Bajo</span>
-                        <div className="w-3 h-3 bg-red-500 rounded"></div>
-                        <div className="w-3 h-3 bg-yellow-500 rounded"></div>
-                        <div className="w-3 h-3 bg-green-500 rounded"></div>
-                        <span>Alto →</span>
                       </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
+                  </CardContent>
+                </Card>
+              </TabsContent>
 
-            {/* Tab: Prioridades Estratégicas */}
-            <TabsContent value="prioridades" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Acciones Prioritarias por Cuadrante</CardTitle>
-                  <CardDescription>
-                    Recomendaciones específicas según la importancia estratégica y prioridad de retención
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {Object.entries(nineBoxData).map(([position, members]) => {
-                    if (members.length === 0) return null;
+              {/* Tab: Vista de Lista */}
+              <TabsContent value="lista">
+                <AdvancedList members={filteredMembers} />
+              </TabsContent>
 
-                    return (
-                      <div key={position}>
-                        <QuadrantInfo
-                          position={position}
-                          showActions={true}
-                          compact={true}
-                        />
-                      </div>
-                    );
-                  })}
-                </CardContent>
-              </Card>
-            </TabsContent>
+              {/* Tab: Prioridades Estratégicas */}
+              <TabsContent value="prioridades" className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Acciones Prioritarias por Cuadrante</CardTitle>
+                    <CardDescription>
+                      Recomendaciones específicas según la importancia estratégica y prioridad de retención
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {Object.entries(filteredNineBoxData).map(([position, members]) => {
+                      if (members.length === 0) return null;
+                      return (
+                        <div key={position}>
+                          <QuadrantInfo position={position} showActions={true} compact={true} />
+                        </div>
+                      );
+                    })}
+                  </CardContent>
+                </Card>
+              </TabsContent>
 
-            {/* Tab: Guía de Uso */}
-            <TabsContent value="guia">
-              <QuadrantLegend showDetailedInfo={true} />
-            </TabsContent>
-          </Tabs>
+              {/* Tab: Guía de Uso */}
+              <TabsContent value="guia">
+                <QuadrantLegend showDetailedInfo={true} />
+              </TabsContent>
+            </Tabs>
+          </div>
         )}
       </main>
     </div>
