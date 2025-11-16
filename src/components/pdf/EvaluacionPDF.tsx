@@ -106,6 +106,7 @@ export const EvaluacionPDF = ({
           competencias={resultadoData.radarData}
           fortalezas={resultadoData.fortalezas}
           areasOportunidad={resultadoData.areasOportunidad}
+          nivel={empleado.nivel}
         />
 
         {/* Footer */}

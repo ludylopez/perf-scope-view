@@ -1,16 +1,20 @@
 import { View, Text } from '@react-pdf/renderer';
 import { pdfStyles } from './styles';
+import { getDimensionExplanation } from '@/lib/generateDimensionExplanations';
 
 interface CompetenciaData {
   dimension: string;
   tuEvaluacion: number;
   promedioMunicipal?: number;
+  dimensionId?: string; // ID de la dimensión del instrumento (ej: dim1_a1)
+  descripcion?: string; // Descripción de la dimensión del instrumento
 }
 
 interface CompetenciasCardsPDFProps {
   competencias: CompetenciaData[];
   fortalezas: Array<{ dimension: string; tuEvaluacion: number }>;
   areasOportunidad: Array<{ dimension: string; tuEvaluacion: number }>;
+  nivel?: string; // Nivel del instrumento (A1, A3, E1, O1, etc.)
 }
 
 const getDimensionFriendlyTitle = (dimension: string): string => {
@@ -159,14 +163,98 @@ const isOportunidad = (dimension: string, areasOportunidad: Array<{ dimension: s
   );
 };
 
+// Función fallback que adapta la descripción del instrumento
+const adaptDescriptionToResultFallback = (
+  descripcionBase: string,
+  porcentaje: number,
+  dimensionNombre: string,
+  promedioMunicipal?: number
+): string => {
+  // Adaptar descripción eliminando "Evalúa" y convirtiéndola en lenguaje de resultado
+  let descripcionAdaptada = descripcionBase
+    .replace(/^Evalúa\s+/i, "")
+    .replace(/^Esta dimensión evalúa\s+/i, "")
+    .replace(/^Grado en que\s+/i, "")
+    .replace(/^Nivel de\s+/i, "")
+    .trim();
+
+  const diferencia = promedioMunicipal ? porcentaje - promedioMunicipal : 0;
+  let comparacion = '';
+  
+  if (promedioMunicipal && promedioMunicipal > 0) {
+    if (diferencia > 0) {
+      comparacion = ` Estás por encima del promedio municipal (${promedioMunicipal.toFixed(1)}%), lo que indica un desempeño destacado.`;
+    } else if (diferencia < 0) {
+      comparacion = ` Estás por debajo del promedio municipal (${promedioMunicipal.toFixed(1)}%), lo que indica un área de desarrollo.`;
+    } else {
+      comparacion = ` Estás alineado con el promedio municipal (${promedioMunicipal.toFixed(1)}%), manteniendo un nivel consistente.`;
+    }
+  }
+
+  if (porcentaje >= 85) {
+    return `Con un ${porcentaje.toFixed(1)}%, demuestras excelencia en ${descripcionAdaptada.toLowerCase()}. Tu desempeño es excepcional.${comparacion}`;
+  } else if (porcentaje >= 75) {
+    return `Con un ${porcentaje.toFixed(1)}%, muestras un buen desempeño en ${descripcionAdaptada.toLowerCase()}. Hay espacio para seguir mejorando.${comparacion}`;
+  } else if (porcentaje >= 60) {
+    return `Con un ${porcentaje.toFixed(1)}%, hay oportunidad de fortalecer ${descripcionAdaptada.toLowerCase()}. Considera un plan de desarrollo específico.${comparacion}`;
+  } else {
+    return `Con un ${porcentaje.toFixed(1)}%, esta área requiere atención prioritaria. ${descripcionAdaptada.charAt(0).toUpperCase() + descripcionAdaptada.slice(1)} necesita desarrollo urgente.${comparacion}`;
+  }
+};
+
+// Componente para renderizar explicación (React-PDF no soporta async directamente)
+const ExplanationBox = ({ competencia, nivel, barColor }: { 
+  competencia: CompetenciaData; 
+  nivel?: string;
+  barColor: string;
+}) => {
+  // Para React-PDF, usamos la descripción del instrumento si está disponible, o la función genérica
+  let explicacion = '';
+  
+  if (competencia.descripcion) {
+    explicacion = adaptDescriptionToResultFallback(
+      competencia.descripcion,
+      competencia.tuEvaluacion,
+      competencia.dimension,
+      competencia.promedioMunicipal
+    );
+  } else {
+    explicacion = getResultExplanation(
+      competencia.dimension,
+      competencia.tuEvaluacion,
+      competencia.promedioMunicipal
+    );
+  }
+
+  return (
+    <View style={{
+      backgroundColor: '#f9fafb',
+      padding: 5,
+      borderRadius: 3,
+      marginBottom: 4,
+      borderLeft: `2px solid ${barColor}`,
+    }}>
+      <Text style={{
+        fontSize: 6,
+        color: '#374151',
+        lineHeight: 1.35,
+      }}>
+        {explicacion}
+      </Text>
+    </View>
+  );
+};
+
 export const CompetenciasCardsPDF = ({ 
   competencias, 
   fortalezas, 
-  areasOportunidad 
+  areasOportunidad,
+  nivel 
 }: CompetenciasCardsPDFProps) => {
   if (!competencias || competencias.length === 0) {
     return null;
   }
+
 
   return (
     <View style={{ marginBottom: 6 }}>
@@ -264,22 +352,12 @@ export const CompetenciasCardsPDF = ({
                 {descripcion}
               </Text>
 
-              {/* Explicación del resultado */}
-              <View style={{
-                backgroundColor: '#f9fafb',
-                padding: 5,
-                borderRadius: 3,
-                marginBottom: 4,
-                borderLeft: `2px solid ${barColor}`,
-              }}>
-                <Text style={{
-                  fontSize: 6,
-                  color: '#374151',
-                  lineHeight: 1.35,
-                }}>
-                  {getResultExplanation(competencia.dimension, porcentaje, competencia.promedioMunicipal)}
-                </Text>
-              </View>
+              {/* Explicación del resultado - se renderizará dinámicamente */}
+              <ExplanationBox 
+                competencia={competencia}
+                nivel={nivel}
+                barColor={barColor}
+              />
 
               {/* Barra de progreso */}
               <View style={{ marginTop: 4 }}>

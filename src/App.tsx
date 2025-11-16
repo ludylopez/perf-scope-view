@@ -30,6 +30,7 @@ import EvaluacionJefeIndividual from "./pages/EvaluacionJefeIndividual";
 import DashboardConsolidado from "./pages/DashboardConsolidado";
 import NotFound from "./pages/NotFound";
 import ConfiguracionSistema from "./pages/ConfiguracionSistema";
+import PopulateExplanations from "./pages/PopulateExplanations";
 
 const queryClient = new QueryClient();
 
@@ -203,6 +204,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <ConfiguracionSistema />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/populate-explanations"
+              element={
+                <ProtectedRoute>
+                  <PopulateExplanations />
                 </ProtectedRoute>
               }
             />
