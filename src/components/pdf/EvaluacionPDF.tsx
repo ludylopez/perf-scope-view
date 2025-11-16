@@ -22,6 +22,8 @@ interface EvaluacionPDFProps {
     profesion?: string;
     correo?: string;
     telefono?: string;
+    jefeNombre?: string;
+    directoraRRHHNombre?: string;
   };
   periodo: string;
   fechaGeneracion: Date;
@@ -111,8 +113,20 @@ export const EvaluacionPDF = ({
         {/* Áreas de Oportunidad */}
         <AreasOportunidadPDF areasOportunidad={resultadoData.areasOportunidad} />
 
-        {/* Plan de Desarrollo - Objetivos y Acciones */}
-        {planDesarrollo && (
+        {/* Footer */}
+        <Text
+          style={pdfStyles.footer}
+          render={({ pageNumber, totalPages }) =>
+            `Página ${pageNumber} de ${totalPages}`
+          }
+          fixed
+        />
+      </Page>
+
+      {/* PÁGINA 2 - Plan de Desarrollo, Dimensiones Débiles y Recomendaciones */}
+      {planDesarrollo && (
+        <Page size="A4" style={pdfStyles.page}>
+          {/* Plan de Desarrollo - Objetivos y Acciones */}
           <View style={pdfStyles.planSection}>
             <Text style={pdfStyles.planTitle}>PLAN DE DESARROLLO PERSONALIZADO</Text>
 
@@ -196,21 +210,7 @@ export const EvaluacionPDF = ({
               </View>
             )}
           </View>
-        )}
 
-        {/* Footer */}
-        <Text
-          style={pdfStyles.footer}
-          render={({ pageNumber, totalPages }) =>
-            `Página ${pageNumber} de ${totalPages}`
-          }
-          fixed
-        />
-      </Page>
-
-      {/* PÁGINA 2 - Solo si hay dimensiones débiles, recomendaciones o plan de desarrollo */}
-      {(dimensionesDebiles.length > 0 || recomendaciones.length > 0) && (
-        <Page size="A4" style={pdfStyles.page}>
           {/* Dimensiones Débiles */}
           {dimensionesDebiles.length > 0 && (
             <View style={{ marginBottom: 8 }}>
@@ -254,7 +254,11 @@ export const EvaluacionPDF = ({
           )}
 
           {/* Firmas */}
-          <FirmasPDF nombreEmpleado={nombreCompleto} />
+          <FirmasPDF 
+            nombreEmpleado={nombreCompleto}
+            nombreJefe={empleado.jefeNombre}
+            nombreDirectoraRRHH={empleado.directoraRRHHNombre}
+          />
 
           {/* Footer */}
           <Text

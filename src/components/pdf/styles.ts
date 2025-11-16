@@ -432,7 +432,7 @@ export const pdfStyles = StyleSheet.create({
   // Firmas
   firmasSection: {
     flexDirection: 'row',
-    gap: 30,
+    gap: 20,
     marginTop: 12,
   },
   firmaBox: {

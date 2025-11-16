@@ -34,18 +34,18 @@ export const BarChartPDF = ({ competencias }: BarChartPDFProps) => {
             : 0;
 
           return (
-            <View key={index} style={{ marginBottom: 14 }}>
+            <View key={index} style={{ marginBottom: 8 }}>
               {/* Nombre de la competencia */}
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                <Text style={{ fontSize: 8, fontWeight: 'bold', color: '#1f2937', width: '50%' }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+                <Text style={{ fontSize: 8, fontWeight: 'bold', color: '#1f2937', flex: 1 }}>
                   {index + 1}. {competencia.dimension}
                 </Text>
-                <View style={{ flexDirection: 'row', gap: 10 }}>
-                  <Text style={{ fontSize: 7.5, fontWeight: 'bold', color: '#2563eb' }}>
+                <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 7.5, fontWeight: 'bold', color: '#2563eb', minWidth: 35, textAlign: 'right' }}>
                     {competencia.tuEvaluacion.toFixed(1)}%
                   </Text>
                   {competencia.promedioMunicipal && competencia.promedioMunicipal > 0 && (
-                    <Text style={{ fontSize: 7.5, color: '#22c55e' }}>
+                    <Text style={{ fontSize: 7.5, color: '#22c55e', minWidth: 35, textAlign: 'right' }}>
                       {competencia.promedioMunicipal.toFixed(1)}%
                     </Text>
                   )}
@@ -53,9 +53,9 @@ export const BarChartPDF = ({ competencias }: BarChartPDFProps) => {
               </View>
 
               {/* Barras horizontales lado a lado */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 {/* Barra del usuario */}
-                <View style={{ flex: 1, position: 'relative', height: chartHeight }}>
+                <View style={{ flex: 1, height: chartHeight }}>
                   <View
                     style={{
                       width: tuWidth,
@@ -63,24 +63,27 @@ export const BarChartPDF = ({ competencias }: BarChartPDFProps) => {
                       backgroundColor: '#2563eb',
                       borderRadius: 3,
                       border: '0.5px solid #1e40af',
-                      alignItems: 'flex-end',
-                      justifyContent: 'center',
-                      paddingRight: 3,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'flex-end',
+                      paddingRight: 4,
                     }}
                   >
-                    <Text style={{ 
-                      fontSize: 6.5,
-                      color: '#ffffff',
-                      fontWeight: 'bold'
-                    }}>
-                      Tú
-                    </Text>
+                    {tuWidth > 30 && (
+                      <Text style={{ 
+                        fontSize: 6.5,
+                        color: '#ffffff',
+                        fontWeight: 'bold'
+                      }}>
+                        Tú
+                      </Text>
+                    )}
                   </View>
                 </View>
                 
                 {/* Barra del promedio municipal */}
                 {competencia.promedioMunicipal && competencia.promedioMunicipal > 0 && (
-                  <View style={{ flex: 1, position: 'relative', height: chartHeight }}>
+                  <View style={{ flex: 1, height: chartHeight }}>
                     <View
                       style={{
                         width: promedioWidth,
@@ -88,18 +91,21 @@ export const BarChartPDF = ({ competencias }: BarChartPDFProps) => {
                         backgroundColor: '#22c55e',
                         borderRadius: 3,
                         border: '0.5px solid #16a34a',
-                        alignItems: 'flex-end',
-                        justifyContent: 'center',
-                        paddingRight: 3,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'flex-end',
+                        paddingRight: 4,
                       }}
                     >
-                      <Text style={{ 
-                        fontSize: 6.5,
-                        color: '#ffffff',
-                        fontWeight: 'bold'
-                      }}>
-                        Prom.
-                      </Text>
+                      {promedioWidth > 30 && (
+                        <Text style={{ 
+                          fontSize: 6.5,
+                          color: '#ffffff',
+                          fontWeight: 'bold'
+                        }}>
+                          Prom.
+                        </Text>
+                      )}
                     </View>
                   </View>
                 )}

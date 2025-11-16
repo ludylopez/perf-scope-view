@@ -1338,6 +1338,8 @@ export const exportEvaluacionCompletaPDFReact = async (
     profesion?: string;
     correo?: string;
     telefono?: string;
+    jefeNombre?: string;
+    directoraRRHHNombre?: string;
   },
   periodo: string,
   fechaGeneracion: Date,
@@ -1390,13 +1392,83 @@ export const exportEvaluacionCompletaPDFReact = async (
       description: "Por favor espere mientras se genera el documento"
     });
     
+    // Obtener nombre del jefe inmediato si no está proporcionado
+    let nombreJefe = empleado.jefeNombre;
+    if (!nombreJefe && empleado.dpi) {
+      try {
+        const { supabase } = await import("@/integrations/supabase/client");
+        const { data: usuario } = await supabase
+          .from("users")
+          .select("jefe_inmediato_id")
+          .eq("dpi", empleado.dpi)
+          .single();
+        
+        if (usuario?.jefe_inmediato_id) {
+          const { data: jefe } = await supabase
+            .from("users")
+            .select("nombre, apellidos")
+            .eq("dpi", usuario.jefe_inmediato_id)
+            .single();
+          
+          if (jefe) {
+            nombreJefe = jefe.apellidos 
+              ? `${jefe.nombre} ${jefe.apellidos}` 
+              : jefe.nombre;
+          }
+        }
+      } catch (error) {
+        console.error("Error obteniendo nombre del jefe:", error);
+      }
+    }
+    
+    // Obtener nombre de la Directora de RRHH (Nuria)
+    let nombreDirectoraRRHH = empleado.directoraRRHHNombre;
+    if (!nombreDirectoraRRHH) {
+      try {
+        const { supabase } = await import("@/integrations/supabase/client");
+        // Primero buscar por nombre "Nuria"
+        let { data: directora } = await supabase
+          .from("users")
+          .select("nombre, apellidos")
+          .ilike("nombre", "%Nuria%")
+          .eq("estado", "activo")
+          .limit(1)
+          .maybeSingle();
+        
+        // Si no se encuentra por nombre, buscar por rol admin_rrhh
+        if (!directora) {
+          const { data: directoraPorRol } = await supabase
+            .from("users")
+            .select("nombre, apellidos")
+            .eq("rol", "admin_rrhh")
+            .eq("estado", "activo")
+            .limit(1)
+            .maybeSingle();
+          
+          directora = directoraPorRol || null;
+        }
+        
+        if (directora) {
+          nombreDirectoraRRHH = directora.apellidos 
+            ? `${directora.nombre} ${directora.apellidos}` 
+            : directora.nombre;
+        }
+      } catch (error) {
+        console.error("Error obteniendo nombre de Directora RRHH:", error);
+      }
+    }
+    
     // Importar componente PDF dinámicamente
     const { EvaluacionPDF } = await import("@/components/pdf/EvaluacionPDF");
     
     // Generar PDF usando React.createElement para evitar problemas con JSX en archivo .ts
     const blob = await pdf(
       React.createElement(EvaluacionPDF, {
-        empleado,
+        empleado: {
+          ...empleado,
+          jefeNombre: nombreJefe,
+          directoraRRHHNombre: nombreDirectoraRRHH,
+        },
         periodo,
         fechaGeneracion,
         resultadoData,
