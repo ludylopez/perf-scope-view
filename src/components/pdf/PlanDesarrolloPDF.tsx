@@ -64,12 +64,12 @@ export const PlanDesarrolloPDF = ({ planDesarrollo }: PlanDesarrolloPDFProps) =>
 
   return (
     <View style={pdfStyles.planSection}>
-      <Text style={pdfStyles.planTitle}>PLAN DE DESARROLLO PERSONALIZADO</Text>
+      <Text style={pdfStyles.planTitle}>🎯 PLAN DE DESARROLLO PERSONALIZADO</Text>
 
-      {/* Objetivos */}
-      {planEstructurado.objetivos && planEstructurado.objetivos.length > 0 && (
-        <View style={pdfStyles.objetivosSection}>
-          <Text style={pdfStyles.planSubtitle}>OBJETIVOS DE DESARROLLO</Text>
+            {/* Objetivos */}
+            {planEstructurado.objetivos && planEstructurado.objetivos.length > 0 && (
+              <View style={pdfStyles.objetivosSection}>
+                <Text style={pdfStyles.planSubtitle}>🎯 OBJETIVOS DE DESARROLLO</Text>
           <View style={pdfStyles.objetivosList}>
             {planEstructurado.objetivos.map((objetivo, idx) => (
               <Text key={idx} style={pdfStyles.objetivoItem}>
@@ -80,10 +80,10 @@ export const PlanDesarrolloPDF = ({ planDesarrollo }: PlanDesarrolloPDFProps) =>
         </View>
       )}
 
-      {/* Acciones en tabla */}
-      {planEstructurado.acciones && planEstructurado.acciones.length > 0 && (
-        <View>
-          <Text style={pdfStyles.planSubtitle}>PLAN DE ACCIÓN DETALLADO</Text>
+            {/* Acciones en tabla */}
+            {planEstructurado.acciones && planEstructurado.acciones.length > 0 && (
+              <View>
+                <Text style={pdfStyles.planSubtitle}>📋 PLAN DE ACCIÓN DETALLADO</Text>
           <Text style={pdfStyles.planSubtitleDescription}>
             Acciones concretas con responsables, fechas e indicadores
           </Text>
@@ -134,7 +134,7 @@ export const PlanDesarrolloPDF = ({ planDesarrollo }: PlanDesarrolloPDFProps) =>
       {/* Dimensiones Débiles */}
       {planEstructurado.dimensionesDebiles && planEstructurado.dimensionesDebiles.length > 0 && (
         <View>
-          <Text style={pdfStyles.sectionTitle}>DIMENSIONES QUE REQUIEREN ATENCIÓN</Text>
+          <Text style={pdfStyles.sectionTitle}>⚠️ DIMENSIONES QUE REQUIEREN ATENCIÓN</Text>
           {planEstructurado.dimensionesDebiles.map((dim, idx) => (
             <View key={idx} style={pdfStyles.dimensionDebilCard}>
               <View style={pdfStyles.dimensionDebilHeader}>
@@ -162,7 +162,7 @@ export const PlanDesarrolloPDF = ({ planDesarrollo }: PlanDesarrolloPDFProps) =>
       {/* Recomendaciones */}
       {recomendaciones && recomendaciones.length > 0 && (
         <View>
-          <Text style={pdfStyles.sectionTitle}>RECOMENDACIONES GENERALES</Text>
+          <Text style={pdfStyles.sectionTitle}>💬 RECOMENDACIONES GENERALES</Text>
           <View style={pdfStyles.recomendacionesList}>
             {recomendaciones.map((rec, idx) => (
               <Text key={idx} style={pdfStyles.recomendacionItem}>

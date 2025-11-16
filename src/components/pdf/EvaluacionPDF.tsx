@@ -1,7 +1,7 @@
 import { Document, Page, View, Text } from '@react-pdf/renderer';
 import { HeaderPDF } from './HeaderPDF';
 import { ResultadoSectionPDF } from './ResultadoSectionPDF';
-import { BarChartPDF } from './BarChartPDF';
+import { CompetenciasCardsPDF } from './CompetenciasCardsPDF';
 import { FortalezasPDF } from './FortalezasPDF';
 import { AreasOportunidadPDF } from './AreasOportunidadPDF';
 import { PlanDesarrolloPDF } from './PlanDesarrolloPDF';
@@ -104,8 +104,12 @@ export const EvaluacionPDF = ({
           performancePercentage={resultadoData.performancePercentage}
         />
 
-        {/* Panorama de Competencias - Gráfico de Barras */}
-        <BarChartPDF competencias={resultadoData.radarData} />
+        {/* Panorama de Competencias - Cards */}
+        <CompetenciasCardsPDF 
+          competencias={resultadoData.radarData}
+          fortalezas={resultadoData.fortalezas}
+          areasOportunidad={resultadoData.areasOportunidad}
+        />
 
         {/* Fortalezas */}
         <FortalezasPDF fortalezas={resultadoData.fortalezas} />
@@ -128,12 +132,12 @@ export const EvaluacionPDF = ({
         <Page size="A4" style={pdfStyles.page}>
           {/* Plan de Desarrollo - Objetivos y Acciones */}
           <View style={pdfStyles.planSection}>
-            <Text style={pdfStyles.planTitle}>PLAN DE DESARROLLO PERSONALIZADO</Text>
+            <Text style={pdfStyles.planTitle}>🎯 PLAN DE DESARROLLO PERSONALIZADO</Text>
 
             {/* Objetivos */}
             {objetivos.length > 0 && (
               <View style={pdfStyles.objetivosSection}>
-                <Text style={pdfStyles.planSubtitle}>OBJETIVOS DE DESARROLLO</Text>
+                <Text style={pdfStyles.planSubtitle}>🎯 OBJETIVOS DE DESARROLLO</Text>
                 <View style={pdfStyles.objetivosList}>
                   {objetivos.map((objetivo, idx) => (
                     <Text key={idx} style={pdfStyles.objetivoItem}>
@@ -144,10 +148,10 @@ export const EvaluacionPDF = ({
               </View>
             )}
 
-            {/* Acciones en tabla */}
-            {acciones.length > 0 && (
-              <View>
-                <Text style={pdfStyles.planSubtitle}>PLAN DE ACCIÓN DETALLADO</Text>
+                    {/* Acciones en tabla */}
+                    {acciones.length > 0 && (
+                      <View>
+                        <Text style={pdfStyles.planSubtitle}>📋 PLAN DE ACCIÓN DETALLADO</Text>
                 <Text style={pdfStyles.planSubtitleDescription}>
                   Acciones concretas con responsables, fechas e indicadores
                 </Text>
@@ -211,10 +215,10 @@ export const EvaluacionPDF = ({
             )}
           </View>
 
-          {/* Dimensiones Débiles */}
-          {dimensionesDebiles.length > 0 && (
-            <View style={{ marginBottom: 8 }}>
-              <Text style={pdfStyles.sectionTitle}>DIMENSIONES QUE REQUIEREN ATENCIÓN</Text>
+                  {/* Dimensiones Débiles */}
+                  {dimensionesDebiles.length > 0 && (
+                    <View style={{ marginBottom: 8 }}>
+                      <Text style={pdfStyles.sectionTitle}>⚠️ DIMENSIONES QUE REQUIEREN ATENCIÓN</Text>
               {dimensionesDebiles.map((dim, idx) => (
                 <View key={idx} style={pdfStyles.dimensionDebilCard}>
                   <View style={pdfStyles.dimensionDebilHeader}>
@@ -239,10 +243,10 @@ export const EvaluacionPDF = ({
             </View>
           )}
 
-          {/* Recomendaciones */}
-          {recomendaciones.length > 0 && (
-            <View style={{ marginBottom: 10 }}>
-              <Text style={pdfStyles.sectionTitle}>RECOMENDACIONES GENERALES</Text>
+                  {/* Recomendaciones */}
+                  {recomendaciones.length > 0 && (
+                    <View style={{ marginBottom: 10 }}>
+                      <Text style={pdfStyles.sectionTitle}>💬 RECOMENDACIONES GENERALES</Text>
               <View style={pdfStyles.recomendacionesList}>
                 {recomendaciones.map((rec, idx) => (
                   <Text key={idx} style={pdfStyles.recomendacionItem}>

@@ -19,7 +19,7 @@ export const FortalezasPDF = ({ fortalezas }: FortalezasPDFProps) => {
 
   return (
     <View>
-      <Text style={pdfStyles.sectionTitle}>FORTALEZAS IDENTIFICADAS</Text>
+      <Text style={pdfStyles.sectionTitle}>✅ FORTALEZAS IDENTIFICADAS</Text>
       <View style={pdfStyles.fortalezasGrid}>
         {fortalezas.map((fortaleza, index) => (
           <View key={index} style={pdfStyles.fortalezaCard}>

@@ -19,7 +19,7 @@ export const AreasOportunidadPDF = ({ areasOportunidad }: AreasOportunidadPDFPro
 
   return (
     <View>
-      <Text style={pdfStyles.sectionTitle}>ÁREAS DE OPORTUNIDAD</Text>
+      <Text style={pdfStyles.sectionTitle}>💡 ÁREAS DE OPORTUNIDAD</Text>
       <View style={pdfStyles.oportunidadesGrid}>
         {areasOportunidad.map((area, index) => (
           <View key={index} style={pdfStyles.oportunidadCard}>

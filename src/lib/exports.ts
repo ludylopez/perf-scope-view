@@ -1397,18 +1397,35 @@ export const exportEvaluacionCompletaPDFReact = async (
     if (!nombreJefe && empleado.dpi) {
       try {
         const { supabase } = await import("@/integrations/supabase/client");
-        const { data: usuario } = await supabase
-          .from("users")
-          .select("jefe_inmediato_id")
-          .eq("dpi", empleado.dpi)
-          .single();
         
-        if (usuario?.jefe_inmediato_id) {
+        // Primero intentar obtener desde user_assignments (relación activa)
+        const { data: assignment } = await supabase
+          .from("user_assignments")
+          .select("jefe_id")
+          .eq("colaborador_id", empleado.dpi)
+          .eq("activo", true)
+          .maybeSingle();
+        
+        let jefeId = null;
+        if (assignment?.jefe_id) {
+          jefeId = assignment.jefe_id;
+        } else {
+          // Si no hay en user_assignments, intentar desde users.jefe_inmediato_id
+          const { data: usuario } = await supabase
+            .from("users")
+            .select("jefe_inmediato_id")
+            .eq("dpi", empleado.dpi)
+            .maybeSingle();
+          
+          jefeId = usuario?.jefe_inmediato_id || null;
+        }
+        
+        if (jefeId) {
           const { data: jefe } = await supabase
             .from("users")
             .select("nombre, apellidos")
-            .eq("dpi", usuario.jefe_inmediato_id)
-            .single();
+            .eq("dpi", jefeId)
+            .maybeSingle();
           
           if (jefe) {
             nombreJefe = jefe.apellidos 
@@ -1426,21 +1443,48 @@ export const exportEvaluacionCompletaPDFReact = async (
     if (!nombreDirectoraRRHH) {
       try {
         const { supabase } = await import("@/integrations/supabase/client");
-        // Primero buscar por nombre "Nuria"
+        
+        // Primero buscar por nombre "Nuria" o "Nury" (en nombre o apellidos)
         let { data: directora } = await supabase
           .from("users")
           .select("nombre, apellidos")
-          .ilike("nombre", "%Nuria%")
+          .or("nombre.ilike.%Nuria%,nombre.ilike.%Nury%,apellidos.ilike.%Nuria%,apellidos.ilike.%Nury%")
           .eq("estado", "activo")
           .limit(1)
           .maybeSingle();
         
-        // Si no se encuentra por nombre, buscar por rol admin_rrhh
+        // Si no se encuentra por nombre, buscar por cargo "Directora" en área de RRHH
+        if (!directora) {
+          const { data: directoraPorCargo } = await supabase
+            .from("users")
+            .select("nombre, apellidos")
+            .and("cargo.ilike.%Directora%,area.ilike.%recursos humanos%")
+            .eq("estado", "activo")
+            .limit(1)
+            .maybeSingle();
+          
+          directora = directoraPorCargo || null;
+        }
+        
+        // Si aún no se encuentra, buscar por cargo o área relacionada a RRHH
+        if (!directora) {
+          const { data: directoraPorCargo2 } = await supabase
+            .from("users")
+            .select("nombre, apellidos")
+            .or("cargo.ilike.%recursos humanos%,cargo.ilike.%RRHH%,cargo.ilike.%rrhh%,area.ilike.%recursos humanos%")
+            .eq("estado", "activo")
+            .limit(1)
+            .maybeSingle();
+          
+          directora = directoraPorCargo2 || null;
+        }
+        
+        // Si aún no se encuentra, buscar por rol admin_rrhh o admin_general
         if (!directora) {
           const { data: directoraPorRol } = await supabase
             .from("users")
             .select("nombre, apellidos")
-            .eq("rol", "admin_rrhh")
+            .in("rol", ["admin_rrhh", "admin_general"])
             .eq("estado", "activo")
             .limit(1)
             .maybeSingle();
