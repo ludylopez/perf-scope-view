@@ -77,7 +77,7 @@ export function NineBoxFilters({
   const updateFilter = (key: keyof FilterOptions, value: string | undefined) => {
     onFiltersChange({
       ...filters,
-      [key]: value,
+      [key]: value === "all" ? undefined : value,
     });
   };
 
@@ -131,14 +131,14 @@ export function NineBoxFilters({
         {/* Filtros rápidos */}
         <div className="flex flex-wrap gap-2">
           <Select
-            value={filters.position || ""}
-            onValueChange={(value) => updateFilter("position", value || undefined)}
+            value={filters.position || "all"}
+            onValueChange={(value) => updateFilter("position", value)}
           >
             <SelectTrigger className="w-[200px]">
               <SelectValue placeholder="Todas las posiciones" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Todas las posiciones</SelectItem>
+              <SelectItem value="all">Todas las posiciones</SelectItem>
               {positionOptions.map((opt) => (
                 <SelectItem key={opt.value} value={opt.value}>
                   {opt.label}
@@ -148,14 +148,14 @@ export function NineBoxFilters({
           </Select>
 
           <Select
-            value={filters.area || ""}
-            onValueChange={(value) => updateFilter("area", value || undefined)}
+            value={filters.area || "all"}
+            onValueChange={(value) => updateFilter("area", value)}
           >
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Todas las áreas" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Todas las áreas</SelectItem>
+              <SelectItem value="all">Todas las áreas</SelectItem>
               {availableAreas.map((area) => (
                 <SelectItem key={area} value={area}>
                   {area}
@@ -165,14 +165,14 @@ export function NineBoxFilters({
           </Select>
 
           <Select
-            value={filters.nivel || ""}
-            onValueChange={(value) => updateFilter("nivel", value || undefined)}
+            value={filters.nivel || "all"}
+            onValueChange={(value) => updateFilter("nivel", value)}
           >
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Todos los niveles" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Todos los niveles</SelectItem>
+              <SelectItem value="all">Todos los niveles</SelectItem>
               {availableNiveles.map((nivel) => (
                 <SelectItem key={nivel} value={nivel}>
                   {nivel}
@@ -207,14 +207,14 @@ export function NineBoxFilters({
                   <div>
                     <label className="text-xs font-medium mb-1.5 block">Cargo</label>
                     <Select
-                      value={filters.cargo || ""}
-                      onValueChange={(value) => updateFilter("cargo", value || undefined)}
+                      value={filters.cargo || "all"}
+                      onValueChange={(value) => updateFilter("cargo", value)}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Todos los cargos" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Todos los cargos</SelectItem>
+                        <SelectItem value="all">Todos los cargos</SelectItem>
                         {availableCargos.map((cargo) => (
                           <SelectItem key={cargo} value={cargo}>
                             {cargo}
@@ -229,16 +229,14 @@ export function NineBoxFilters({
                       Importancia Estratégica
                     </label>
                     <Select
-                      value={filters.importancia || ""}
-                      onValueChange={(value) =>
-                        updateFilter("importancia", value || undefined)
-                      }
+                      value={filters.importancia || "all"}
+                      onValueChange={(value) => updateFilter("importancia", value)}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Cualquier importancia" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Cualquier importancia</SelectItem>
+                        <SelectItem value="all">Cualquier importancia</SelectItem>
                         {importanciaOptions.map((opt) => (
                           <SelectItem key={opt.value} value={opt.value}>
                             {opt.label}
@@ -253,16 +251,14 @@ export function NineBoxFilters({
                       Prioridad de Retención
                     </label>
                     <Select
-                      value={filters.retencion || ""}
-                      onValueChange={(value) =>
-                        updateFilter("retencion", value || undefined)
-                      }
+                      value={filters.retencion || "all"}
+                      onValueChange={(value) => updateFilter("retencion", value)}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Cualquier prioridad" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Cualquier prioridad</SelectItem>
+                        <SelectItem value="all">Cualquier prioridad</SelectItem>
                         {retencionOptions.map((opt) => (
                           <SelectItem key={opt.value} value={opt.value}>
                             {opt.label}
