@@ -1518,7 +1518,8 @@ export const exportEvaluacionCompletaPDFReact = async (
           const { data: directoraPorCargo } = await supabase
             .from("users")
             .select("nombre, apellidos")
-            .and("cargo.ilike.%Directora%,area.ilike.%recursos humanos%")
+            .ilike("cargo", "%Directora%")
+            .ilike("area", "%recursos humanos%")
             .eq("estado", "activo")
             .limit(1)
             .maybeSingle();
@@ -1594,11 +1595,12 @@ export const exportEvaluacionCompletaPDFReact = async (
     
     // Importar componente PDF y renderer dinámicamente
     const { EvaluacionPDF } = await import("@/components/pdf/EvaluacionPDF");
-    const { pdf } = await import("@react-pdf/renderer");
+    const { pdf, Document } = await import("@react-pdf/renderer");
     
     // Generar PDF usando React.createElement para evitar problemas con JSX en archivo .ts
     const blob = await pdf(
-      React.createElement(EvaluacionPDF, {
+      React.createElement(Document, {},
+        React.createElement(EvaluacionPDF, {
         empleado: {
           ...empleado,
           jefeNombre: nombreJefe,
@@ -1608,7 +1610,8 @@ export const exportEvaluacionCompletaPDFReact = async (
         fechaGeneracion,
         resultadoData: resultadoDataWithExplanations,
         planDesarrollo,
-      })
+        })
+      )
     ).toBlob();
     
     // Crear URL y descargar

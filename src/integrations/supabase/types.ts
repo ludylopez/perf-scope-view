@@ -26,6 +26,7 @@ export type Database = {
           fecha_modificacion: string | null
           feedback_grupal: string | null
           feedback_individual: string | null
+          generado_por_ia: boolean | null
           id: string
           periodo_id: string
           updated_at: string | null
@@ -41,6 +42,7 @@ export type Database = {
           fecha_modificacion?: string | null
           feedback_grupal?: string | null
           feedback_individual?: string | null
+          generado_por_ia?: boolean | null
           id?: string
           periodo_id: string
           updated_at?: string | null
@@ -56,6 +58,7 @@ export type Database = {
           fecha_modificacion?: string | null
           feedback_grupal?: string | null
           feedback_individual?: string | null
+          generado_por_ia?: boolean | null
           id?: string
           periodo_id?: string
           updated_at?: string | null
@@ -90,6 +93,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      dimension_explanations: {
+        Row: {
+          activo: boolean | null
+          created_at: string | null
+          descripcion_base: string
+          dimension_id: string
+          dimension_nombre: string
+          explicacion: string
+          id: string
+          incluye_comparacion: boolean | null
+          nivel: string
+          rango_maximo: number
+          rango_minimo: number
+          updated_at: string | null
+        }
+        Insert: {
+          activo?: boolean | null
+          created_at?: string | null
+          descripcion_base: string
+          dimension_id: string
+          dimension_nombre: string
+          explicacion: string
+          id?: string
+          incluye_comparacion?: boolean | null
+          nivel: string
+          rango_maximo: number
+          rango_minimo: number
+          updated_at?: string | null
+        }
+        Update: {
+          activo?: boolean | null
+          created_at?: string | null
+          descripcion_base?: string
+          dimension_id?: string
+          dimension_nombre?: string
+          explicacion?: string
+          id?: string
+          incluye_comparacion?: boolean | null
+          nivel?: string
+          rango_maximo?: number
+          rango_minimo?: number
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       evaluation_periods: {
         Row: {
@@ -213,6 +261,75 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["dpi"]
+          },
+        ]
+      }
+      feedback_guides: {
+        Row: {
+          apertura: string | null
+          areas_desarrollo: Json | null
+          cierre: string | null
+          colaborador_id: string
+          created_at: string | null
+          fecha_generacion: string | null
+          fortalezas: Json | null
+          generado_por_ia: boolean | null
+          id: string
+          periodo_id: string
+          preguntas_dialogo: Json | null
+          preparacion: string | null
+          tipo: string
+          tips_conduccion: Json | null
+          updated_at: string | null
+        }
+        Insert: {
+          apertura?: string | null
+          areas_desarrollo?: Json | null
+          cierre?: string | null
+          colaborador_id: string
+          created_at?: string | null
+          fecha_generacion?: string | null
+          fortalezas?: Json | null
+          generado_por_ia?: boolean | null
+          id?: string
+          periodo_id: string
+          preguntas_dialogo?: Json | null
+          preparacion?: string | null
+          tipo?: string
+          tips_conduccion?: Json | null
+          updated_at?: string | null
+        }
+        Update: {
+          apertura?: string | null
+          areas_desarrollo?: Json | null
+          cierre?: string | null
+          colaborador_id?: string
+          created_at?: string | null
+          fecha_generacion?: string | null
+          fortalezas?: Json | null
+          generado_por_ia?: boolean | null
+          id?: string
+          periodo_id?: string
+          preguntas_dialogo?: Json | null
+          preparacion?: string | null
+          tipo?: string
+          tips_conduccion?: Json | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feedback_guides_colaborador_id_fkey"
+            columns: ["colaborador_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["dpi"]
+          },
+          {
+            foreignKeyName: "feedback_guides_periodo_id_fkey"
+            columns: ["periodo_id"]
+            isOneToOne: false
+            referencedRelation: "evaluation_periods"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -511,6 +628,65 @@ export type Database = {
         }
         Relationships: []
       }
+      openai_api_logs: {
+        Row: {
+          colaborador_id: string | null
+          completion_tokens: number | null
+          created_at: string | null
+          error_code: string | null
+          error_message: string | null
+          function_name: string
+          id: string
+          model_used: string | null
+          periodo_id: string | null
+          prompt_tokens: number | null
+          request_duration_ms: number | null
+          status: string
+          total_tokens: number | null
+          user_agent: string | null
+        }
+        Insert: {
+          colaborador_id?: string | null
+          completion_tokens?: number | null
+          created_at?: string | null
+          error_code?: string | null
+          error_message?: string | null
+          function_name: string
+          id?: string
+          model_used?: string | null
+          periodo_id?: string | null
+          prompt_tokens?: number | null
+          request_duration_ms?: number | null
+          status: string
+          total_tokens?: number | null
+          user_agent?: string | null
+        }
+        Update: {
+          colaborador_id?: string | null
+          completion_tokens?: number | null
+          created_at?: string | null
+          error_code?: string | null
+          error_message?: string | null
+          function_name?: string
+          id?: string
+          model_used?: string | null
+          periodo_id?: string | null
+          prompt_tokens?: number | null
+          request_duration_ms?: number | null
+          status?: string
+          total_tokens?: number | null
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_periodo"
+            columns: ["periodo_id"]
+            isOneToOne: false
+            referencedRelation: "evaluation_periods"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_assignments: {
         Row: {
           activo: boolean | null
@@ -565,6 +741,7 @@ export type Database = {
       }
       users: {
         Row: {
+          antiguedad: number | null
           apellidos: string
           area: string
           cargo: string
@@ -573,6 +750,7 @@ export type Database = {
           departamento_dependencia: string | null
           direccion_unidad: string | null
           dpi: string
+          edad: number | null
           estado: string
           fecha_ingreso: string | null
           fecha_nacimiento: string
@@ -590,6 +768,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          antiguedad?: number | null
           apellidos: string
           area: string
           cargo: string
@@ -598,6 +777,7 @@ export type Database = {
           departamento_dependencia?: string | null
           direccion_unidad?: string | null
           dpi: string
+          edad?: number | null
           estado?: string
           fecha_ingreso?: string | null
           fecha_nacimiento: string
@@ -615,6 +795,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          antiguedad?: number | null
           apellidos?: string
           area?: string
           cargo?: string
@@ -623,6 +804,7 @@ export type Database = {
           departamento_dependencia?: string | null
           direccion_unidad?: string | null
           dpi?: string
+          edad?: number | null
           estado?: string
           fecha_ingreso?: string | null
           fecha_nacimiento?: string
@@ -665,6 +847,11 @@ export type Database = {
         Args: { usuario_dpi: string }
         Returns: number
       }
+      calcular_antiguedad_meses_calculado: {
+        Args: { fecha_ingreso: string }
+        Returns: number
+      }
+      calcular_edad: { Args: { fecha_nacimiento_str: string }; Returns: number }
       calculate_complete_final_result: {
         Args: {
           autoevaluacion_id: string
@@ -713,6 +900,7 @@ export type Database = {
       }
       delete_job_level: { Args: { p_code: string }; Returns: Json }
       es_jefe_intermedio: { Args: { usuario_dpi: string }; Returns: boolean }
+      formatear_antiguedad_legible: { Args: { meses: number }; Returns: string }
       get_9box_por_antiguedad: {
         Args: { periodo_id_param: string }
         Returns: Json
@@ -792,6 +980,15 @@ export type Database = {
       get_jerarquia_arriba: { Args: { usuario_dpi: string }; Returns: Json }
       get_job_level_info: { Args: { p_code: string }; Returns: Json }
       get_nivel_antiguedad_stats: { Args: never; Returns: Json }
+      get_openai_usage_stats: {
+        Args: {
+          fecha_fin_param?: string
+          fecha_inicio_param?: string
+          periodo_id_param?: string
+        }
+        Returns: Json
+      }
+      get_personal_analytics: { Args: never; Returns: Json }
       get_progresion_desempeno: {
         Args: { periodo_actual_id: string; periodo_anterior_id: string }
         Returns: Json
@@ -821,6 +1018,22 @@ export type Database = {
           periodo_anterior_id: string
         }
         Returns: Json
+      }
+      log_openai_api_call: {
+        Args: {
+          colaborador_id_param?: string
+          completion_tokens_param?: number
+          error_code_param?: string
+          error_message_param?: string
+          function_name_param: string
+          model_used_param?: string
+          periodo_id_param?: string
+          prompt_tokens_param?: number
+          request_duration_ms_param?: number
+          status_param?: string
+          total_tokens_param?: number
+        }
+        Returns: string
       }
       score_to_percentage: { Args: { score: number }; Returns: number }
       update_job_level: {
