@@ -70,83 +70,195 @@ const getDimensionDescription = (dimension: string): string => {
 
 const getResultExplanation = (dimension: string, percentage: number, promedioMunicipal?: number): string => {
   const nombre = dimension.toLowerCase();
-  const diferencia = promedioMunicipal ? percentage - promedioMunicipal : 0;
+  // Asegurar que promedioMunicipal sea número válido o 0
+  const promedioValido = (promedioMunicipal !== undefined && typeof promedioMunicipal === 'number' && !isNaN(promedioMunicipal)) ? promedioMunicipal : 0;
+  const diferencia = promedioValido > 0 ? percentage - promedioValido : 0;
   
   // Explicaciones para competencias técnicas
   if (nombre.includes("técnica") || nombre.includes("competencia") || nombre.includes("conocimiento") || nombre.includes("laborales")) {
     if (percentage >= 85) {
-      return `Con un ${percentage.toFixed(1)}%, demuestras un dominio excepcional de las habilidades técnicas requeridas para tu puesto. ${diferencia > 0 ? `Estás por encima del promedio municipal (${promedioMunicipal?.toFixed(1)}%), lo que indica que tus competencias técnicas son un diferenciador clave.` : diferencia < 0 ? `Aunque estás ligeramente por debajo del promedio municipal (${promedioMunicipal?.toFixed(1)}%), mantienes un nivel sólido.` : 'Estás alineado con el promedio municipal, manteniendo un nivel consistente.'}`;
+      const comparacion = promedioValido > 0 
+        ? (diferencia > 0 ? `Estás por encima del promedio municipal (${promedioValido.toFixed(1)}%), lo que indica que tus competencias técnicas son un diferenciador clave.` 
+          : diferencia < 0 ? `Aunque estás ligeramente por debajo del promedio municipal (${promedioValido.toFixed(1)}%), mantienes un nivel sólido.` 
+          : 'Estás alineado con el promedio municipal, manteniendo un nivel consistente.')
+        : 'Estás alineado con el promedio municipal, manteniendo un nivel consistente.';
+      return `Con un ${percentage.toFixed(1)}%, demuestras un dominio excepcional de las habilidades técnicas requeridas para tu puesto. ${comparacion}`;
     } else if (percentage >= 75) {
-      return `Con un ${percentage.toFixed(1)}%, muestras buenos conocimientos técnicos en tu área de trabajo. ${diferencia > 0 ? `Superas el promedio municipal (${promedioMunicipal?.toFixed(1)}%), lo que refleja tu compromiso con la excelencia técnica.` : diferencia < 0 ? `Estás cerca del promedio municipal (${promedioMunicipal?.toFixed(1)}%), con oportunidad de fortalecer aún más tus competencias.` : 'Estás alineado con el estándar esperado para tu nivel.'}`;
+      const comparacion = promedioValido > 0 
+        ? (diferencia > 0 ? `Superas el promedio municipal (${promedioValido.toFixed(1)}%), lo que refleja tu compromiso con la excelencia técnica.` 
+          : diferencia < 0 ? `Estás cerca del promedio municipal (${promedioValido.toFixed(1)}%), con oportunidad de fortalecer aún más tus competencias.` 
+          : 'Estás alineado con el estándar esperado para tu nivel.')
+        : 'Estás alineado con el estándar esperado para tu nivel.';
+      return `Con un ${percentage.toFixed(1)}%, muestras buenos conocimientos técnicos en tu área de trabajo. ${comparacion}`;
     } else if (percentage >= 60) {
-      return `Con un ${percentage.toFixed(1)}%, hay oportunidad de fortalecer tus conocimientos técnicos. ${diferencia > 0 ? `A pesar de estar por encima del promedio municipal (${promedioMunicipal?.toFixed(1)}%), aún puedes mejorar.` : diferencia < 0 ? `Estás por debajo del promedio municipal (${promedioMunicipal?.toFixed(1)}%), lo que indica un área importante de desarrollo.` : 'Considera capacitación adicional para mejorar tu desempeño técnico.'}`;
+      const comparacion = promedioValido > 0 
+        ? (diferencia > 0 ? `A pesar de estar por encima del promedio municipal (${promedioValido.toFixed(1)}%), aún puedes mejorar.` 
+          : diferencia < 0 ? `Estás por debajo del promedio municipal (${promedioValido.toFixed(1)}%), lo que indica un área importante de desarrollo.` 
+          : 'Considera capacitación adicional para mejorar tu desempeño técnico.')
+        : 'Considera capacitación adicional para mejorar tu desempeño técnico.';
+      return `Con un ${percentage.toFixed(1)}%, hay oportunidad de fortalecer tus conocimientos técnicos. ${comparacion}`;
     } else {
-      return `Con un ${percentage.toFixed(1)}%, esta área requiere atención prioritaria. ${diferencia > 0 ? `Aunque superas el promedio municipal (${promedioMunicipal?.toFixed(1)}%), el nivel general necesita mejora.` : diferencia < 0 ? `Estás significativamente por debajo del promedio municipal (${promedioMunicipal?.toFixed(1)}%), lo que requiere un plan de desarrollo específico.` : 'Es fundamental desarrollar estas competencias para mejorar tu desempeño general.'}`;
+      const comparacion = promedioValido > 0 
+        ? (diferencia > 0 ? `Aunque superas el promedio municipal (${promedioValido.toFixed(1)}%), el nivel general necesita mejora.` 
+          : diferencia < 0 ? `Estás significativamente por debajo del promedio municipal (${promedioValido.toFixed(1)}%), lo que requiere un plan de desarrollo específico.` 
+          : 'Es fundamental desarrollar estas competencias para mejorar tu desempeño general.')
+        : 'Es fundamental desarrollar estas competencias para mejorar tu desempeño general.';
+      return `Con un ${percentage.toFixed(1)}%, esta área requiere atención prioritaria. ${comparacion}`;
     }
   }
   
   // Explicaciones para comportamiento organizacional
   if (nombre.includes("comportamiento") || nombre.includes("actitud") || nombre.includes("valor") || nombre.includes("organizacional")) {
     if (percentage >= 80) {
-      return `Con un ${percentage.toFixed(1)}%, tus valores y actitud profesional son un pilar sólido de tu desempeño. ${diferencia > 0 ? `Superas el promedio municipal (${promedioMunicipal?.toFixed(1)}%), demostrando un compromiso ejemplar con la cultura organizacional.` : diferencia < 0 ? `Estás cerca del promedio municipal (${promedioMunicipal?.toFixed(1)}%), manteniendo un buen nivel.` : 'Reflejas los valores institucionales de manera consistente.'}`;
+      const comparacion = promedioValido > 0 
+        ? (diferencia > 0 ? `Superas el promedio municipal (${promedioValido.toFixed(1)}%), demostrando un compromiso ejemplar con la cultura organizacional.` 
+          : diferencia < 0 ? `Estás cerca del promedio municipal (${promedioValido.toFixed(1)}%), manteniendo un buen nivel.` 
+          : 'Reflejas los valores institucionales de manera consistente.')
+        : 'Reflejas los valores institucionales de manera consistente.';
+      return `Con un ${percentage.toFixed(1)}%, tus valores y actitud profesional son un pilar sólido de tu desempeño. ${comparacion}`;
     } else if (percentage >= 70) {
-      return `Con un ${percentage.toFixed(1)}%, muestras una actitud positiva hacia el trabajo. ${diferencia > 0 ? `Estás por encima del promedio municipal (${promedioMunicipal?.toFixed(1)}%), lo que indica buena alineación con los valores.` : diferencia < 0 ? `Estás ligeramente por debajo del promedio municipal (${promedioMunicipal?.toFixed(1)}%), con oportunidad de fortalecer tu compromiso.` : 'Mantén este nivel y busca oportunidades para demostrar aún más los valores institucionales.'}`;
+      const comparacion = promedioValido > 0 
+        ? (diferencia > 0 ? `Estás por encima del promedio municipal (${promedioValido.toFixed(1)}%), lo que indica buena alineación con los valores.` 
+          : diferencia < 0 ? `Estás ligeramente por debajo del promedio municipal (${promedioValido.toFixed(1)}%), con oportunidad de fortalecer tu compromiso.` 
+          : 'Mantén este nivel y busca oportunidades para demostrar aún más los valores institucionales.')
+        : 'Mantén este nivel y busca oportunidades para demostrar aún más los valores institucionales.';
+      return `Con un ${percentage.toFixed(1)}%, muestras una actitud positiva hacia el trabajo. ${comparacion}`;
     } else {
-      return `Con un ${percentage.toFixed(1)}%, es importante enfocarse en alinear mejor con la cultura y valores organizacionales. ${diferencia > 0 ? `Aunque superas el promedio municipal (${promedioMunicipal?.toFixed(1)}%), hay espacio para mejorar.` : diferencia < 0 ? `Estás por debajo del promedio municipal (${promedioMunicipal?.toFixed(1)}%), lo que requiere atención para fortalecer tu compromiso institucional.` : 'Considera cómo puedes demostrar mejor los valores y normas de la institución.'}`;
+      const comparacion = promedioValido > 0 
+        ? (diferencia > 0 ? `Aunque superas el promedio municipal (${promedioValido.toFixed(1)}%), hay espacio para mejorar.` 
+          : diferencia < 0 ? `Estás por debajo del promedio municipal (${promedioValido.toFixed(1)}%), lo que requiere atención para fortalecer tu compromiso institucional.` 
+          : 'Considera cómo puedes demostrar mejor los valores y normas de la institución.')
+        : 'Considera cómo puedes demostrar mejor los valores y normas de la institución.';
+      return `Con un ${percentage.toFixed(1)}%, es importante enfocarse en alinear mejor con la cultura y valores organizacionales. ${comparacion}`;
     }
   }
   
   // Explicaciones para relaciones interpersonales
   if (nombre.includes("relaciones interpersonales") || nombre.includes("trabajo en equipo") || nombre.includes("comunicación")) {
     if (percentage >= 85) {
-      return `Con un ${percentage.toFixed(1)}%, destacas por tu capacidad de comunicación y colaboración efectiva. ${diferencia > 0 ? `Superas significativamente el promedio municipal (${promedioMunicipal?.toFixed(1)}%), siendo un referente en trabajo en equipo.` : diferencia < 0 ? `Estás cerca del promedio municipal (${promedioMunicipal?.toFixed(1)}%), manteniendo excelentes relaciones.` : 'Tus habilidades interpersonales son una fortaleza reconocida.'}`;
+      const comparacion = promedioValido > 0 
+        ? (diferencia > 0 ? `Superas significativamente el promedio municipal (${promedioValido.toFixed(1)}%), siendo un referente en trabajo en equipo.` 
+          : diferencia < 0 ? `Estás cerca del promedio municipal (${promedioValido.toFixed(1)}%), manteniendo excelentes relaciones.` 
+          : 'Tus habilidades interpersonales son una fortaleza reconocida.')
+        : 'Tus habilidades interpersonales son una fortaleza reconocida.';
+      return `Con un ${percentage.toFixed(1)}%, destacas por tu capacidad de comunicación y colaboración efectiva. ${comparacion}`;
     } else if (percentage >= 75) {
-      return `Con un ${percentage.toFixed(1)}%, mantienes buenas relaciones profesionales con tus compañeros. ${diferencia > 0 ? `Estás por encima del promedio municipal (${promedioMunicipal?.toFixed(1)}%), lo que facilita el trabajo colaborativo.` : diferencia < 0 ? `Estás cerca del promedio municipal (${promedioMunicipal?.toFixed(1)}%), con oportunidad de fortalecer la comunicación.` : 'Continúa fomentando un ambiente de trabajo colaborativo.'}`;
+      const comparacion = promedioValido > 0 
+        ? (diferencia > 0 ? `Estás por encima del promedio municipal (${promedioValido.toFixed(1)}%), lo que facilita el trabajo colaborativo.` 
+          : diferencia < 0 ? `Estás cerca del promedio municipal (${promedioValido.toFixed(1)}%), con oportunidad de fortalecer la comunicación.` 
+          : 'Continúa fomentando un ambiente de trabajo colaborativo.')
+        : 'Continúa fomentando un ambiente de trabajo colaborativo.';
+      return `Con un ${percentage.toFixed(1)}%, mantienes buenas relaciones profesionales con tus compañeros. ${comparacion}`;
     } else {
-      return `Con un ${percentage.toFixed(1)}%, hay oportunidad de mejorar tus habilidades de comunicación y trabajo en equipo. ${diferencia > 0 ? `Aunque superas el promedio municipal (${promedioMunicipal?.toFixed(1)}%), puedes desarrollar más estas competencias.` : diferencia < 0 ? `Estás por debajo del promedio municipal (${promedioMunicipal?.toFixed(1)}%), lo que requiere atención para mejorar la colaboración.` : 'Considera participar más activamente en actividades de equipo y mejorar la comunicación.'}`;
+      const comparacion = promedioValido > 0 
+        ? (diferencia > 0 ? `Aunque superas el promedio municipal (${promedioValido.toFixed(1)}%), puedes desarrollar más estas competencias.` 
+          : diferencia < 0 ? `Estás por debajo del promedio municipal (${promedioValido.toFixed(1)}%), lo que requiere atención para mejorar la colaboración.` 
+          : 'Considera participar más activamente en actividades de equipo y mejorar la comunicación.')
+        : 'Considera participar más activamente en actividades de equipo y mejorar la comunicación.';
+      return `Con un ${percentage.toFixed(1)}%, hay oportunidad de mejorar tus habilidades de comunicación y trabajo en equipo. ${comparacion}`;
     }
   }
   
   // Explicaciones para orientación al servicio
   if (nombre.includes("servicio") || nombre.includes("atención") || nombre.includes("orientación") || nombre.includes("usuario")) {
     if (percentage >= 80) {
-      return `Con un ${percentage.toFixed(1)}%, demuestras un compromiso excepcional con la atención al usuario. ${diferencia > 0 ? `Superas el promedio municipal (${promedioMunicipal?.toFixed(1)}%), siendo un ejemplo de servicio de calidad.` : diferencia < 0 ? `Estás cerca del promedio municipal (${promedioMunicipal?.toFixed(1)}%), manteniendo un buen nivel de servicio.` : 'Tu enfoque en el usuario es reconocido y valorado.'}`;
+      const comparacion = promedioValido > 0 
+        ? (diferencia > 0 ? `Superas el promedio municipal (${promedioValido.toFixed(1)}%), siendo un ejemplo de servicio de calidad.` 
+          : diferencia < 0 ? `Estás cerca del promedio municipal (${promedioValido.toFixed(1)}%), manteniendo un buen nivel de servicio.` 
+          : 'Tu enfoque en el usuario es reconocido y valorado.')
+        : 'Tu enfoque en el usuario es reconocido y valorado.';
+      return `Con un ${percentage.toFixed(1)}%, demuestras un compromiso excepcional con la atención al usuario. ${comparacion}`;
     } else if (percentage >= 70) {
-      return `Con un ${percentage.toFixed(1)}%, muestras una actitud positiva hacia el servicio. ${diferencia > 0 ? `Estás por encima del promedio municipal (${promedioMunicipal?.toFixed(1)}%), lo que indica buen compromiso con los usuarios.` : diferencia < 0 ? `Estás cerca del promedio municipal (${promedioMunicipal?.toFixed(1)}%), con oportunidad de mejorar la calidad del servicio.` : 'Mantén este nivel y busca formas de superar las expectativas de los usuarios.'}`;
+      const comparacion = promedioValido > 0 
+        ? (diferencia > 0 ? `Estás por encima del promedio municipal (${promedioValido.toFixed(1)}%), lo que indica buen compromiso con los usuarios.` 
+          : diferencia < 0 ? `Estás cerca del promedio municipal (${promedioValido.toFixed(1)}%), con oportunidad de mejorar la calidad del servicio.` 
+          : 'Mantén este nivel y busca formas de superar las expectativas de los usuarios.')
+        : 'Mantén este nivel y busca formas de superar las expectativas de los usuarios.';
+      return `Con un ${percentage.toFixed(1)}%, muestras una actitud positiva hacia el servicio. ${comparacion}`;
     } else {
-      return `Con un ${percentage.toFixed(1)}%, es importante fortalecer tu enfoque en las necesidades de los usuarios. ${diferencia > 0 ? `Aunque superas el promedio municipal (${promedioMunicipal?.toFixed(1)}%), puedes mejorar aún más.` : diferencia < 0 ? `Estás por debajo del promedio municipal (${promedioMunicipal?.toFixed(1)}%), lo que requiere atención para mejorar el servicio.` : 'Considera cómo puedes anticipar y responder mejor a las necesidades de los usuarios.'}`;
+      const comparacion = promedioValido > 0 
+        ? (diferencia > 0 ? `Aunque superas el promedio municipal (${promedioValido.toFixed(1)}%), puedes mejorar aún más.` 
+          : diferencia < 0 ? `Estás por debajo del promedio municipal (${promedioValido.toFixed(1)}%), lo que requiere atención para mejorar el servicio.` 
+          : 'Considera cómo puedes anticipar y responder mejor a las necesidades de los usuarios.')
+        : 'Considera cómo puedes anticipar y responder mejor a las necesidades de los usuarios.';
+      return `Con un ${percentage.toFixed(1)}%, es importante fortalecer tu enfoque en las necesidades de los usuarios. ${comparacion}`;
     }
   }
   
   // Explicaciones para productividad
   if (nombre.includes("productividad") || nombre.includes("cumplimiento") || nombre.includes("objetivos")) {
     if (percentage >= 80) {
-      return `Con un ${percentage.toFixed(1)}%, demuestras alta efectividad en el cumplimiento de objetivos y plazos. ${diferencia > 0 ? `Superas el promedio municipal (${promedioMunicipal?.toFixed(1)}%), siendo un referente en productividad.` : diferencia < 0 ? `Estás cerca del promedio municipal (${promedioMunicipal?.toFixed(1)}%), manteniendo un buen ritmo de trabajo.` : 'Tu capacidad para cumplir objetivos es consistente y confiable.'}`;
+      const comparacion = promedioValido > 0 
+        ? (diferencia > 0 ? `Superas el promedio municipal (${promedioValido.toFixed(1)}%), siendo un referente en productividad.` 
+          : diferencia < 0 ? `Estás cerca del promedio municipal (${promedioValido.toFixed(1)}%), manteniendo un buen ritmo de trabajo.` 
+          : 'Tu capacidad para cumplir objetivos es consistente y confiable.')
+        : 'Tu capacidad para cumplir objetivos es consistente y confiable.';
+      return `Con un ${percentage.toFixed(1)}%, demuestras alta efectividad en el cumplimiento de objetivos y plazos. ${comparacion}`;
     } else if (percentage >= 70) {
-      return `Con un ${percentage.toFixed(1)}%, cumples adecuadamente con tus responsabilidades. ${diferencia > 0 ? `Estás por encima del promedio municipal (${promedioMunicipal?.toFixed(1)}%), lo que indica buena gestión del tiempo.` : diferencia < 0 ? `Estás cerca del promedio municipal (${promedioMunicipal?.toFixed(1)}%), con oportunidad de optimizar tu productividad.` : 'Continúa mejorando la eficiencia en el cumplimiento de plazos.'}`;
+      const comparacion = promedioValido > 0 
+        ? (diferencia > 0 ? `Estás por encima del promedio municipal (${promedioValido.toFixed(1)}%), lo que indica buena gestión del tiempo.` 
+          : diferencia < 0 ? `Estás cerca del promedio municipal (${promedioValido.toFixed(1)}%), con oportunidad de optimizar tu productividad.` 
+          : 'Continúa mejorando la eficiencia en el cumplimiento de plazos.')
+        : 'Continúa mejorando la eficiencia en el cumplimiento de plazos.';
+      return `Con un ${percentage.toFixed(1)}%, cumples adecuadamente con tus responsabilidades. ${comparacion}`;
     } else {
-      return `Con un ${percentage.toFixed(1)}%, hay oportunidad de mejorar la gestión del tiempo y cumplimiento de objetivos. ${diferencia > 0 ? `Aunque superas el promedio municipal (${promedioMunicipal?.toFixed(1)}%), puedes optimizar más.` : diferencia < 0 ? `Estás por debajo del promedio municipal (${promedioMunicipal?.toFixed(1)}%), lo que requiere atención para mejorar la productividad.` : 'Considera técnicas de gestión del tiempo y priorización de tareas.'}`;
+      const comparacion = promedioValido > 0 
+        ? (diferencia > 0 ? `Aunque superas el promedio municipal (${promedioValido.toFixed(1)}%), puedes optimizar más.` 
+          : diferencia < 0 ? `Estás por debajo del promedio municipal (${promedioValido.toFixed(1)}%), lo que requiere atención para mejorar la productividad.` 
+          : 'Considera técnicas de gestión del tiempo y priorización de tareas.')
+        : 'Considera técnicas de gestión del tiempo y priorización de tareas.';
+      return `Con un ${percentage.toFixed(1)}%, hay oportunidad de mejorar la gestión del tiempo y cumplimiento de objetivos. ${comparacion}`;
     }
   }
   
   // Explicaciones para calidad
   if (nombre.includes("calidad")) {
     if (percentage >= 80) {
-      return `Con un ${percentage.toFixed(1)}%, tu trabajo se caracteriza por la precisión y el cumplimiento de estándares. ${diferencia > 0 ? `Superas el promedio municipal (${promedioMunicipal?.toFixed(1)}%), siendo un ejemplo de excelencia.` : diferencia < 0 ? `Estás cerca del promedio municipal (${promedioMunicipal?.toFixed(1)}%), manteniendo altos estándares.` : 'La calidad de tu trabajo es reconocida y consistente.'}`;
+      const comparacion = promedioValido > 0 
+        ? (diferencia > 0 ? `Superas el promedio municipal (${promedioValido.toFixed(1)}%), siendo un ejemplo de excelencia.` 
+          : diferencia < 0 ? `Estás cerca del promedio municipal (${promedioValido.toFixed(1)}%), manteniendo altos estándares.` 
+          : 'La calidad de tu trabajo es reconocida y consistente.')
+        : 'La calidad de tu trabajo es reconocida y consistente.';
+      return `Con un ${percentage.toFixed(1)}%, tu trabajo se caracteriza por la precisión y el cumplimiento de estándares. ${comparacion}`;
     } else if (percentage >= 70) {
-      return `Con un ${percentage.toFixed(1)}%, mantienes un nivel adecuado de calidad en tus entregables. ${diferencia > 0 ? `Estás por encima del promedio municipal (${promedioMunicipal?.toFixed(1)}%), lo que indica atención al detalle.` : diferencia < 0 ? `Estás cerca del promedio municipal (${promedioMunicipal?.toFixed(1)}%), con oportunidad de elevar los estándares.` : 'Continúa mejorando la precisión y presentación de tu trabajo.'}`;
+      const comparacion = promedioValido > 0 
+        ? (diferencia > 0 ? `Estás por encima del promedio municipal (${promedioValido.toFixed(1)}%), lo que indica atención al detalle.` 
+          : diferencia < 0 ? `Estás cerca del promedio municipal (${promedioValido.toFixed(1)}%), con oportunidad de elevar los estándares.` 
+          : 'Continúa mejorando la precisión y presentación de tu trabajo.')
+        : 'Continúa mejorando la precisión y presentación de tu trabajo.';
+      return `Con un ${percentage.toFixed(1)}%, mantienes un nivel adecuado de calidad en tus entregables. ${comparacion}`;
     } else {
-      return `Con un ${percentage.toFixed(1)}%, es importante fortalecer la precisión y cumplimiento de estándares. ${diferencia > 0 ? `Aunque superas el promedio municipal (${promedioMunicipal?.toFixed(1)}%), puedes mejorar más.` : diferencia < 0 ? `Estás por debajo del promedio municipal (${promedioMunicipal?.toFixed(1)}%), lo que requiere atención para mejorar la calidad.` : 'Considera revisar procesos y estándares para elevar la calidad de tu trabajo.'}`;
+      const comparacion = promedioValido > 0 
+        ? (diferencia > 0 ? `Aunque superas el promedio municipal (${promedioValido.toFixed(1)}%), puedes mejorar más.` 
+          : diferencia < 0 ? `Estás por debajo del promedio municipal (${promedioValido.toFixed(1)}%), lo que requiere atención para mejorar la calidad.` 
+          : 'Considera revisar procesos y estándares para elevar la calidad de tu trabajo.')
+        : 'Considera revisar procesos y estándares para elevar la calidad de tu trabajo.';
+      return `Con un ${percentage.toFixed(1)}%, es importante fortalecer la precisión y cumplimiento de estándares. ${comparacion}`;
     }
   }
   
   // Explicación genérica
   if (percentage >= 80) {
-    return `Con un ${percentage.toFixed(1)}%, esta es una de tus áreas más fuertes. ${diferencia > 0 ? `Superas el promedio municipal (${promedioMunicipal?.toFixed(1)}%), lo que indica excelente desempeño.` : diferencia < 0 ? `Estás cerca del promedio municipal (${promedioMunicipal?.toFixed(1)}%), manteniendo un nivel sólido.` : 'Continúa desarrollando esta competencia para mantener tu excelencia.'}`;
+    const comparacion = promedioValido > 0 
+      ? (diferencia > 0 ? `Superas el promedio municipal (${promedioValido.toFixed(1)}%), lo que indica excelente desempeño.` 
+        : diferencia < 0 ? `Estás cerca del promedio municipal (${promedioValido.toFixed(1)}%), manteniendo un nivel sólido.` 
+        : 'Continúa desarrollando esta competencia para mantener tu excelencia.')
+      : 'Continúa desarrollando esta competencia para mantener tu excelencia.';
+    return `Con un ${percentage.toFixed(1)}%, esta es una de tus áreas más fuertes. ${comparacion}`;
   } else if (percentage >= 70) {
-    return `Con un ${percentage.toFixed(1)}%, muestras un desempeño adecuado en esta dimensión. ${diferencia > 0 ? `Estás por encima del promedio municipal (${promedioMunicipal?.toFixed(1)}%), lo que es positivo.` : diferencia < 0 ? `Estás cerca del promedio municipal (${promedioMunicipal?.toFixed(1)}%), con oportunidad de mejorar.` : 'Hay espacio para crecer y fortalecer aún más esta competencia.'}`;
+    const comparacion = promedioValido > 0 
+      ? (diferencia > 0 ? `Estás por encima del promedio municipal (${promedioValido.toFixed(1)}%), lo que es positivo.` 
+        : diferencia < 0 ? `Estás cerca del promedio municipal (${promedioValido.toFixed(1)}%), con oportunidad de mejorar.` 
+        : 'Hay espacio para crecer y fortalecer aún más esta competencia.')
+      : 'Hay espacio para crecer y fortalecer aún más esta competencia.';
+    return `Con un ${percentage.toFixed(1)}%, muestras un desempeño adecuado en esta dimensión. ${comparacion}`;
   } else {
-    return `Con un ${percentage.toFixed(1)}%, esta área requiere atención y desarrollo. ${diferencia > 0 ? `Aunque superas el promedio municipal (${promedioMunicipal?.toFixed(1)}%), puedes mejorar más.` : diferencia < 0 ? `Estás por debajo del promedio municipal (${promedioMunicipal?.toFixed(1)}%), lo que indica un área importante de crecimiento.` : 'Considera un plan de desarrollo específico para fortalecer esta competencia.'}`;
+    const comparacion = promedioValido > 0 
+      ? (diferencia > 0 ? `Aunque superas el promedio municipal (${promedioValido.toFixed(1)}%), puedes mejorar más.` 
+        : diferencia < 0 ? `Estás por debajo del promedio municipal (${promedioValido.toFixed(1)}%), lo que indica un área importante de crecimiento.` 
+        : 'Considera un plan de desarrollo específico para fortalecer esta competencia.')
+      : 'Considera un plan de desarrollo específico para fortalecer esta competencia.';
+    return `Con un ${percentage.toFixed(1)}%, esta área requiere atención y desarrollo. ${comparacion}`;
   }
 };
 
@@ -179,16 +291,18 @@ const adaptDescriptionToResultFallback = (
     .replace(/^Nivel de\s+/i, "")
     .trim();
 
-  const diferencia = promedioMunicipal ? porcentaje - promedioMunicipal : 0;
+  // Asegurar que promedioMunicipal sea número válido o 0
+  const promedioValido = (promedioMunicipal !== undefined && typeof promedioMunicipal === 'number' && !isNaN(promedioMunicipal) && promedioMunicipal > 0) ? promedioMunicipal : 0;
+  const diferencia = promedioValido > 0 ? porcentaje - promedioValido : 0;
   let comparacion = '';
   
-  if (promedioMunicipal && promedioMunicipal > 0) {
+  if (promedioValido > 0) {
     if (diferencia > 0) {
-      comparacion = ` Estás por encima del promedio municipal (${promedioMunicipal.toFixed(1)}%), lo que indica un desempeño destacado.`;
+      comparacion = ` Estás por encima del promedio municipal (${promedioValido.toFixed(1)}%), lo que indica un desempeño destacado.`;
     } else if (diferencia < 0) {
-      comparacion = ` Estás por debajo del promedio municipal (${promedioMunicipal.toFixed(1)}%), lo que indica un área de desarrollo.`;
+      comparacion = ` Estás por debajo del promedio municipal (${promedioValido.toFixed(1)}%), lo que indica un área de desarrollo.`;
     } else {
-      comparacion = ` Estás alineado con el promedio municipal (${promedioMunicipal.toFixed(1)}%), manteniendo un nivel consistente.`;
+      comparacion = ` Estás alineado con el promedio municipal (${promedioValido.toFixed(1)}%), manteniendo un nivel consistente.`;
     }
   }
 
@@ -212,10 +326,11 @@ const ExplanationBox = ({ competencia, nivel, barColor }: {
   // Usar explicación pre-cargada de la base de datos si está disponible
   let explicacion = '';
   
-  if (competencia.explicacion) {
+  // Validar que explicacion sea string válido (no null ni undefined)
+  if (competencia.explicacion && typeof competencia.explicacion === 'string' && competencia.explicacion.trim() !== '') {
     // Usar explicación de la base de datos (ya incluye comparación si corresponde)
     explicacion = competencia.explicacion;
-  } else if (competencia.descripcion) {
+  } else if (competencia.descripcion && typeof competencia.descripcion === 'string' && competencia.descripcion.trim() !== '') {
     // Fallback: adaptar descripción del instrumento
     explicacion = adaptDescriptionToResultFallback(
       competencia.descripcion,

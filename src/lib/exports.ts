@@ -1572,17 +1572,20 @@ export const exportEvaluacionCompletaPDFReact = async (
         const tuEvaluacion = typeof r.tuEvaluacion === 'number' && !isNaN(r.tuEvaluacion) ? r.tuEvaluacion : 0;
         const promedioMunicipal = r.promedioMunicipal !== undefined && typeof r.promedioMunicipal === 'number' && !isNaN(r.promedioMunicipal) ? r.promedioMunicipal : undefined;
         
-        let explicacion = null;
+        let explicacion: string | null | undefined = null;
         if (r.dimensionId && empleado.nivel) {
           try {
-            explicacion = await getDimensionExplanation(
+            const result = await getDimensionExplanation(
               r.dimensionId,
               empleado.nivel,
               tuEvaluacion,
               promedioMunicipal
             );
+            // Asegurar que explicacion sea string o undefined, nunca null
+            explicacion = result && typeof result === 'string' && result.trim() !== '' ? result : undefined;
           } catch (error) {
             console.warn(`No se pudo obtener explicación para ${r.dimensionId}:`, error);
+            explicacion = undefined;
           }
         }
         return {
@@ -1590,8 +1593,8 @@ export const exportEvaluacionCompletaPDFReact = async (
           tuEvaluacion,
           promedioMunicipal,
           dimensionId: r.dimensionId || undefined,
-          descripcion: r.descripcion || undefined,
-          explicacion: explicacion || undefined
+          descripcion: (r.descripcion && typeof r.descripcion === 'string' && r.descripcion.trim() !== '') ? r.descripcion : undefined,
+          explicacion: explicacion // Ya está validado arriba
         };
       })
     );
