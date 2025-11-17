@@ -19,22 +19,24 @@ const getScoreInterpretation = (percentage: number) => {
 };
 
 export const ResultadoSectionPDF = ({ performancePercentage }: ResultadoSectionPDFProps) => {
-  const interpretation = getScoreInterpretation(performancePercentage);
-  const description = performancePercentage >= 75
+  // Asegurar que performancePercentage sea un número válido
+  const percentage = typeof performancePercentage === 'number' && !isNaN(performancePercentage) ? performancePercentage : 0;
+  const interpretation = getScoreInterpretation(percentage);
+  const description = percentage >= 75
     ? 'Estás cumpliendo satisfactoriamente con las expectativas del cargo.'
     : 'Hay áreas importantes que requieren atención y mejora.';
 
   return (
     <View style={pdfStyles.resultadoSection}>
       <View style={pdfStyles.percentageContainer}>
-        <Text style={pdfStyles.percentage}>{performancePercentage}</Text>
+        <Text style={pdfStyles.percentage}>{percentage.toFixed(0)}</Text>
         <Text style={pdfStyles.percentageLabel}>%</Text>
       </View>
       <View style={pdfStyles.resultadoCenter}>
         <Text style={[pdfStyles.interpretation, interpretation.color]}>
-          RESULTADO GENERAL: Tu desempeño es {interpretation.label}
+          RESULTADO GENERAL: Tu desempeño es {interpretation.label || 'Regular'}
         </Text>
-        <Text style={pdfStyles.description}>{description}</Text>
+        <Text style={pdfStyles.description}>{description || 'Sin descripción disponible.'}</Text>
       </View>
     </View>
   );

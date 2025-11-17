@@ -79,12 +79,10 @@ export const pdfStyles = StyleSheet.create({
     borderRadius: 4,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
   },
   resultadoSectionInner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 15,
     width: '100%',
   },
   resultadoLeft: {
@@ -174,7 +172,6 @@ export const pdfStyles = StyleSheet.create({
   competenciasGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
     marginBottom: 10,
   },
   competenciaItem: {
@@ -210,7 +207,6 @@ export const pdfStyles = StyleSheet.create({
   fortalezasGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
     marginBottom: 6,
   },
   fortalezaCard: {
@@ -224,7 +220,6 @@ export const pdfStyles = StyleSheet.create({
   oportunidadesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
     marginBottom: 6,
   },
   oportunidadCard: {
@@ -444,8 +439,8 @@ export const pdfStyles = StyleSheet.create({
   // Firmas
   firmasSection: {
     flexDirection: 'row',
-    gap: 20,
     marginTop: 12,
+    justifyContent: 'space-around',
   },
   firmaBox: {
     flex: 1,

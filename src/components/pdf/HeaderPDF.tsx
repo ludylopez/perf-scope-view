@@ -23,9 +23,9 @@ interface HeaderPDFProps {
 }
 
 export const HeaderPDF = ({ empleado, periodo, fechaGeneracion, jefeCompleto }: HeaderPDFProps) => {
-  const nombreCompleto = empleado.apellidos 
-    ? `${empleado.nombre} ${empleado.apellidos}` 
-    : empleado.nombre;
+  const nombreCompleto = empleado?.apellidos 
+    ? `${empleado?.nombre || 'N/A'} ${empleado.apellidos}` 
+    : (empleado?.nombre || 'N/A');
 
   return (
     <>
@@ -42,58 +42,58 @@ export const HeaderPDF = ({ empleado, periodo, fechaGeneracion, jefeCompleto }: 
           <View style={pdfStyles.infoColumn}>
             <View style={pdfStyles.infoRow}>
               <Text style={pdfStyles.infoLabel}>EMPLEADO:</Text>
-              <Text style={pdfStyles.infoValue}>{nombreCompleto}</Text>
+              <Text style={pdfStyles.infoValue}>{nombreCompleto || 'N/A'}</Text>
             </View>
             
-            {empleado.dpi && (
+            {empleado?.dpi && (
               <View style={pdfStyles.infoRow}>
                 <Text style={pdfStyles.infoLabel}>DPI:</Text>
-                <Text style={pdfStyles.infoValue}>{empleado.dpi}</Text>
+                <Text style={pdfStyles.infoValue}>{empleado.dpi || ''}</Text>
               </View>
             )}
             
-            {empleado.cargo && (
+            {empleado?.cargo && (
               <View style={pdfStyles.infoRow}>
                 <Text style={pdfStyles.infoLabel}>CARGO:</Text>
-                <Text style={pdfStyles.infoValue}>{empleado.cargo}</Text>
+                <Text style={pdfStyles.infoValue}>{empleado.cargo || ''}</Text>
               </View>
             )}
             
-            {empleado.area && (
+            {empleado?.area && (
               <View style={pdfStyles.infoRow}>
                 <Text style={pdfStyles.infoLabel}>ÁREA:</Text>
-                <Text style={pdfStyles.infoValue}>{empleado.area}</Text>
+                <Text style={pdfStyles.infoValue}>{empleado.area || ''}</Text>
               </View>
             )}
           </View>
 
           {/* Columna derecha */}
           <View style={pdfStyles.infoColumn}>
-            {empleado.direccionUnidad && (
+            {empleado?.direccionUnidad && (
               <View style={pdfStyles.infoRow}>
                 <Text style={pdfStyles.infoLabel}>DIRECCIÓN/UNIDAD:</Text>
-                <Text style={pdfStyles.infoValue}>{empleado.direccionUnidad}</Text>
+                <Text style={pdfStyles.infoValue}>{empleado.direccionUnidad || ''}</Text>
               </View>
             )}
             
-            {empleado.departamentoDependencia && (
+            {empleado?.departamentoDependencia && (
               <View style={pdfStyles.infoRow}>
                 <Text style={pdfStyles.infoLabel}>DEPTO/DEPENDENCIA:</Text>
-                <Text style={pdfStyles.infoValue}>{empleado.departamentoDependencia}</Text>
+                <Text style={pdfStyles.infoValue}>{empleado.departamentoDependencia || ''}</Text>
               </View>
             )}
             
-            {empleado.profesion && (
+            {empleado?.profesion && (
               <View style={pdfStyles.infoRow}>
                 <Text style={pdfStyles.infoLabel}>PROFESIÓN:</Text>
-                <Text style={pdfStyles.infoValue}>{empleado.profesion}</Text>
+                <Text style={pdfStyles.infoValue}>{empleado.profesion || ''}</Text>
               </View>
             )}
             
-            {empleado.nivel && (
+            {empleado?.nivel && (
               <View style={pdfStyles.infoRow}>
                 <Text style={pdfStyles.infoLabel}>NIVEL:</Text>
-                <Text style={pdfStyles.infoValue}>{empleado.nivel}</Text>
+                <Text style={pdfStyles.infoValue}>{empleado.nivel || ''}</Text>
               </View>
             )}
           </View>
@@ -102,12 +102,12 @@ export const HeaderPDF = ({ empleado, periodo, fechaGeneracion, jefeCompleto }: 
         <View style={pdfStyles.infoGrid}>
           <View style={pdfStyles.infoRow}>
             <Text style={pdfStyles.infoLabel}>PERÍODO:</Text>
-            <Text style={pdfStyles.infoValue}>{periodo}</Text>
+            <Text style={pdfStyles.infoValue}>{periodo || 'N/A'}</Text>
           </View>
           <View style={pdfStyles.infoRow}>
             <Text style={pdfStyles.infoLabel}>FECHA GENERACIÓN:</Text>
             <Text style={pdfStyles.infoValue}>
-              {format(fechaGeneracion, "d 'de' MMMM, yyyy 'a las' HH:mm", { locale: es })}
+              {fechaGeneracion ? format(fechaGeneracion, "d 'de' MMMM, yyyy 'a las' HH:mm", { locale: es }) : 'N/A'}
             </Text>
           </View>
         </View>
@@ -115,7 +115,7 @@ export const HeaderPDF = ({ empleado, periodo, fechaGeneracion, jefeCompleto }: 
         <View style={pdfStyles.infoRow}>
           <Text style={pdfStyles.infoLabel}>ESTADO:</Text>
           <Text style={pdfStyles.infoEstado}>
-            {empleado.nivel === 'C1' 
+            {empleado?.nivel === 'C1' 
               ? 'Resultado Final (Autoevaluación Concejo Municipal)' 
               : jefeCompleto 
                 ? 'Resultado Consolidado' 

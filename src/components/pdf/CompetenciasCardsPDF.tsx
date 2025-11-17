@@ -400,7 +400,7 @@ export const CompetenciasCardsPDF = ({
   return (
     <View style={{ marginBottom: 6 }}>
       <Text style={pdfStyles.sectionTitle}>📊 PANORAMA DE COMPETENCIAS</Text>
-      <View style={{ marginTop: 4, flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'space-between' }}>
+      <View style={{ marginTop: 4, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
         {competenciasValidas.map((competencia, index) => {
 
           const esFortaleza = isFortaleza(competencia.dimension, fortalezas);
@@ -442,7 +442,7 @@ export const CompetenciasCardsPDF = ({
             >
               {/* Header con número y badge */}
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
                   {/* Círculo con número */}
                   <View style={{
                     width: 24,
