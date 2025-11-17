@@ -38,6 +38,7 @@ import { cn } from "@/lib/utils";
 import type { AssignmentWithUsers } from "@/types/assignment";
 import { validateEvaluationPermission } from "@/lib/validations";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ImportAssignmentsDialog } from "@/components/ImportAssignmentsDialog";
 
 interface User {
   dpi: string;
@@ -55,7 +56,6 @@ const AdminAsignaciones = () => {
   const [assignments, setAssignments] = useState<AssignmentWithUsers[]>([]);
   const [loading, setLoading] = useState(true);
   const [showImportDialog, setShowImportDialog] = useState(false);
-  const [file, setFile] = useState<File | null>(null);
   const [manualAssignment, setManualAssignment] = useState({
     colaboradorId: "",
     jefeId: "",
@@ -208,137 +208,6 @@ const AdminAsignaciones = () => {
       console.error("Error creating assignment:", error);
       toast.error(error.message || "Error al crear asignación");
     }
-  };
-
-  const handleFileUpload = async () => {
-    if (!file) {
-      toast.error("Debe seleccionar un archivo");
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      try {
-        const text = e.target?.result as string;
-        const lines = text.split("\n").filter(line => line.trim());
-        
-        // Esperamos formato CSV: colaborador_dpi,jefe_dpi,grupo_id (opcional)
-        // Primera línea puede ser header, la omitimos si contiene "colaborador" o "jefe"
-        const startIndex = lines[0]?.toLowerCase().includes("colaborador") || 
-                          lines[0]?.toLowerCase().includes("jefe") ? 1 : 0;
-        
-        const assignmentsData = lines.slice(startIndex).map(line => {
-          const parts = line.split(",").map(s => s.trim());
-          const colaboradorId = parts[0];
-          const jefeId = parts[1];
-          const grupoId = parts[2] || null;
-          
-          return {
-            colaborador_id: colaboradorId,
-            jefe_id: jefeId,
-            grupo_id: grupoId,
-            activo: true,
-          };
-        }).filter(a => a.colaborador_id && a.jefe_id && a.colaborador_id.length > 0 && a.jefe_id.length > 0);
-
-        // Validar permisos para cada asignación antes de insertar
-        const validAssignments = [];
-        const invalidAssignments = [];
-
-        for (const assignment of assignmentsData) {
-          const colaborador = users.find(u => u.dpi === assignment.colaborador_id);
-          const jefe = users.find(u => u.dpi === assignment.jefe_id);
-
-          if (!colaborador || !jefe) {
-            invalidAssignments.push({
-              ...assignment,
-              reason: `Usuario no encontrado: ${!colaborador ? assignment.colaborador_id : assignment.jefe_id}`
-            });
-            continue;
-          }
-
-          const validationResult = await validateEvaluationPermission(
-            jefe.dpi,
-            colaborador.dpi
-          );
-
-          if (!validationResult.valid) {
-            invalidAssignments.push({
-              ...assignment,
-              reason: validationResult.error || validationResult.message || "Permisos de evaluación inválidos"
-            });
-            continue;
-          }
-
-          // Validaciones específicas para C1 y A1
-          if (colaborador.nivel === 'C1') {
-            invalidAssignments.push({
-              ...assignment,
-              reason: "El Concejo Municipal (C1) solo puede realizar autoevaluaciones. No puede ser asignado a un jefe."
-            });
-            continue;
-          }
-
-          if (colaborador.nivel === 'A1' && jefe.nivel !== 'C1') {
-            invalidAssignments.push({
-              ...assignment,
-              reason: "El Alcalde Municipal (A1) solo puede ser evaluado por miembros del Concejo Municipal (C1)."
-            });
-            continue;
-          }
-
-          // Verificar si ya existe esta asignación específica
-          const { data: existing } = await supabase
-            .from("user_assignments")
-            .select("id")
-            .eq("colaborador_id", assignment.colaborador_id)
-            .eq("jefe_id", assignment.jefe_id)
-            .eq("activo", true)
-            .maybeSingle();
-
-          if (existing) {
-            // Omitir asignaciones duplicadas sin agregarlas a inválidas
-            continue;
-          }
-
-          validAssignments.push(assignment);
-        }
-
-        if (invalidAssignments.length > 0) {
-          toast.warning(`${invalidAssignments.length} asignaciones inválidas fueron omitidas. Revise los permisos de evaluación.`);
-          console.warn("Asignaciones inválidas:", invalidAssignments);
-        }
-
-        const assignments = validAssignments;
-
-        if (assignments.length === 0) {
-          toast.error("No se encontraron asignaciones válidas en el archivo");
-          return;
-        }
-
-        const { error } = await supabase
-          .from("user_assignments")
-          .insert(assignments);
-
-        if (error) throw error;
-
-        // Actualizar roles de jefes automáticamente
-        const jefeIds = [...new Set(assignments.map(a => a.jefe_id))];
-        for (const jefeId of jefeIds) {
-          await updateUserRoleFromAssignments(jefeId);
-        }
-
-        toast.success(`${assignments.length} asignaciones creadas exitosamente`);
-        setFile(null);
-        setShowImportDialog(false);
-        loadAssignments();
-      } catch (error: any) {
-        console.error("Error importing assignments:", error);
-        toast.error(error.message || "Error al importar asignaciones");
-      }
-    };
-
-    reader.readAsText(file);
   };
 
   const handleDeleteAssignment = async (id: string) => {
@@ -566,46 +435,19 @@ const AdminAsignaciones = () => {
                 <p className="text-xs text-muted-foreground">
                   Puede incluir encabezado en la primera línea (se detectará automáticamente)
                 </p>
-                <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline">
-                      <Upload className="mr-2 h-4 w-4" />
-                      Seleccionar Archivo CSV
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Importar Asignaciones</DialogTitle>
-                      <DialogDescription>
-                        Seleccione un archivo CSV con las asignaciones a importar
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label>Archivo CSV</Label>
-                        <Input
-                          type="file"
-                          accept=".csv"
-                          onChange={(e) => setFile(e.target.files?.[0] || null)}
-                        />
-                      </div>
-                      {file && (
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <CheckCircle2 className="h-4 w-4 text-success" />
-                          {file.name}
-                        </div>
-                      )}
-                    </div>
-                    <DialogFooter>
-                      <Button variant="outline" onClick={() => setShowImportDialog(false)}>
-                        Cancelar
-                      </Button>
-                      <Button onClick={handleFileUpload} disabled={!file}>
-                        Importar
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
+                <Button 
+                  variant="outline"
+                  onClick={() => setShowImportDialog(true)}
+                >
+                  <Upload className="mr-2 h-4 w-4" />
+                  Importar Masivo CSV/Excel
+                </Button>
+                
+                <ImportAssignmentsDialog 
+                  open={showImportDialog}
+                  onOpenChange={setShowImportDialog}
+                  onImportComplete={loadAssignments}
+                />
               </div>
             </CardContent>
           </Card>
