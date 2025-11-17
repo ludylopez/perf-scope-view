@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { ReactNode, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { DimensionProgress } from "@/components/evaluation/DimensionProgress";
 
@@ -23,8 +23,20 @@ export const WizardStep = ({
   total,
   children,
 }: WizardStepProps) => {
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  // Scroll automático al inicio cuando cambia el paso
+  useEffect(() => {
+    if (cardRef.current) {
+      cardRef.current.scrollIntoView({ 
+        behavior: "smooth", 
+        block: "start"
+      });
+    }
+  }, [currentStep]);
+
   return (
-    <Card className="border-2">
+    <Card ref={cardRef} className="border-2 scroll-mt-4">
       <CardHeader>
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1">
