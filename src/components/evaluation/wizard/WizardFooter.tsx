@@ -23,13 +23,25 @@ export const WizardFooter = ({
   isLastStep,
   isSubmitting = false,
 }: WizardFooterProps) => {
+  const handleNext = () => {
+    onNext();
+    // Scroll al inicio después de cambiar de paso
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handlePrevious = () => {
+    onPrevious();
+    // Scroll al inicio después de cambiar de paso
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   return (
     <div className="sticky bottom-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-t border-border pt-4 mt-6">
       <div className="flex items-center justify-between gap-4">
         <Button
           variant="outline"
           size="lg"
-          onClick={onPrevious}
+          onClick={handlePrevious}
           disabled={currentStep === 0}
           className={cn(
             "w-full sm:w-auto",
@@ -54,7 +66,7 @@ export const WizardFooter = ({
           ) : (
             <Button
               size="lg"
-              onClick={onNext}
+              onClick={handleNext}
               disabled={!canGoNext}
               className="w-full"
             >

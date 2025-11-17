@@ -24,15 +24,30 @@ export const LikertScale = ({
   onChange,
   disabled = false,
 }: LikertScaleProps) => {
+  const handleChange = (v: string) => {
+    onChange(parseInt(v));
+    // Pequeño scroll suave después de responder
+    setTimeout(() => {
+      const currentElement = document.getElementById(`likert-${itemId}`);
+      const nextElement = currentElement?.nextElementSibling;
+      if (nextElement) {
+        nextElement.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+    }, 100);
+  };
+
   return (
-    <div className="space-y-3 rounded-lg border bg-card p-4">
+    <div 
+      id={`likert-${itemId}`}
+      className="space-y-3 rounded-lg border bg-card p-4 transition-all hover:border-primary/50"
+    >
       <p className="text-sm font-medium leading-relaxed text-foreground">
         {itemText}
       </p>
       
       <RadioGroup
         value={value?.toString()}
-        onValueChange={(v) => onChange(parseInt(v))}
+        onValueChange={handleChange}
         disabled={disabled}
         className="grid grid-cols-5 gap-2"
       >
