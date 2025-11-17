@@ -203,8 +203,12 @@ const Dashboard = () => {
         setProgress(100);
         
         // Cargar datos de resultados si está enviada
-        // IMPORTANTE: Solo cargar resultados si el jefe completó su evaluación
-        if (isColaborador) {
+        // IMPORTANTE: Para C1 (Concejo Municipal), cargar resultados inmediatamente ya que solo tienen autoevaluación
+        // Para otros niveles, solo cargar resultados si el jefe completó su evaluación
+        if (user.nivel === 'C1') {
+          // C1 solo tiene autoevaluación, cargar resultados inmediatamente
+          await loadResultadosData();
+        } else if (isColaborador) {
           const jefeId = await getColaboradorJefe(user.dpi);
           if (jefeId) {
             const jefeCompleto = await hasJefeEvaluation(jefeId, user.dpi, activePeriodId);
@@ -751,10 +755,10 @@ const Dashboard = () => {
         </div>
 
         {/* Colaborador Dashboard */}
-        {isColaborador && (
+        {(isColaborador || user?.nivel === 'C1') && (
           <div className="space-y-6">
             {/* Mostrar resultados si están disponibles Y el jefe completó */}
-            {evaluationStatus === "submitted" && resultadoData && resultadoData.jefeCompleto && (
+            {evaluationStatus === "submitted" && resultadoData && (resultadoData.jefeCompleto || user?.nivel === 'C1') && (
               <div id="resultados-evaluacion-container">
                 {/* Título y Badge */}
                 <div className="mb-6">
@@ -770,7 +774,9 @@ const Dashboard = () => {
                   <p className="text-muted-foreground">
                     {resultadoData.jefeCompleto 
                       ? "Resultado consolidado de tu evaluación de desempeño"
-                      : "Autoevaluación enviada. Esperando evaluación del jefe para resultado consolidado."}
+                      : user?.nivel === 'C1'
+                        ? "Resultado final de tu autoevaluación (Concejo Municipal)"
+                        : "Autoevaluación enviada. Esperando evaluación del jefe para resultado consolidado."}
                   </p>
                 </div>
 
@@ -779,7 +785,9 @@ const Dashboard = () => {
                   <Alert className="mb-6 border-blue-200 bg-blue-50 dark:bg-blue-950/20">
                     <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                     <AlertDescription className="text-blue-800 dark:text-blue-200">
-                      Su autoevaluación fue recibida. Cuando su jefe complete la evaluación, aquí aparecerá su resultado consolidado.
+                      {user?.nivel === 'C1'
+                        ? "Su autoevaluación fue recibida exitosamente. Como miembro del Concejo Municipal, su resultado final está disponible inmediatamente."
+                        : "Su autoevaluación fue recibida. Cuando su jefe complete la evaluación, aquí aparecerá su resultado consolidado."}
                     </AlertDescription>
                   </Alert>
                 )}
@@ -1180,8 +1188,8 @@ const Dashboard = () => {
               </div>
             )}
 
-            {/* Mostrar mensaje si autoevaluación enviada pero jefe no completó */}
-            {evaluationStatus === "submitted" && (!resultadoData || !resultadoData.jefeCompleto) && (
+            {/* Mostrar mensaje si autoevaluación enviada pero jefe no completó (excepto C1 que ya tiene resultados) */}
+            {evaluationStatus === "submitted" && (!resultadoData || (!resultadoData.jefeCompleto && user?.nivel !== 'C1')) && (
               <Card className="md:col-span-2 border-blue-200 bg-blue-50 dark:bg-blue-950/20">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -1196,8 +1204,18 @@ const Dashboard = () => {
                   <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950/20">
                     <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                     <AlertDescription className="text-blue-800 dark:text-blue-200">
-                      <strong>Su autoevaluación fue enviada correctamente.</strong> Cuando su jefe complete la evaluación, 
-                      aquí aparecerá su resultado consolidado con el gráfico radar, fortalezas y áreas de mejora.
+                      {user?.nivel === 'C1' ? (
+                        <>
+                          <strong>Su autoevaluación fue enviada correctamente.</strong> Como miembro del Concejo Municipal, 
+                          su resultado final ya está disponible. Puede ver su gráfico radar, fortalezas y áreas de mejora 
+                          en la sección de resultados.
+                        </>
+                      ) : (
+                        <>
+                          <strong>Su autoevaluación fue enviada correctamente.</strong> Cuando su jefe complete la evaluación, 
+                          aquí aparecerá su resultado consolidado con el gráfico radar, fortalezas y áreas de mejora.
+                        </>
+                      )}
                     </AlertDescription>
                   </Alert>
                   <div className="flex items-center justify-center p-4">
