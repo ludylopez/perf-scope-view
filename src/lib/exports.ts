@@ -1593,6 +1593,30 @@ export const exportEvaluacionCompletaPDFReact = async (
       radarData: radarDataWithExplanations
     };
     
+    // Validar datos antes de generar PDF
+    if (!resultadoDataWithExplanations || !resultadoDataWithExplanations.radarData || resultadoDataWithExplanations.radarData.length === 0) {
+      throw new Error("No hay datos de evaluación disponibles para generar el PDF");
+    }
+    
+    // Validar que los datos de radar tengan la estructura correcta
+    resultadoDataWithExplanations.radarData.forEach((r, idx) => {
+      if (typeof r.tuEvaluacion !== 'number' || isNaN(r.tuEvaluacion)) {
+        console.warn(`⚠️ Dimensión ${idx + 1} (${r.dimension}) tiene tuEvaluacion inválido:`, r.tuEvaluacion);
+      }
+      if (r.promedioMunicipal !== undefined && (typeof r.promedioMunicipal !== 'number' || isNaN(r.promedioMunicipal))) {
+        console.warn(`⚠️ Dimensión ${idx + 1} (${r.dimension}) tiene promedioMunicipal inválido:`, r.promedioMunicipal);
+      }
+    });
+    
+    console.log('📄 [PDF] Generando PDF con React-PDF, datos validados:', {
+      empleado: empleado.nombre,
+      periodo,
+      radarDataCount: resultadoDataWithExplanations.radarData.length,
+      fortalezasCount: resultadoDataWithExplanations.fortalezas?.length || 0,
+      areasOportunidadCount: resultadoDataWithExplanations.areasOportunidad?.length || 0,
+      tienePlanDesarrollo: !!planDesarrollo
+    });
+    
     // Importar componente PDF y renderer dinámicamente
     const { EvaluacionPDF } = await import("@/components/pdf/EvaluacionPDF");
     const { pdf, Document } = await import("@react-pdf/renderer");
@@ -1628,32 +1652,38 @@ export const exportEvaluacionCompletaPDFReact = async (
       title: "Éxito",
       description: "PDF generado exitosamente"
     });
-  } catch (error) {
-    console.error("Error al exportar PDF con React-PDF:", error);
-    const toast = (await import("@/hooks/use-toast")).toast;
-    toast({
-      title: "Error",
-      description: "Error al generar el PDF. Intentando método alternativo...",
-      variant: "destructive"
+  } catch (error: any) {
+    console.error("❌ Error al exportar PDF con React-PDF:", error);
+    console.error("❌ Stack trace:", error?.stack);
+    console.error("❌ Error details:", {
+      message: error?.message,
+      name: error?.name,
+      cause: error?.cause
     });
     
-    // Fallback a método anterior
-    try {
-      await exportEvaluacionCompletaPDFFromElement(
-        "resultados-evaluacion-container",
-        empleado,
-        periodo,
-        fechaGeneracion
-      );
-    } catch (fallbackError) {
-      console.error("Error en fallback:", fallbackError);
+    const toast = (await import("@/hooks/use-toast")).toast;
+    
+    // Solo hacer fallback si el error es específico de React-PDF, no si es de datos
+    if (error?.message?.includes("No hay datos")) {
       toast({
         title: "Error",
-        description: "No se pudo generar el PDF. Por favor, intente nuevamente.",
+        description: error.message || "No hay datos disponibles para generar el PDF",
         variant: "destructive"
       });
-      throw fallbackError;
+      throw error;
     }
+    
+    // Mostrar error detallado al usuario
+    toast({
+      title: "Error al generar PDF",
+      description: `Error: ${error?.message || 'Error desconocido'}. Revisa la consola para más detalles.`,
+      variant: "destructive",
+      duration: 10000
+    });
+    
+    // NO hacer fallback automático - el usuario debe saber que hay un problema
+    // Si realmente necesita el PDF, puede intentar nuevamente o contactar soporte
+    throw error;
   }
 };
 

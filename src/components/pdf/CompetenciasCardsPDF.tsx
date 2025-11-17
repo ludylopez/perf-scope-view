@@ -232,6 +232,11 @@ const ExplanationBox = ({ competencia, nivel, barColor }: {
     );
   }
 
+  // Asegurar que siempre haya contenido - React-PDF no puede renderizar strings vacíos
+  if (!explicacion || explicacion.trim() === '') {
+    explicacion = `Evaluación de desempeño en esta dimensión con ${competencia.tuEvaluacion.toFixed(1)}%.`;
+  }
+
   return (
     <View style={{
       backgroundColor: '#f9fafb',
@@ -316,7 +321,7 @@ export const CompetenciasCardsPDF = ({
                   </View>
                   
                   {/* Badge */}
-                  {badgeText && (
+                  {badgeText && badgeText.trim() !== '' && (
                     <View style={{
                       backgroundColor: badgeBgColor,
                       paddingHorizontal: 4,
@@ -349,14 +354,16 @@ export const CompetenciasCardsPDF = ({
               </Text>
 
               {/* Descripción */}
-              <Text style={{
-                fontSize: 6.5,
-                color: '#6b7280',
-                marginBottom: 4,
-                lineHeight: 1.3,
-              }}>
-                {descripcion}
-              </Text>
+              {descripcion && descripcion.trim() !== '' && (
+                <Text style={{
+                  fontSize: 6.5,
+                  color: '#6b7280',
+                  marginBottom: 4,
+                  lineHeight: 1.3,
+                }}>
+                  {descripcion}
+                </Text>
+              )}
 
               {/* Explicación del resultado - se renderizará dinámicamente */}
               <ExplanationBox 
