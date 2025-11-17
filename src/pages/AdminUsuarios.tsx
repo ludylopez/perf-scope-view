@@ -327,6 +327,8 @@ const AdminUsuarios = () => {
         jefeInmediato: item.jefe_inmediato_id,
         rol: item.rol,
         estado: item.estado,
+        edad: item.edad || null,
+        antiguedad: item.antiguedad || null,
         primerIngreso: item.primer_ingreso,
         instrumentoId: item.instrumento_id,
       }));
@@ -1127,9 +1129,15 @@ const AdminUsuarios = () => {
                     <Label>Edad (calculada)</Label>
                     <Input
                       type="text"
-                      value={editingUser.fechaNacimiento ? calcularEdadDesdeFecha(formatDDMMAAAAToISO(editingUser.fechaNacimiento)) || '' : ''}
+                      value={
+                        (editingUser as any).edad 
+                          ? `${(editingUser as any).edad} años` 
+                          : editingUser.fechaNacimiento 
+                            ? calcularEdadDesdeFecha(formatDDMMAAAAToISO(editingUser.fechaNacimiento)) || 'Calculando...' 
+                            : 'No disponible'
+                      }
                       readOnly
-                      className="bg-muted"
+                      className="bg-muted font-semibold"
                       placeholder="Se calculará automáticamente"
                     />
                     <p className="text-xs text-muted-foreground">Calculada automáticamente desde la fecha de nacimiento</p>
@@ -1146,9 +1154,26 @@ const AdminUsuarios = () => {
                     <Label>Antigüedad (calculada)</Label>
                     <Input
                       type="text"
-                      value={(editingUser as any).fechaIngreso ? calcularAntiguedadDesdeFecha((editingUser as any).fechaIngreso) || '' : ''}
+                      value={
+                        (editingUser as any).antiguedad !== null && (editingUser as any).antiguedad !== undefined
+                          ? (() => {
+                              const meses = (editingUser as any).antiguedad;
+                              const años = Math.floor(meses / 12);
+                              const mesesRestantes = meses % 12;
+                              if (años > 0 && mesesRestantes > 0) {
+                                return `${años} año${años > 1 ? 's' : ''} ${mesesRestantes} mes${mesesRestantes > 1 ? 'es' : ''}`;
+                              } else if (años > 0) {
+                                return `${años} año${años > 1 ? 's' : ''}`;
+                              } else {
+                                return `${mesesRestantes} mes${mesesRestantes > 1 ? 'es' : ''}`;
+                              }
+                            })()
+                          : (editingUser as any).fechaIngreso 
+                            ? calcularAntiguedadDesdeFecha((editingUser as any).fechaIngreso) || 'Calculando...' 
+                            : 'No disponible'
+                      }
                       readOnly
-                      className="bg-muted"
+                      className="bg-muted font-semibold"
                       placeholder="Se calculará automáticamente"
                     />
                     <p className="text-xs text-muted-foreground">Calculada automáticamente en meses desde la fecha de ingreso</p>

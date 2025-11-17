@@ -118,8 +118,21 @@ const DashboardRRHH = () => {
       const { data: advancedStatsData, error: advancedError } = await supabase
         .rpc("get_advanced_dashboard_stats", { periodo_id_param: currentPeriodId });
 
-      if (!advancedError && advancedStatsData) {
+      if (advancedError) {
+        console.error("Error loading advanced stats:", advancedError);
+        toast.error("Error al cargar métricas avanzadas", {
+          description: advancedError.message
+        });
+      } else if (advancedStatsData) {
+        console.log("Advanced stats loaded:", {
+          hasElegibilidad: !!advancedStatsData.elegibilidad,
+          hasAntiguedadDistribution: !!advancedStatsData.antiguedadDistribution,
+          hasAntiguedadCompleta: !!advancedStatsData.antiguedadCompleta,
+          keys: Object.keys(advancedStatsData)
+        });
         setAdvancedStats(advancedStatsData);
+      } else {
+        console.warn("No advanced stats data returned");
       }
 
       // Cargar KPIs ejecutivos
@@ -175,17 +188,39 @@ const DashboardRRHH = () => {
         porcentajeCompletitud: statsData.porcentajeCompletitud || 0,
         promedioDesempeno: statsData.promedioDesempeno || 0,
         promedioPotencial: statsData.promedioPotencial || 0,
+        npsPromedio: statsData.npsPromedio !== null && statsData.npsPromedio !== undefined ? statsData.npsPromedio : undefined,
+        npsPromoters: statsData.npsPromoters !== null && statsData.npsPromoters !== undefined ? statsData.npsPromoters : undefined,
+        npsPassives: statsData.npsPassives !== null && statsData.npsPassives !== undefined ? statsData.npsPassives : undefined,
+        npsDetractors: statsData.npsDetractors !== null && statsData.npsDetractors !== undefined ? statsData.npsDetractors : undefined,
         distribucion9Box: distribucion9Box as Record<string, number>,
         evaluacionesPorArea,
         evaluacionesPorNivel,
         tendenciaSemanal,
       });
+
+      // Cargar estadísticas de uso de OpenAI API desde Supabase
+      const { data: openaiStatsData, error: openaiStatsError } = await supabase
+        .rpc("get_openai_usage_stats", {
+          periodo_id_param: currentPeriodId
+        });
+
+      if (!openaiStatsError && openaiStatsData) {
+        setApiUsageStats({
+          totalCalls: openaiStatsData.totalLlamadas || 0,
+          totalTokens: openaiStatsData.totalTokens || 0,
+          successfulCalls: openaiStatsData.llamadasExitosas || 0,
+          failedCalls: openaiStatsData.llamadasFallidas || 0,
+          lastCallDate: openaiStatsData.ultimaLlamada || undefined,
+        });
+      } else {
+        // Fallback a localStorage si la función SQL falla
+        setApiUsageStats(getAPIUsageStats());
+      }
     } catch (error: any) {
       console.error("Error loading stats:", error);
       toast.error("Error al cargar estadísticas");
     } finally {
       setLoading(false);
-      setApiUsageStats(getAPIUsageStats());
     }
   };
 
@@ -751,6 +786,39 @@ const DashboardRRHH = () => {
           </TabsContent>
 
           <TabsContent value="antiguedad" className="space-y-6">
+            {/* Debug info - remover en producción */}
+            {process.env.NODE_ENV === 'development' && (
+              <Card className="bg-yellow-50 border-yellow-200">
+                <CardHeader>
+                  <CardTitle className="text-sm">Debug Info</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <pre className="text-xs overflow-auto">
+                    {JSON.stringify({
+                      hasAdvancedStats: !!advancedStats,
+                      hasElegibilidad: !!advancedStats?.elegibilidad,
+                      hasAntiguedadDistribution: !!advancedStats?.antiguedadDistribution,
+                      hasAntiguedadCompleta: !!advancedStats?.antiguedadCompleta,
+                      keys: advancedStats ? Object.keys(advancedStats) : [],
+                      elegibilidad: advancedStats?.elegibilidad,
+                      antiguedadDistribution: advancedStats?.antiguedadDistribution
+                    }, null, 2)}
+                  </pre>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Mensaje si no hay datos */}
+            {!advancedStats && (
+              <Card className="bg-muted/50">
+                <CardContent className="pt-6">
+                  <p className="text-center text-muted-foreground">
+                    Cargando métricas de antigüedad...
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Elegibilidad */}
             {advancedStats?.elegibilidad && (
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
@@ -796,6 +864,17 @@ const DashboardRRHH = () => {
                   </CardContent>
                 </Card>
               </div>
+            )}
+
+            {/* Mensaje si no hay distribución de antigüedad */}
+            {advancedStats && !advancedStats.antiguedadDistribution && (
+              <Card className="bg-yellow-50 border-yellow-200">
+                <CardContent className="pt-6">
+                  <p className="text-center text-yellow-800">
+                    ⚠️ No se encontraron datos de distribución de antigüedad. Verifica la consola para más detalles.
+                  </p>
+                </CardContent>
+              </Card>
             )}
 
             {/* Distribución de Antigüedad */}

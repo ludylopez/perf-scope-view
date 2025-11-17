@@ -493,9 +493,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
 
     let openaiResponse;
+    let promptTokens = 0;
+    let completionTokens = 0;
+    let totalTokens = 0;
+    const requestStartTime = Date.now();
+
     try {
       console.log("Llamando a OpenAI API...");
-      
+
       openaiResponse = await fetch(
         "https://api.openai.com/v1/chat/completions",
         {
@@ -522,21 +527,38 @@ Deno.serve(async (req: Request): Promise<Response> => {
           }),
         }
       );
-      
+
+      const requestDuration = Date.now() - requestStartTime;
+
       if (!openaiResponse.ok) {
         const errorText = await openaiResponse.text();
         console.error("Error en OpenAI API:", errorText);
         let parsedError = errorText;
+        let errorCode = `${openaiResponse.status}`;
         try {
           const errorJson = JSON.parse(errorText);
           parsedError = errorJson.error?.message || errorJson.message || errorText;
+          errorCode = errorJson.error?.code || errorCode;
         } catch {
           parsedError = errorText.substring(0, 500);
         }
+
+        // Registrar llamada fallida
+        await supabase.rpc("log_openai_api_call", {
+          function_name_param: "generate-development-plan",
+          model_used_param: "gpt-4o-mini",
+          colaborador_id_param: colaborador_id,
+          periodo_id_param: periodo_id,
+          status_param: "failed",
+          error_message_param: parsedError,
+          error_code_param: errorCode,
+          request_duration_ms_param: requestDuration,
+        });
+
         return new Response(
-          JSON.stringify({ 
-            success: false, 
-            error: `Error en OpenAI API: ${parsedError}` 
+          JSON.stringify({
+            success: false,
+            error: `Error en OpenAI API: ${parsedError}`
           }),
           { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
         );
@@ -545,10 +567,24 @@ Deno.serve(async (req: Request): Promise<Response> => {
       console.log("✅ OpenAI API respondió correctamente");
     } catch (fetchError: any) {
       console.error("Error en fetch a OpenAI:", fetchError);
+      const requestDuration = Date.now() - requestStartTime;
+
+      // Registrar llamada fallida
+      await supabase.rpc("log_openai_api_call", {
+        function_name_param: "generate-development-plan",
+        model_used_param: "gpt-4o-mini",
+        colaborador_id_param: colaborador_id,
+        periodo_id_param: periodo_id,
+        status_param: "failed",
+        error_message_param: fetchError.message || String(fetchError),
+        error_code_param: "FETCH_ERROR",
+        request_duration_ms_param: requestDuration,
+      });
+
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: `Error conectando con OpenAI: ${fetchError.message || String(fetchError)}` 
+        JSON.stringify({
+          success: false,
+          error: `Error conectando con OpenAI: ${fetchError.message || String(fetchError)}`
         }),
         { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
       );
@@ -556,6 +592,27 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     const openaiData = await openaiResponse.json();
     const planText = openaiData.choices?.[0]?.message?.content || "";
+
+    // Extraer estadísticas de uso de tokens
+    if (openaiData.usage) {
+      promptTokens = openaiData.usage.prompt_tokens || 0;
+      completionTokens = openaiData.usage.completion_tokens || 0;
+      totalTokens = openaiData.usage.total_tokens || 0;
+    }
+
+    // Registrar llamada exitosa con tokens reales
+    const requestDuration = Date.now() - requestStartTime;
+    await supabase.rpc("log_openai_api_call", {
+      function_name_param: "generate-development-plan",
+      model_used_param: "gpt-4o-mini",
+      colaborador_id_param: colaborador_id,
+      periodo_id_param: periodo_id,
+      status_param: "success",
+      prompt_tokens_param: promptTokens,
+      completion_tokens_param: completionTokens,
+      total_tokens_param: totalTokens,
+      request_duration_ms_param: requestDuration,
+    });
 
     // Parsear respuesta de OpenAI (ya viene como JSON)
     let planData;
