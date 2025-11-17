@@ -5,7 +5,6 @@ import { format } from "date-fns";
 import html2canvas from "html2canvas";
 import { es } from "date-fns/locale";
 import { scoreToPercentage } from "./calculations";
-import { pdf } from "@react-pdf/renderer";
 import React from "react";
 
 // Tipos para exportación
@@ -1534,8 +1533,9 @@ export const exportEvaluacionCompletaPDFReact = async (
       radarData: radarDataWithExplanations
     };
     
-    // Importar componente PDF dinámicamente
+    // Importar componente PDF y renderer dinámicamente
     const { EvaluacionPDF } = await import("@/components/pdf/EvaluacionPDF");
+    const { pdf } = await import("@react-pdf/renderer");
     
     // Generar PDF usando React.createElement para evitar problemas con JSX en archivo .ts
     const blob = await pdf(
