@@ -66,10 +66,10 @@ const VistaResultadosFinales = () => {
           // Convertir resultado consolidado al formato esperado
           setResultadoFinal({
             desempenoAuto: resultadoFinal?.desempenoAuto || 0,
-            desempenoJefe: consolidado.desempeno_final_promedio || 0,
-            desempenoFinal: consolidado.desempeno_final_promedio || 0,
-            potencial: consolidado.potencial_promedio,
-            posicion9Box: consolidado.posicion_9box_moda,
+            desempenoJefe: consolidado.desempenoFinalPromedio || 0,
+            desempenoFinal: consolidado.desempenoFinalPromedio || 0,
+            potencial: consolidado.potencialPromedio,
+            posicion9Box: consolidado.posicion9BoxModa,
           });
         } else {
           // Fallback: intentar cargar desde final_evaluation_results (legacy)

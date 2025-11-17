@@ -277,9 +277,9 @@ const Matriz9Box = () => {
           let resultadoFinal: any = null;
           if (resultadoConsolidado && Object.keys(resultadoConsolidado).length > 0) {
             resultadoFinal = {
-              desempenoFinal: resultadoConsolidado.desempeno_final_promedio || 0,
-              potencial: resultadoConsolidado.potencial_promedio,
-              posicion9Box: resultadoConsolidado.posicion_9box_moda,
+              desempenoFinal: resultadoConsolidado.desempenoFinalPromedio || 0,
+              potencial: resultadoConsolidado.potencialPromedio,
+              posicion9Box: resultadoConsolidado.posicion9BoxModa,
             };
           } else {
             // Fallback: usar getFinalResultFromSupabase

@@ -293,25 +293,9 @@ export const validateEvaluationPermissionSync = (
     return { isValid: false, message: "Un usuario no puede evaluarse a sí mismo como jefe." };
   }
 
-  // Regla 4: Un usuario no puede evaluar a otro de un nivel jerárquico superior, a menos que sea C1 evaluando A1.
-  if (
-    !isSelfEvaluation &&
-    evaluatorUser.nivel !== 'C1' as JobLevelCode && // C1 puede evaluar A1
-    (evaluatorUser.hierarchical_order !== undefined && evaluatedUser.hierarchical_order !== undefined) &&
-    evaluatorUser.hierarchical_order < evaluatedUser.hierarchical_order // Evaluador tiene mayor jerarquía (menor número)
-  ) {
-    return { isValid: false, message: "No puedes evaluar a un colaborador de un nivel jerárquico superior." };
-  }
-
-  // Regla 5: Un usuario no puede evaluar a otro de un nivel jerárquico igual, a menos que sea C1 evaluando A1
-  if (
-    !isSelfEvaluation &&
-    evaluatorUser.nivel !== 'C1' as JobLevelCode && // C1 puede evaluar A1
-    (evaluatorUser.hierarchical_order !== undefined && evaluatedUser.hierarchical_order !== undefined) &&
-    evaluatorUser.hierarchical_order === evaluatedUser.hierarchical_order
-  ) {
-    return { isValid: false, message: "No puedes evaluar a un colaborador de tu mismo nivel jerárquico." };
-  }
+  // Regla 4 y 5: Las validaciones de jerarquía se manejan mediante las funciones específicas
+  // validateConcejoEvaluation y validateAlcaldeEvaluation, y mediante las asignaciones activas.
+  // No necesitamos validar hierarchical_order aquí ya que no está disponible en el tipo User.
 
   return { isValid: true, message: "Permiso de evaluación válido." };
 };

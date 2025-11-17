@@ -150,15 +150,14 @@ const AdminAsignaciones = () => {
       return;
     }
 
-    // Validar permisos de evaluación usando la función de validación
-    const validationResult = validateEvaluationPermission(
-      { dpi: jefe.dpi, nivel: jefe.nivel as any, hierarchical_order: undefined },
-      { dpi: colaborador.dpi, nivel: colaborador.nivel as any, hierarchical_order: undefined },
-      false // No es autoevaluación
+    // Validar permisos de evaluación usando la función de validación async
+    const validationResult = await validateEvaluationPermission(
+      jefe.dpi,
+      colaborador.dpi
     );
 
-    if (!validationResult.isValid) {
-      toast.error(validationResult.message);
+    if (!validationResult.valid) {
+      toast.error(validationResult.error || validationResult.message || "No tiene permisos para crear esta asignación");
       return;
     }
 
@@ -258,16 +257,15 @@ const AdminAsignaciones = () => {
             continue;
           }
 
-          const validationResult = validateEvaluationPermission(
-            { dpi: jefe.dpi, nivel: jefe.nivel as any, hierarchical_order: undefined },
-            { dpi: colaborador.dpi, nivel: colaborador.nivel as any, hierarchical_order: undefined },
-            false
+          const validationResult = await validateEvaluationPermission(
+            jefe.dpi,
+            colaborador.dpi
           );
 
-          if (!validationResult.isValid) {
+          if (!validationResult.valid) {
             invalidAssignments.push({
               ...assignment,
-              reason: validationResult.message
+              reason: validationResult.error || validationResult.message || "Permisos de evaluación inválidos"
             });
             continue;
           }
