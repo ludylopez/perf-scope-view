@@ -263,15 +263,30 @@ export const CompetenciasCardsPDF = ({
   nivel 
 }: CompetenciasCardsPDFProps) => {
   if (!competencias || competencias.length === 0) {
-    return null;
+    // Retornar View vacío en lugar de null para evitar problemas con React-PDF
+    return <View />;
   }
 
+
+  // Filtrar competencias inválidas antes de renderizar
+  const competenciasValidas = competencias.filter((c, idx) => {
+    if (!c || !c.dimension || typeof c.tuEvaluacion !== 'number') {
+      console.warn(`⚠️ Competencia ${idx} tiene datos inválidos, será omitida:`, c);
+      return false;
+    }
+    return true;
+  });
+
+  if (competenciasValidas.length === 0) {
+    return <View />;
+  }
 
   return (
     <View style={{ marginBottom: 6 }}>
       <Text style={pdfStyles.sectionTitle}>📊 PANORAMA DE COMPETENCIAS</Text>
       <View style={{ marginTop: 4, flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'space-between' }}>
-        {competencias.map((competencia, index) => {
+        {competenciasValidas.map((competencia, index) => {
+
           const esFortaleza = isFortaleza(competencia.dimension, fortalezas);
           const esOportunidad = isOportunidad(competencia.dimension, areasOportunidad);
           const esNeutro = !esFortaleza && !esOportunidad;
@@ -284,10 +299,15 @@ export const CompetenciasCardsPDF = ({
           const badgeText = esFortaleza ? 'FORTALEZA' : esOportunidad ? 'OPORTUNIDAD' : null; // Usar null en lugar de '' para evitar problemas con React-PDF
           const barColor = esFortaleza ? '#22c55e' : esOportunidad ? '#f97316' : '#6b7280';
           
-          const titulo = getDimensionFriendlyTitle(competencia.dimension);
-          const descripcion = getDimensionDescription(competencia.dimension);
-          const porcentaje = competencia.tuEvaluacion;
+          const titulo = getDimensionFriendlyTitle(competencia.dimension) || `Dimensión ${index + 1}`;
+          const descripcion = getDimensionDescription(competencia.dimension) || 'Evaluación de desempeño en esta dimensión.';
+          const porcentaje = competencia.tuEvaluacion || 0;
           const barWidth = Math.min((porcentaje / 100) * 100, 100);
+
+          // Construir el texto del badge de forma segura
+          const badgeContent = badgeText 
+            ? `${esFortaleza ? '✓ ' : esOportunidad ? '💡 ' : ''}${badgeText}`
+            : null;
 
           return (
             <View 
@@ -321,7 +341,7 @@ export const CompetenciasCardsPDF = ({
                   </View>
                   
                   {/* Badge */}
-                  {badgeText && (
+                  {badgeContent && (
                     <View style={{
                       backgroundColor: badgeBgColor,
                       paddingHorizontal: 4,
@@ -330,7 +350,7 @@ export const CompetenciasCardsPDF = ({
                       flexShrink: 0,
                     }}>
                       <Text style={{ fontSize: 6.5, fontWeight: 'bold', color: badgeTextColor }}>
-                        {esFortaleza && '✓ '}{esOportunidad && '💡 '}{badgeText}
+                        {badgeContent}
                       </Text>
                     </View>
                   )}

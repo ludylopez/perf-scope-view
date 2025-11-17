@@ -1567,30 +1567,60 @@ export const exportEvaluacionCompletaPDFReact = async (
     const { getDimensionExplanation } = await import("@/lib/generateDimensionExplanations");
     const radarDataWithExplanations = await Promise.all(
       resultadoData.radarData.map(async (r) => {
+        // Asegurar que todos los valores sean válidos
+        const dimension = r.dimension || `Dimensión ${r.dimensionId || 'desconocida'}`;
+        const tuEvaluacion = typeof r.tuEvaluacion === 'number' && !isNaN(r.tuEvaluacion) ? r.tuEvaluacion : 0;
+        const promedioMunicipal = r.promedioMunicipal !== undefined && typeof r.promedioMunicipal === 'number' && !isNaN(r.promedioMunicipal) ? r.promedioMunicipal : undefined;
+        
         let explicacion = null;
         if (r.dimensionId && empleado.nivel) {
           try {
             explicacion = await getDimensionExplanation(
               r.dimensionId,
               empleado.nivel,
-              r.tuEvaluacion,
-              r.promedioMunicipal
+              tuEvaluacion,
+              promedioMunicipal
             );
           } catch (error) {
             console.warn(`No se pudo obtener explicación para ${r.dimensionId}:`, error);
           }
         }
         return {
-          ...r,
+          dimension,
+          tuEvaluacion,
+          promedioMunicipal,
+          dimensionId: r.dimensionId || undefined,
+          descripcion: r.descripcion || undefined,
           explicacion: explicacion || undefined
         };
       })
     );
     
-    // Crear resultadoData con explicaciones pre-cargadas
+    // Validar y limpiar fortalezas y áreas de oportunidad
+    const fortalezasValidas = (resultadoData.fortalezas || []).map(f => ({
+      dimension: f.dimension || 'Dimensión desconocida',
+      nombreCompleto: f.nombreCompleto || f.dimension || 'Dimensión desconocida',
+      tuEvaluacion: typeof f.tuEvaluacion === 'number' && !isNaN(f.tuEvaluacion) ? f.tuEvaluacion : 0,
+      promedioMunicipal: f.promedioMunicipal !== undefined && typeof f.promedioMunicipal === 'number' && !isNaN(f.promedioMunicipal) ? f.promedioMunicipal : undefined
+    }));
+
+    const areasOportunidadValidas = (resultadoData.areasOportunidad || []).map(a => ({
+      dimension: a.dimension || 'Dimensión desconocida',
+      nombreCompleto: a.nombreCompleto || a.dimension || 'Dimensión desconocida',
+      tuEvaluacion: typeof a.tuEvaluacion === 'number' && !isNaN(a.tuEvaluacion) ? a.tuEvaluacion : 0,
+      promedioMunicipal: a.promedioMunicipal !== undefined && typeof a.promedioMunicipal === 'number' && !isNaN(a.promedioMunicipal) ? a.promedioMunicipal : undefined
+    }));
+    
+    // Crear resultadoData con explicaciones pre-cargadas y datos validados
     const resultadoDataWithExplanations = {
-      ...resultadoData,
-      radarData: radarDataWithExplanations
+      performancePercentage: typeof resultadoData.performancePercentage === 'number' && !isNaN(resultadoData.performancePercentage) 
+        ? resultadoData.performancePercentage 
+        : 0,
+      jefeCompleto: resultadoData.jefeCompleto || false,
+      fortalezas: fortalezasValidas,
+      areasOportunidad: areasOportunidadValidas,
+      radarData: radarDataWithExplanations,
+      resultadoConsolidado: resultadoData.resultadoConsolidado || undefined
     };
     
     // Validar datos antes de generar PDF
