@@ -146,7 +146,7 @@ const Dashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { activePeriodId, activePeriod } = usePeriod();
-  
+
   const [evaluationStatus, setEvaluationStatus] = useState<"not_started" | "in_progress" | "submitted">("not_started");
   const [progress, setProgress] = useState(0);
   const [jerarquiaInfo, setJerarquiaInfo] = useState<any>(null);
@@ -160,11 +160,36 @@ const Dashboard = () => {
     promedioMunicipal: Record<string, number>;
   } | null>(null);
   const [planDesarrollo, setPlanDesarrollo] = useState<any>(null);
+  const [dashboardStats, setDashboardStats] = useState<any>(null);
 
   const isColaborador = user?.rol === "colaborador";
   const isJefe = user?.rol === "jefe";
   const isAdminRRHH = user?.rol === "admin_rrhh";
   const isAdminGeneral = user?.rol === "admin_general";
+
+  // Cargar estadísticas del dashboard para RRHH
+  useEffect(() => {
+    if (!user || !activePeriodId) return;
+    if (!isAdminRRHH && !isAdminGeneral) return;
+
+    const loadDashboardStats = async () => {
+      try {
+        const { data, error } = await supabase
+          .rpc("get_dashboard_stats", { periodo_id_param: activePeriodId });
+
+        if (error) {
+          console.error("Error loading dashboard stats:", error);
+          return;
+        }
+
+        setDashboardStats(data);
+      } catch (error) {
+        console.error("Error loading dashboard stats:", error);
+      }
+    };
+
+    loadDashboardStats();
+  }, [user, activePeriodId, isAdminRRHH, isAdminGeneral]);
 
   useEffect(() => {
     if (!user || !activePeriodId) return;
@@ -1341,7 +1366,9 @@ const Dashboard = () => {
                 <CardTitle className="text-sm font-medium">Total Usuarios</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-3xl font-bold text-primary">124</p>
+                <p className="text-3xl font-bold text-primary">
+                  {dashboardStats?.totalUsuarios || 0}
+                </p>
                 <p className="text-xs text-muted-foreground mt-1">Activos en el sistema</p>
               </CardContent>
             </Card>
@@ -1351,8 +1378,13 @@ const Dashboard = () => {
                 <CardTitle className="text-sm font-medium">Evaluaciones Completadas</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-3xl font-bold text-success">45</p>
-                <p className="text-xs text-muted-foreground mt-1">36% del total</p>
+                <p className="text-3xl font-bold text-success">
+                  {dashboardStats?.evaluacionesCompletadas || 0}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {dashboardStats?.porcentajeCompletitud || 0}% del total
+                </p>
+                <Progress value={dashboardStats?.porcentajeCompletitud || 0} className="mt-2 h-2" />
               </CardContent>
             </Card>
 
@@ -1361,20 +1393,40 @@ const Dashboard = () => {
                 <CardTitle className="text-sm font-medium">Pendientes</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-3xl font-bold text-warning">79</p>
-                <p className="text-xs text-muted-foreground mt-1">Requieren seguimiento</p>
+                <p className="text-3xl font-bold text-warning">
+                  {dashboardStats?.evaluacionesPendientes || 0}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">Sin iniciar</p>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">Reaperturas</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-3xl font-bold text-info">3</p>
-                <p className="text-xs text-muted-foreground mt-1">Este periodo</p>
-              </CardContent>
-            </Card>
+            {dashboardStats?.evaluacionesEnProgreso > 0 && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium">En Progreso</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-3xl font-bold text-info">
+                    {dashboardStats?.evaluacionesEnProgreso || 0}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">Requieren seguimiento</p>
+                </CardContent>
+              </Card>
+            )}
+
+            {dashboardStats?.reaperturas > 0 && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium">Reaperturas</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-3xl font-bold text-info">
+                    {dashboardStats?.reaperturas || 0}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">Este período</p>
+                </CardContent>
+              </Card>
+            )}
 
             <Card className="md:col-span-2 lg:col-span-4">
               <CardHeader>
@@ -1422,24 +1474,13 @@ const Dashboard = () => {
                     <Settings className="mr-2 h-4 w-4" />
                     Configuración Sistema
                   </Button>
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     className="justify-start"
                     onClick={() => {
-                      // Crear reporte básico para admin
-                      const reportData = {
-                        title: "Reporte de Administración",
-                        periodo: activePeriod?.nombre || "N/A",
-                        fecha: new Date().toLocaleDateString("es-GT"),
-                        summary: [
-                          { label: "Total Usuarios", value: "124" },
-                          { label: "Evaluaciones Completadas", value: "45" },
-                          { label: "Pendientes", value: "79" },
-                        ],
-                      };
                       toast({
-                        title: "Exportación",
-                        description: "Función de exportación disponible en Dashboard de RR.HH.",
+                        title: "Reportes Completos",
+                        description: "Accede al Dashboard de Monitoreo para reportes detallados y exportación.",
                       });
                       navigate("/admin/dashboard");
                     }}
