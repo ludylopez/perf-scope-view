@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { PeriodProvider } from "@/contexts/PeriodContext";
+import { importarAsignacionesDirecto } from "./lib/importarAsignacionesDirecto";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Autoevaluacion from "./pages/Autoevaluacion";
@@ -272,5 +273,11 @@ const App = () => (
     </AuthProvider>
   </QueryClientProvider>
 );
+
+// Exponer función de importación en consola
+if (typeof window !== 'undefined') {
+  (window as any).importarAsignaciones = importarAsignacionesDirecto;
+  console.log('✅ Función importarAsignaciones() disponible en consola del navegador');
+}
 
 export default App;
