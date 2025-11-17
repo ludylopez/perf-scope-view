@@ -45,6 +45,15 @@ interface EvaluacionPDFProps {
       tuEvaluacion: number;
       promedioMunicipal?: number;
     }>;
+    resultadoConsolidado?: {
+      totalEvaluadores?: number;
+      resultadosPorEvaluador?: Array<{
+        evaluadorNombre?: string;
+        desempenoFinal?: number;
+        potencial?: number;
+        posicion9Box?: string;
+      }>;
+    };
   };
   planDesarrollo?: {
     planEstructurado?: {
@@ -100,6 +109,18 @@ export const EvaluacionPDF = ({
         <ResultadoSectionPDF 
           performancePercentage={resultadoData.performancePercentage}
         />
+
+        {/* Información de múltiples evaluadores */}
+        {resultadoData.resultadoConsolidado && resultadoData.resultadoConsolidado.totalEvaluadores && resultadoData.resultadoConsolidado.totalEvaluadores > 1 && (
+          <View style={{ marginTop: 10, padding: 10, backgroundColor: '#EFF6FF', borderRadius: 5 }}>
+            <Text style={{ fontSize: 10, fontWeight: 'bold', marginBottom: 5 }}>
+              Evaluado por {resultadoData.resultadoConsolidado.totalEvaluadores} evaluadores
+            </Text>
+            <Text style={{ fontSize: 8, color: '#666' }}>
+              Los resultados mostrados son el promedio consolidado de todas las evaluaciones.
+            </Text>
+          </View>
+        )}
 
         {/* Panorama de Competencias - Cards */}
         <CompetenciasCardsPDF 

@@ -63,6 +63,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { perteneceACuadrilla as verificarCuadrilla, getGruposDelColaborador } from "@/lib/jerarquias";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAutoSave } from "@/hooks/useAutoSave";
+import { validateEvaluationPermission } from "@/lib/validations";
 
 // Datos mock del colaborador
 const MOCK_COLABORADORES: Record<string, any> = {
@@ -208,6 +209,14 @@ const EvaluacionColaborador = () => {
         }
 
         setColaborador(colaboradorFormatted);
+
+        // Validar permisos de evaluación (usando función async que consulta BD)
+        const validationResult = await validateEvaluationPermission(user.dpi, colaboradorFormatted.dpi);
+        if (!validationResult.valid) {
+          toast.error(validationResult.error || "No tiene permisos para evaluar a este colaborador");
+          navigate("/evaluacion-equipo");
+          return;
+        }
 
         // Cargar instrumento según el nivel del colaborador
         if (colaboradorFormatted.nivel) {
@@ -386,21 +395,37 @@ const EvaluacionColaborador = () => {
     await submitEvaluation(draft);
     
     // El trigger automático calculará el resultado final cuando se guarde la evaluación
+    // y lo guardará en evaluation_results_by_evaluator
     // Solo esperamos un momento para que el trigger procese
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise(resolve => setTimeout(resolve, 1500));
     
-    // Verificar que el resultado final se haya calculado
-    const { data: finalResult } = await supabase
-      .from("final_evaluation_results")
+    // Verificar que el resultado se haya guardado en evaluation_results_by_evaluator
+    const { data: resultByEvaluator } = await supabase
+      .from("evaluation_results_by_evaluator")
       .select("id")
       .eq("colaborador_id", colaborador.dpi)
       .eq("periodo_id", periodoId)
+      .eq("evaluador_id", user.dpi)
       .maybeSingle();
     
-    if (finalResult) {
-      toast.success("¡Evaluación enviada exitosamente! El resultado final se ha calculado automáticamente.");
+    if (resultByEvaluator) {
+      toast.success("¡Evaluación enviada exitosamente! El resultado se ha guardado correctamente.");
     } else {
-      toast.success("¡Evaluación enviada exitosamente! El resultado final se calculará cuando esté disponible la autoevaluación.");
+      // Verificar si hay autoevaluación pendiente
+      const { data: autoeval } = await supabase
+        .from("evaluations")
+        .select("id")
+        .eq("usuario_id", colaborador.dpi)
+        .eq("periodo_id", periodoId)
+        .eq("tipo", "auto")
+        .eq("estado", "enviado")
+        .maybeSingle();
+      
+      if (!autoeval) {
+        toast.success("¡Evaluación enviada exitosamente! El resultado se calculará cuando el colaborador complete su autoevaluación.");
+      } else {
+        toast.warning("La evaluación se envió, pero el resultado aún no se ha calculado. Por favor, espere unos momentos.");
+      }
     }
     
     navigate("/evaluacion-equipo");

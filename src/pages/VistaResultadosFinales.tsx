@@ -18,12 +18,14 @@ import { scoreToPercentage } from "@/lib/calculations";
 import { PerformanceRadarAnalysis } from "@/components/evaluation/PerformanceRadarAnalysis";
 import { getInstrumentForUser } from "@/lib/instruments";
 import { supabase } from "@/integrations/supabase/client";
+import { getConsolidatedResult, getResultsByEvaluator } from "@/lib/finalResultSupabase";
 
 const VistaResultadosFinales = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { activePeriodId, activePeriod } = usePeriod();
   const [resultadoFinal, setResultadoFinal] = useState<any>(null);
+  const [resultadoConsolidado, setResultadoConsolidado] = useState<any>(null);
   const [planDesarrollo, setPlanDesarrollo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [autoevaluacion, setAutoevaluacion] = useState<any>(null);
@@ -57,20 +59,34 @@ const VistaResultadosFinales = () => {
         const resultadoData = JSON.parse(stored);
         setResultadoFinal(resultadoData.resultadoFinal);
       } else {
-        // Intentar cargar desde Supabase
-        const { data, error } = await supabase
-          .from("final_evaluation_results")
-          .select("*")
-          .eq("colaborador_id", user?.dpi)
-          .eq("periodo_id", activePeriodId)
-          .single();
-
-        if (!error && data) {
-          setResultadoFinal(data.resultado_final);
+        // Intentar cargar resultado consolidado desde Supabase
+        const consolidado = await getConsolidatedResult(user?.dpi || "", activePeriodId);
+        
+        if (consolidado && Object.keys(consolidado).length > 0) {
+          // Convertir resultado consolidado al formato esperado
+          setResultadoFinal({
+            desempenoAuto: resultadoFinal?.desempenoAuto || 0,
+            desempenoJefe: consolidado.desempeno_final_promedio || 0,
+            desempenoFinal: consolidado.desempeno_final_promedio || 0,
+            potencial: consolidado.potencial_promedio,
+            posicion9Box: consolidado.posicion_9box_moda,
+          });
         } else {
-          toast.error("No se encontraron resultados finales");
-          navigate("/dashboard");
-          return;
+          // Fallback: intentar cargar desde final_evaluation_results (legacy)
+          const { data, error } = await supabase
+            .from("final_evaluation_results")
+            .select("*")
+            .eq("colaborador_id", user?.dpi)
+            .eq("periodo_id", activePeriodId)
+            .maybeSingle();
+
+          if (!error && data) {
+            setResultadoFinal(data.resultado_final);
+          } else {
+            toast.error("No se encontraron resultados finales");
+            navigate("/dashboard");
+            return;
+          }
         }
       }
 

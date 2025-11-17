@@ -374,45 +374,49 @@ const Dashboard = () => {
           });
 
           if (dpisMismoNivel.length > 0) {
+            // Usar vista consolidada para obtener resultados con múltiples evaluadores
             const { data: finalResults } = await supabase
-              .from('final_evaluation_results')
-              .select('colaborador_id, resultado_final, autoevaluacion_id, evaluacion_jefe_id')
+              .from('final_evaluation_results_consolidated')
+              .select('colaborador_id, desempeno_final_promedio')
               .eq('periodo_id', activePeriodId)
               .in('colaborador_id', dpisMismoNivel); // Filtrar solo mismo nivel
 
-            console.log('📊 [Dashboard] Resultados finales encontrados para mismo nivel:', finalResults?.length || 0);
+            console.log('📊 [Dashboard] Resultados consolidados encontrados para mismo nivel:', finalResults?.length || 0);
 
             if (finalResults && finalResults.length > 0) {
-              const autoevaluacionIds = finalResults.map(r => r.autoevaluacion_id).filter(id => id);
-              const jefeEvaluacionIds = finalResults.map(r => r.evaluacion_jefe_id).filter(id => id);
-              
+              // Obtener autoevaluaciones para calcular promedios por dimensión
               const { data: autoEvals } = await supabase
                 .from('evaluations')
-                .select('id, responses')
-                .in('id', autoevaluacionIds)
-                .eq('tipo', 'auto');
+                .select('id, responses, usuario_id')
+                .eq('periodo_id', activePeriodId)
+                .eq('tipo', 'auto')
+                .eq('estado', 'enviado')
+                .in('usuario_id', dpisMismoNivel);
 
-              const { data: jefeEvals } = await supabase
-                .from('evaluations')
-                .select('id, responses')
-                .in('id', jefeEvaluacionIds)
-                .eq('tipo', 'jefe');
-
-              const autoEvalMap = new Map((autoEvals || []).map(e => [e.id, (e.responses as Record<string, number>) || {}]));
-              const jefeEvalMap = new Map((jefeEvals || []).map(e => [e.id, (e.responses as Record<string, number>) || {}]));
+              const autoEvalMap = new Map((autoEvals || []).map(e => [e.usuario_id, (e.responses as Record<string, number>) || {}]));
 
               instrument.dimensionesDesempeno.forEach((dim) => {
                 let sumaPorcentajes = 0;
                 let contador = 0;
 
                 finalResults.forEach((resultado) => {
-                  const autoResponses = autoEvalMap.get(resultado.autoevaluacion_id) || {};
-                  const jefeResponses = jefeEvalMap.get(resultado.evaluacion_jefe_id) || {};
-                  const consolidadas = calculateConsolidatedResponses(autoResponses, jefeResponses);
-                  const porcentaje = calculateDimensionPercentage(consolidadas, dim);
-                  if (porcentaje > 0) {
-                    sumaPorcentajes += porcentaje;
-                    contador++;
+                  const autoResponses = autoEvalMap.get(resultado.colaborador_id) || {};
+                  
+                  // Para resultados consolidados, usar el desempeño promedio directamente
+                  if (resultado.desempeno_final_promedio) {
+                    // Usar el promedio consolidado directamente
+                    const porcentaje = scoreToPercentage(resultado.desempeno_final_promedio);
+                    if (porcentaje > 0) {
+                      sumaPorcentajes += porcentaje;
+                      contador++;
+                    }
+                  } else {
+                    // Fallback: calcular desde autoevaluación si no hay promedio consolidado
+                    const porcentaje = calculateDimensionPercentage(autoResponses, dim);
+                    if (porcentaje > 0) {
+                      sumaPorcentajes += porcentaje;
+                      contador++;
+                    }
                   }
                 });
 

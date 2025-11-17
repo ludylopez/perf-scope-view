@@ -30,12 +30,14 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { ArrowLeft, Upload, UserPlus, Users, X, CheckCircle2, AlertCircle, ChevronsUpDown, Check } from "lucide-react";
+import { ArrowLeft, Upload, UserPlus, Users, X, CheckCircle2, AlertCircle, ChevronsUpDown, Check, AlertTriangle } from "lucide-react";
 import { updateUserRoleFromAssignments } from "@/lib/userRoleDetection";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { AssignmentWithUsers } from "@/types/assignment";
+import { validateEvaluationPermission } from "@/lib/validations";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface User {
   dpi: string;
@@ -139,6 +141,52 @@ const AdminAsignaciones = () => {
       return;
     }
 
+    // Obtener usuarios completos para validación
+    const colaborador = users.find(u => u.dpi === manualAssignment.colaboradorId);
+    const jefe = users.find(u => u.dpi === manualAssignment.jefeId);
+
+    if (!colaborador || !jefe) {
+      toast.error("No se encontraron los usuarios seleccionados");
+      return;
+    }
+
+    // Validar permisos de evaluación usando la función de validación
+    const validationResult = validateEvaluationPermission(
+      { dpi: jefe.dpi, nivel: jefe.nivel as any, hierarchical_order: undefined },
+      { dpi: colaborador.dpi, nivel: colaborador.nivel as any, hierarchical_order: undefined },
+      false // No es autoevaluación
+    );
+
+    if (!validationResult.isValid) {
+      toast.error(validationResult.message);
+      return;
+    }
+
+    // Verificar si ya existe esta asignación específica (mismo colaborador y mismo jefe)
+    const { data: existing } = await supabase
+      .from("user_assignments")
+      .select("id")
+      .eq("colaborador_id", manualAssignment.colaboradorId)
+      .eq("jefe_id", manualAssignment.jefeId)
+      .eq("activo", true)
+      .maybeSingle();
+
+    if (existing) {
+      toast.warning("Esta asignación específica ya existe");
+      return;
+    }
+
+    // Validaciones específicas para C1 y A1
+    if (colaborador.nivel === 'C1') {
+      toast.error("El Concejo Municipal (C1) solo puede realizar autoevaluaciones. No puede ser asignado a un jefe.");
+      return;
+    }
+
+    if (colaborador.nivel === 'A1' && jefe.nivel !== 'C1') {
+      toast.error("El Alcalde Municipal (A1) solo puede ser evaluado por miembros del Concejo Municipal (C1).");
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from("user_assignments")
@@ -180,7 +228,7 @@ const AdminAsignaciones = () => {
         const startIndex = lines[0]?.toLowerCase().includes("colaborador") || 
                           lines[0]?.toLowerCase().includes("jefe") ? 1 : 0;
         
-        const assignments = lines.slice(startIndex).map(line => {
+        const assignmentsData = lines.slice(startIndex).map(line => {
           const parts = line.split(",").map(s => s.trim());
           const colaboradorId = parts[0];
           const jefeId = parts[1];
@@ -193,6 +241,77 @@ const AdminAsignaciones = () => {
             activo: true,
           };
         }).filter(a => a.colaborador_id && a.jefe_id && a.colaborador_id.length > 0 && a.jefe_id.length > 0);
+
+        // Validar permisos para cada asignación antes de insertar
+        const validAssignments = [];
+        const invalidAssignments = [];
+
+        for (const assignment of assignmentsData) {
+          const colaborador = users.find(u => u.dpi === assignment.colaborador_id);
+          const jefe = users.find(u => u.dpi === assignment.jefe_id);
+
+          if (!colaborador || !jefe) {
+            invalidAssignments.push({
+              ...assignment,
+              reason: `Usuario no encontrado: ${!colaborador ? assignment.colaborador_id : assignment.jefe_id}`
+            });
+            continue;
+          }
+
+          const validationResult = validateEvaluationPermission(
+            { dpi: jefe.dpi, nivel: jefe.nivel as any, hierarchical_order: undefined },
+            { dpi: colaborador.dpi, nivel: colaborador.nivel as any, hierarchical_order: undefined },
+            false
+          );
+
+          if (!validationResult.isValid) {
+            invalidAssignments.push({
+              ...assignment,
+              reason: validationResult.message
+            });
+            continue;
+          }
+
+          // Validaciones específicas para C1 y A1
+          if (colaborador.nivel === 'C1') {
+            invalidAssignments.push({
+              ...assignment,
+              reason: "El Concejo Municipal (C1) solo puede realizar autoevaluaciones. No puede ser asignado a un jefe."
+            });
+            continue;
+          }
+
+          if (colaborador.nivel === 'A1' && jefe.nivel !== 'C1') {
+            invalidAssignments.push({
+              ...assignment,
+              reason: "El Alcalde Municipal (A1) solo puede ser evaluado por miembros del Concejo Municipal (C1)."
+            });
+            continue;
+          }
+
+          // Verificar si ya existe esta asignación específica
+          const { data: existing } = await supabase
+            .from("user_assignments")
+            .select("id")
+            .eq("colaborador_id", assignment.colaborador_id)
+            .eq("jefe_id", assignment.jefe_id)
+            .eq("activo", true)
+            .maybeSingle();
+
+          if (existing) {
+            // Omitir asignaciones duplicadas sin agregarlas a inválidas
+            continue;
+          }
+
+          validAssignments.push(assignment);
+        }
+
+        if (invalidAssignments.length > 0) {
+          toast.warning(`${invalidAssignments.length} asignaciones inválidas fueron omitidas. Revise los permisos de evaluación.`);
+          console.warn("Asignaciones inválidas:", invalidAssignments);
+        }
+
+        const assignments = validAssignments;
 
         if (assignments.length === 0) {
           toast.error("No se encontraron asignaciones válidas en el archivo");
@@ -284,6 +403,14 @@ const AdminAsignaciones = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Información sobre múltiples asignaciones */}
+              <Alert>
+                <Users className="h-4 w-4" />
+                <AlertDescription>
+                  Los colaboradores pueden tener múltiples evaluadores asignados. Esto es especialmente útil para niveles directivos que pueden ser evaluados por varios jefes.
+                </AlertDescription>
+              </Alert>
+
               <div className="grid gap-4 md:grid-cols-3">
                 {/* Selector de Colaborador */}
                 <div className="space-y-2">
@@ -501,6 +628,7 @@ const AdminAsignaciones = () => {
                   <TableHead>Colaborador</TableHead>
                   <TableHead>Jefe Evaluador</TableHead>
                   <TableHead>Grupo</TableHead>
+                  <TableHead>Total Evaluadores</TableHead>
                   <TableHead>Fecha Creación</TableHead>
                   <TableHead>Acciones</TableHead>
                 </TableRow>
@@ -508,62 +636,81 @@ const AdminAsignaciones = () => {
               <TableBody>
                 {assignments.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground">
+                    <TableCell colSpan={6} className="text-center text-muted-foreground">
                       No hay asignaciones registradas
                     </TableCell>
                   </TableRow>
                 ) : (
-                  assignments.map((assignment) => (
-                    <TableRow key={assignment.id}>
-                      <TableCell>
-                        {assignment.colaborador ? (
-                          <div>
-                            <p className="font-medium">
-                              {assignment.colaborador.nombre} {assignment.colaborador.apellidos}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              {assignment.colaborador.cargo} • {assignment.colaborador.nivel}
-                            </p>
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground">{assignment.colaboradorId}</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {assignment.jefe ? (
-                          <div>
-                            <p className="font-medium">
-                              {assignment.jefe.nombre} {assignment.jefe.apellidos}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              {assignment.jefe.cargo}
-                            </p>
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground">{assignment.jefeId}</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {assignment.grupoId ? (
-                          <Badge variant="outline">{assignment.grupoId}</Badge>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {new Date(assignment.createdAt).toLocaleDateString("es-GT")}
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteAssignment(assignment.id)}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  (() => {
+                    // Agrupar asignaciones por colaborador para mostrar total de evaluadores
+                    const evaluadoresPorColaborador = new Map<string, number>();
+                    assignments.forEach(a => {
+                      const count = evaluadoresPorColaborador.get(a.colaboradorId) || 0;
+                      evaluadoresPorColaborador.set(a.colaboradorId, count + 1);
+                    });
+
+                    return assignments.map((assignment) => (
+                      <TableRow key={assignment.id}>
+                        <TableCell>
+                          {assignment.colaborador ? (
+                            <div>
+                              <p className="font-medium">
+                                {assignment.colaborador.nombre} {assignment.colaborador.apellidos}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                {assignment.colaborador.cargo} • {assignment.colaborador.nivel}
+                              </p>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">{assignment.colaboradorId}</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {assignment.jefe ? (
+                            <div>
+                              <p className="font-medium">
+                                {assignment.jefe.nombre} {assignment.jefe.apellidos}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                {assignment.jefe.cargo}
+                              </p>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">{assignment.jefeId}</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {assignment.grupoId ? (
+                            <Badge variant="outline">{assignment.grupoId}</Badge>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {evaluadoresPorColaborador.get(assignment.colaboradorId) > 1 ? (
+                            <Badge variant="outline" className="flex items-center gap-1 w-fit">
+                              <Users className="h-3 w-3" />
+                              {evaluadoresPorColaborador.get(assignment.colaboradorId)}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">1</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {new Date(assignment.createdAt).toLocaleDateString("es-GT")}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteAssignment(assignment.id)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ));
+                  })()
                 )}
               </TableBody>
             </Table>

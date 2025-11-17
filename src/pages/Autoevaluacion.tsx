@@ -203,6 +203,14 @@ const Autoevaluacion = () => {
           toast.error("No se encontró un instrumento de evaluación para su nivel");
           return;
         }
+        
+        // Validación específica para C1: no debe tener dimensiones de potencial
+        if (user.nivel === 'C1' && userInstrument.dimensionesPotencial && userInstrument.dimensionesPotencial.length > 0) {
+          console.error("⚠️ Error: Instrumento C1 no debe tener dimensiones de potencial");
+          toast.error("Error en configuración del instrumento: C1 no debe tener evaluación de potencial");
+          return;
+        }
+        
         setInstrument(userInstrument);
 
         // Check if already submitted

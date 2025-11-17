@@ -58,6 +58,7 @@ export interface JobLevelInfoResponse {
 
 // Constantes para los niveles predefinidos
 export const JOB_LEVEL_CODES = {
+  C1: 'C1',
   A1: 'A1',
   A2: 'A2',
   S2: 'S2',
@@ -77,6 +78,7 @@ export type JobLevelCode = typeof JOB_LEVEL_CODES[keyof typeof JOB_LEVEL_CODES];
 
 // Nombres de los niveles
 export const JOB_LEVEL_NAMES: Record<JobLevelCode, string> = {
+  C1: 'CONCEJO MUNICIPAL',
   A1: 'ALCALDE MUNICIPAL',
   A2: 'ASESORÍA PROFESIONAL',
   S2: 'SECRETARIO',
@@ -94,6 +96,7 @@ export const JOB_LEVEL_NAMES: Record<JobLevelCode, string> = {
 
 // Categorías por nivel
 export const JOB_LEVEL_CATEGORIES: Record<JobLevelCode, JobLevelCategory> = {
+  C1: 'administrativo',
   A1: 'administrativo',
   A2: 'administrativo',
   S2: 'administrativo',
@@ -111,6 +114,7 @@ export const JOB_LEVEL_CATEGORIES: Record<JobLevelCode, JobLevelCategory> = {
 
 // Orden jerárquico por nivel
 export const JOB_LEVEL_HIERARCHY: Record<JobLevelCode, number> = {
+  C1: 0.9,
   A1: 1.0,
   A2: 1.1,
   S2: 1.2,

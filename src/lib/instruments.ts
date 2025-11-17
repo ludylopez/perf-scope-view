@@ -1,8 +1,9 @@
 import { Instrument } from "@/types/evaluation";
-import { INSTRUMENT_A1, INSTRUMENT_A3, INSTRUMENT_O2, INSTRUMENT_E1, INSTRUMENT_O1, INSTRUMENT_OTE, INSTRUMENT_D2, INSTRUMENT_A4, INSTRUMENT_S2, INSTRUMENT_E2, INSTRUMENT_D1 } from "@/data/instruments";
+import { INSTRUMENT_C1, INSTRUMENT_A1, INSTRUMENT_A3, INSTRUMENT_O2, INSTRUMENT_E1, INSTRUMENT_O1, INSTRUMENT_OTE, INSTRUMENT_D2, INSTRUMENT_A4, INSTRUMENT_S2, INSTRUMENT_E2, INSTRUMENT_D1 } from "@/data/instruments";
 import { InstrumentCalculationConfig, getInstrumentCalculationConfig } from "./instrumentCalculations";
 
 const INSTRUMENTS: Record<string, Instrument> = {
+  C1: INSTRUMENT_C1,
   A1: INSTRUMENT_A1,
   A3: INSTRUMENT_A3,
   O2: INSTRUMENT_O2,
@@ -251,6 +252,7 @@ export const registerInstrument = (instrument: Instrument, config?: InstrumentCa
 export const getRecommendedInstrumentId = (nivel: string): string => {
   // Mapeo de niveles a instrumentos (1:1)
   const nivelToInstrument: Record<string, string> = {
+    "C1": "C1",   // CONCEJO MUNICIPAL
     "A1": "A1",   // ALCALDE MUNICIPAL
     "A2": "A2",   // ASESORÍA PROFESIONAL
     "S2": "S2",   // SECRETARIO

@@ -58,6 +58,8 @@ export const mapearNivelAcodigo = (nivelInput: string): string => {
 
   // Mapeo de nombres descriptivos a códigos
   const nombreACodigo: Record<string, string> = {
+    'CONCEJO MUNICIPAL': 'C1',
+    'CONCEJO': 'C1',
     'ALCALDE MUNICIPAL': 'A1',
     'ALCALDE': 'A1',
     'ASESORIA PROFESIONAL': 'A2',
@@ -146,7 +148,7 @@ export const normalizarGenero = (genero: string): 'masculino' | 'femenino' | 'ot
 export const inferTipoPuesto = (nivel: string): 'administrativo' | 'operativo' | null => {
   const nivelUpper = nivel.toUpperCase().trim();
   // Niveles administrativos
-  if (['A1', 'A2', 'A3', 'A4', 'S2', 'D1', 'D2', 'E1', 'E2'].includes(nivelUpper)) {
+  if (['C1', 'A1', 'A2', 'A3', 'A4', 'S2', 'D1', 'D2', 'E1', 'E2'].includes(nivelUpper)) {
     return 'administrativo';
   }
   // Niveles operativos

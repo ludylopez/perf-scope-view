@@ -4,11 +4,12 @@ import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, FileEdit, CheckCircle2, Clock, Grid3x3 } from "lucide-react";
+import { ArrowLeft, FileEdit, CheckCircle2, Clock, Grid3x3, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { getActivePeriod } from "@/lib/supabase";
 import { toast } from "sonner";
+import { MultipleEvaluatorsInfo } from "@/types/evaluation";
 
 // Componente memoizado para el badge de estado
 const StatusBadge = memo(({ estado }: { estado: string }) => {
@@ -43,6 +44,7 @@ const EvaluacionEquipo = () => {
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [teamStatus, setTeamStatus] = useState<Record<string, { estado: string; progreso: number }>>({});
+  const [multipleEvaluatorsInfo, setMultipleEvaluatorsInfo] = useState<Record<string, MultipleEvaluatorsInfo>>({});
   const [periodoId, setPeriodoId] = useState<string>("");
 
   useEffect(() => {
@@ -165,6 +167,9 @@ const EvaluacionEquipo = () => {
       });
 
       setTeamStatus(status);
+      
+      // Cargar información de múltiples evaluadores
+      await loadMultipleEvaluatorsInfo(members, periodoIdParam);
     } catch (error: any) {
       console.error("Error loading team members:", error);
       toast.error("Error al cargar miembros del equipo");
@@ -181,6 +186,88 @@ const EvaluacionEquipo = () => {
       ]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadMultipleEvaluatorsInfo = async (members: any[], periodoIdParam: string) => {
+    try {
+      if (members.length === 0) {
+        setMultipleEvaluatorsInfo({});
+        return;
+      }
+
+      const colaboradoresIds = members.map(m => m.dpi);
+      
+      // Obtener todas las asignaciones activas para estos colaboradores
+      const { data: allAssignments, error: assignmentsError } = await supabase
+        .from("user_assignments")
+        .select(`
+          colaborador_id,
+          jefe_id,
+          users!user_assignments_jefe_id_fkey (
+            dpi,
+            nombre,
+            apellidos
+          )
+        `)
+        .in("colaborador_id", colaboradoresIds)
+        .eq("activo", true);
+
+      if (assignmentsError) {
+        console.error("Error loading multiple evaluators info:", assignmentsError);
+        return;
+      }
+
+      // Agrupar por colaborador
+      const infoMap: Record<string, MultipleEvaluatorsInfo> = {};
+      
+      members.forEach((colaborador) => {
+        const asignaciones = allAssignments?.filter(a => a.colaborador_id === colaborador.dpi) || [];
+        
+        if (asignaciones.length > 0) {
+          // Obtener estados de evaluación para cada evaluador
+          const evaluadores = asignaciones.map((asignacion: any) => {
+            const jefe = asignacion.users;
+            return {
+              evaluadorId: jefe.dpi,
+              evaluadorNombre: `${jefe.nombre} ${jefe.apellidos}`,
+            };
+          });
+
+          // Verificar estados de evaluación
+          const evaluadoresConEstado = evaluadores.map(async (eval) => {
+            const { data: evaluacion } = await supabase
+              .from("evaluations")
+              .select("estado")
+              .eq("colaborador_id", colaborador.dpi)
+              .eq("evaluador_id", eval.evaluadorId)
+              .eq("periodo_id", periodoIdParam)
+              .eq("tipo", "jefe")
+              .maybeSingle();
+
+            return {
+              ...eval,
+              estadoEvaluacion: evaluacion?.estado === "enviado" 
+                ? "enviado" 
+                : evaluacion?.estado === "borrador" 
+                ? "borrador" 
+                : "pendiente" as "pendiente" | "borrador" | "enviado",
+            };
+          });
+
+          const evaluadoresCompletos = await Promise.all(evaluadoresConEstado);
+
+          infoMap[colaborador.dpi] = {
+            colaboradorId: colaborador.dpi,
+            evaluadores: evaluadoresCompletos,
+            totalEvaluadores: evaluadoresCompletos.length,
+          };
+        }
+      });
+
+      setMultipleEvaluatorsInfo(infoMap);
+    } catch (error) {
+      console.error("Error loading multiple evaluators info:", error);
     }
   };
 
@@ -241,9 +328,22 @@ const EvaluacionEquipo = () => {
                   <CardHeader>
                     <div className="flex items-start justify-between">
                       <div>
-                        <CardTitle>{colaborador.nombre}</CardTitle>
+                        <CardTitle className="flex items-center gap-2">
+                          {colaborador.nombre}
+                          {multipleEvaluatorsInfo[colaborador.dpi]?.totalEvaluadores > 1 && (
+                            <Badge variant="outline" className="text-xs">
+                              <Users className="mr-1 h-3 w-3" />
+                              {multipleEvaluatorsInfo[colaborador.dpi].totalEvaluadores} evaluadores
+                            </Badge>
+                          )}
+                        </CardTitle>
                         <CardDescription>
                           {colaborador.cargo} • {colaborador.area} • Nivel {colaborador.nivel}
+                          {multipleEvaluatorsInfo[colaborador.dpi]?.totalEvaluadores > 1 && (
+                            <span className="ml-2 text-xs text-muted-foreground">
+                              (Evaluado por múltiples jefes)
+                            </span>
+                          )}
                         </CardDescription>
                       </div>
                       <StatusBadge estado={status.estado} />

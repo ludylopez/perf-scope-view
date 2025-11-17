@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { FinalScore } from "@/types/evaluation";
+import { FinalScore, EvaluationResultByEvaluator, ConsolidatedEvaluationResult } from "@/types/evaluation";
 import { scoreToPercentage } from "@/lib/calculations";
 
 /**
@@ -184,5 +184,181 @@ export const getFinalResultsByJefe = async (
     console.error("Error in getFinalResultsByJefe:", error);
     return [];
   }
+};
+
+/**
+ * Guarda el resultado de evaluación por evaluador en evaluation_results_by_evaluator
+ */
+export const saveResultByEvaluator = async (
+  colaboradorId: string,
+  periodoId: string,
+  evaluadorId: string,
+  autoevaluacionId: string,
+  evaluacionJefeId: string,
+  resultadoFinal: FinalScore,
+  comparativo?: any
+): Promise<string | null> => {
+  try {
+    const desempenoPorcentaje = scoreToPercentage(resultadoFinal.desempenoFinal);
+    const potencialPorcentaje = resultadoFinal.potencial 
+      ? scoreToPercentage(resultadoFinal.potencial)
+      : null;
+
+    const resultadoData = {
+      colaborador_id: colaboradorId,
+      periodo_id: periodoId,
+      evaluador_id: evaluadorId,
+      autoevaluacion_id: autoevaluacionId,
+      evaluacion_jefe_id: evaluacionJefeId,
+      resultado_final: {
+        desempenoAuto: resultadoFinal.desempenoAuto,
+        desempenoJefe: resultadoFinal.desempenoJefe,
+        desempenoFinal: resultadoFinal.desempenoFinal,
+        potencial: resultadoFinal.potencial,
+        posicion9Box: resultadoFinal.posicion9Box,
+      },
+      comparativo: comparativo || {},
+      posicion_9box: resultadoFinal.posicion9Box || null,
+      desempeno_final: resultadoFinal.desempenoFinal,
+      desempeno_porcentaje: desempenoPorcentaje,
+      potencial: resultadoFinal.potencial || null,
+      potencial_porcentaje: potencialPorcentaje,
+    };
+
+    // Upsert (insertar o actualizar) usando ON CONFLICT
+    const { data, error } = await supabase
+      .from("evaluation_results_by_evaluator")
+      .upsert(resultadoData, {
+        onConflict: "colaborador_id,periodo_id,evaluador_id",
+      })
+      .select("id")
+      .single();
+
+    if (error) {
+      console.error("Error saving result by evaluator:", error);
+      return null;
+    }
+    return data.id;
+  } catch (error) {
+    console.error("Error in saveResultByEvaluator:", error);
+    return null;
+  }
+};
+
+/**
+ * Obtiene el resultado consolidado de evaluación para un colaborador
+ * Usa la función RPC get_consolidated_result
+ */
+export const getConsolidatedResult = async (
+  colaboradorId: string,
+  periodoId: string
+): Promise<ConsolidatedEvaluationResult | null> => {
+  try {
+    const { data, error } = await supabase
+      .rpc("get_consolidated_result", {
+        p_colaborador_id: colaboradorId,
+        p_periodo_id: periodoId,
+      });
+
+    if (error || !data || Object.keys(data).length === 0) {
+      return null;
+    }
+
+    // Enriquecer con nombres de evaluadores
+    const enrichedData = await enrichResultsWithEvaluatorNames(data);
+    return enrichedData;
+  } catch (error) {
+    console.error("Error in getConsolidatedResult:", error);
+    return null;
+  }
+};
+
+/**
+ * Obtiene todos los resultados individuales por evaluador para un colaborador
+ */
+export const getResultsByEvaluator = async (
+  colaboradorId: string,
+  periodoId: string
+): Promise<EvaluationResultByEvaluator[]> => {
+  try {
+    const { data, error } = await supabase
+      .from("evaluation_results_by_evaluator")
+      .select(`
+        *,
+        evaluador:users!evaluation_results_by_evaluator_evaluador_id_fkey (
+          dpi,
+          nombre,
+          apellidos
+        )
+      `)
+      .eq("colaborador_id", colaboradorId)
+      .eq("periodo_id", periodoId);
+
+    if (error || !data) return [];
+
+    return data.map((row: any) => ({
+      id: row.id,
+      colaboradorId: row.colaborador_id,
+      periodoId: row.periodo_id,
+      evaluadorId: row.evaluador_id,
+      evaluadorNombre: row.evaluador 
+        ? `${row.evaluador.nombre} ${row.evaluador.apellidos}`
+        : undefined,
+      autoevaluacionId: row.autoevaluacion_id,
+      evaluacionJefeId: row.evaluacion_jefe_id,
+      resultadoFinal: row.resultado_final as FinalScore,
+      comparativo: row.comparativo || {},
+      posicion9Box: row.posicion_9box,
+      desempenoFinal: row.desempeno_final,
+      desempenoPorcentaje: row.desempeno_porcentaje,
+      potencial: row.potencial,
+      potencialPorcentaje: row.potencial_porcentaje,
+      fechaGeneracion: row.fecha_generacion,
+    }));
+  } catch (error) {
+    console.error("Error in getResultsByEvaluator:", error);
+    return [];
+  }
+};
+
+/**
+ * Enriquece los resultados consolidados con nombres de evaluadores
+ */
+export const enrichResultsWithEvaluatorNames = async (
+  consolidatedResult: any
+): Promise<ConsolidatedEvaluationResult> => {
+  if (!consolidatedResult.resultados_por_evaluador || !Array.isArray(consolidatedResult.resultados_por_evaluador)) {
+    return consolidatedResult as ConsolidatedEvaluationResult;
+  }
+
+  // Obtener nombres de evaluadores
+  const evaluadorIds = consolidatedResult.resultados_por_evaluador.map(
+    (r: any) => r.evaluador_id
+  );
+
+  const { data: evaluadores } = await supabase
+    .from("users")
+    .select("dpi, nombre, apellidos")
+    .in("dpi", evaluadorIds);
+
+  const evaluadoresMap = new Map(
+    evaluadores?.map((e: any) => [
+      e.dpi,
+      `${e.nombre} ${e.apellidos}`,
+    ]) || []
+  );
+
+  // Enriquecer resultados con nombres
+  const resultadosEnriquecidos = consolidatedResult.resultados_por_evaluador.map(
+    (r: any) => ({
+      ...r,
+      evaluadorNombre: evaluadoresMap.get(r.evaluador_id),
+    })
+  );
+
+  return {
+    ...consolidatedResult,
+    resultadosPorEvaluador: resultadosEnriquecidos,
+  } as ConsolidatedEvaluationResult;
 };
 

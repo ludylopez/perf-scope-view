@@ -187,7 +187,8 @@ export const exportResultadoIndividualPDF = (
   colaboradorNombre: string,
   periodo: string,
   resultado: any,
-  planDesarrollo?: any
+  planDesarrollo?: any,
+  resultadoConsolidado?: any // Información de múltiples evaluadores
 ) => {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -229,6 +230,11 @@ export const exportResultadoIndividualPDF = (
     resultados.push(["Posición 9-Box", resultado.posicion9Box]);
   }
 
+  // Agregar información de múltiples evaluadores si existe
+  if (resultadoConsolidado && resultadoConsolidado.totalEvaluadores > 1) {
+    resultados.push(["Total Evaluadores", `${resultadoConsolidado.totalEvaluadores}`]);
+  }
+
   resultados.forEach(([label, value]) => {
     doc.setFont("helvetica", "bold");
     doc.text(`${label}:`, 14, yPosition);
@@ -236,6 +242,50 @@ export const exportResultadoIndividualPDF = (
     doc.text(value.toString(), 80, yPosition);
     yPosition += 7;
   });
+
+  // Mostrar detalles de múltiples evaluadores si existen
+  if (resultadoConsolidado && resultadoConsolidado.totalEvaluadores > 1 && resultadoConsolidado.resultadosPorEvaluador) {
+    yPosition += 5;
+    if (yPosition > pageHeight - 60) {
+      doc.addPage();
+      yPosition = 20;
+    }
+    
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("Evaluaciones por Evaluador", 14, yPosition);
+    yPosition += 10;
+
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    resultadoConsolidado.resultadosPorEvaluador.forEach((evalResult: any, idx: number) => {
+      if (yPosition > pageHeight - 40) {
+        doc.addPage();
+        yPosition = 20;
+      }
+      
+      const evaluadorNombre = evalResult.evaluadorNombre || `Evaluador ${idx + 1}`;
+      doc.setFont("helvetica", "bold");
+      doc.text(`${evaluadorNombre}:`, 20, yPosition);
+      yPosition += 6;
+      
+      doc.setFont("helvetica", "normal");
+      doc.text(`  Desempeño: ${scoreToPercentage(evalResult.desempenoFinal)}%`, 25, yPosition);
+      yPosition += 5;
+      
+      if (evalResult.potencial) {
+        doc.text(`  Potencial: ${scoreToPercentage(evalResult.potencial)}%`, 25, yPosition);
+        yPosition += 5;
+      }
+      
+      if (evalResult.posicion9Box) {
+        doc.text(`  9-Box: ${evalResult.posicion9Box}`, 25, yPosition);
+        yPosition += 5;
+      }
+      
+      yPosition += 3;
+    });
+  }
 
   yPosition += 10;
 
@@ -1364,6 +1414,15 @@ export const exportEvaluacionCompletaPDFReact = async (
       dimensionId?: string;
       descripcion?: string;
     }>;
+    resultadoConsolidado?: {
+      totalEvaluadores?: number;
+      resultadosPorEvaluador?: Array<{
+        evaluadorNombre?: string;
+        desempenoFinal?: number;
+        potencial?: number;
+        posicion9Box?: string;
+      }>;
+    };
   },
   planDesarrollo?: {
     planEstructurado?: {

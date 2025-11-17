@@ -179,6 +179,18 @@ const DashboardRRHH = () => {
         setResumenSeguimiento(resumenData);
       }
 
+      // Cargar estadísticas de múltiples evaluadores
+      const { data: multipleEvaluatorsStats, error: multipleEvaluatorsError } = await supabase
+        .rpc("get_multiple_evaluators_stats", { periodo_id_param: currentPeriodId });
+
+      if (!multipleEvaluatorsError && multipleEvaluatorsStats) {
+        // Agregar estadísticas de múltiples evaluadores a advancedStats
+        setAdvancedStats((prev: any) => ({
+          ...prev,
+          multipleEvaluators: multipleEvaluatorsStats,
+        }));
+      }
+
       setStats({
         totalUsuarios: statsData.totalUsuarios || 0,
         totalJefes: statsData.totalJefes || 0,
@@ -416,6 +428,10 @@ const DashboardRRHH = () => {
         { label: "Porcentaje de Completitud", value: `${stats.porcentajeCompletitud}%` },
         { label: "Promedio de Desempeño", value: `${scoreToPercentage(stats.promedioDesempeno)}%` },
         { label: "Promedio de Potencial", value: `${scoreToPercentage(stats.promedioPotencial)}%` },
+        ...(advancedStats?.multipleEvaluators ? [
+          { label: "Colaboradores con Múltiples Evaluadores", value: advancedStats.multipleEvaluators.colaboradores_con_multiples || 0 },
+          { label: "Promedio de Evaluadores por Colaborador", value: advancedStats.multipleEvaluators.promedio_evaluadores?.toFixed(1) || "0" },
+        ] : []),
       ],
       tables: [
         {
@@ -456,6 +472,14 @@ const DashboardRRHH = () => {
             item.completadas,
           ]),
         },
+        ...(advancedStats?.multipleEvaluators?.distribucion ? [{
+          title: "Distribución de Evaluadores",
+          headers: ["Número de Evaluadores", "Cantidad de Colaboradores"],
+          rows: advancedStats.multipleEvaluators.distribucion.map((item: any) => [
+            item.evaluadores,
+            item.colaboradores,
+          ]),
+        }] : []),
       ],
     };
 
@@ -669,6 +693,42 @@ const DashboardRRHH = () => {
               )}
             </CardContent>
           </Card>
+
+          {/* Múltiples Evaluadores */}
+          {advancedStats?.multipleEvaluators && (
+            <Card className="border-blue-200 dark:border-blue-800">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  Múltiples Evaluadores
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-4xl font-bold text-blue-600 dark:text-blue-400">
+                  {advancedStats.multipleEvaluators.colaboradores_con_multiples || 0}
+                </p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Colaboradores con múltiples evaluadores
+                </p>
+                {advancedStats.multipleEvaluators.promedio_evaluadores > 0 && (
+                  <div className="mt-4 space-y-1 text-xs">
+                    <div className="flex justify-between">
+                      <span>Promedio de evaluadores:</span>
+                      <span className="font-semibold">
+                        {advancedStats.multipleEvaluators.promedio_evaluadores.toFixed(1)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Total evaluaciones:</span>
+                      <span className="font-semibold">
+                        {advancedStats.multipleEvaluators.total_evaluaciones || 0}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Tarjeta de Uso de API de IA */}

@@ -18,7 +18,11 @@ export interface Instrument {
   version: string;
   tiempoEstimado?: string;
   dimensionesDesempeno: Dimension[];
-  dimensionesPotencial: Dimension[];
+  dimensionesPotencial: Dimension[]; // Puede ser array vacío para niveles sin potencial (ej: C1)
+  configuracion_calculo?: {
+    pesoAuto?: number;
+    pesoJefe?: number;
+  };
 }
 
 export interface Response {
@@ -159,4 +163,70 @@ export interface FinalEvaluationResult {
   };
   planDesarrolloId?: string;
   fechaGeneracion: string;
+}
+
+// Tipos para sistema de múltiples evaluadores
+export interface EvaluationResultByEvaluator {
+  id: string;
+  colaboradorId: string;
+  periodoId: string;
+  evaluadorId: string;
+  evaluadorNombre?: string;
+  autoevaluacionId: string;
+  evaluacionJefeId: string;
+  resultadoFinal: FinalScore;
+  comparativo: {
+    dimensiones?: Array<{
+      dimensionId: string;
+      nombre: string;
+      autoevaluacion: number;
+      evaluacionJefe: number;
+      diferencia: number;
+    }>;
+    desempenoAuto?: number;
+    desempenoJefe?: number;
+    desempenoFinal?: number;
+    potencial?: number;
+  };
+  posicion9Box?: string;
+  desempenoFinal: number;
+  desempenoPorcentaje: number;
+  potencial?: number;
+  potencialPorcentaje?: number;
+  fechaGeneracion: string;
+}
+
+export interface ConsolidatedEvaluationResult {
+  colaboradorId: string;
+  periodoId: string;
+  desempenoFinalPromedio: number;
+  desempenoPorcentajePromedio: number;
+  potencialPromedio?: number;
+  potencialPorcentajePromedio?: number;
+  posicion9BoxModa?: string;
+  totalEvaluadores: number;
+  resultadosPorEvaluador: Array<{
+    evaluadorId: string;
+    evaluadorNombre?: string;
+    desempenoFinal: number;
+    desempenoPorcentaje: number;
+    potencial?: number;
+    potencialPorcentaje?: number;
+    posicion9Box?: string;
+    fechaGeneracion?: string;
+  }>;
+  desempenoFinalMinimo?: number;
+  desempenoFinalMaximo?: number;
+  desempenoPorcentajeMinimo?: number;
+  desempenoPorcentajeMaximo?: number;
+}
+
+export interface MultipleEvaluatorsInfo {
+  colaboradorId: string;
+  evaluadores: Array<{
+    evaluadorId: string;
+    evaluadorNombre: string;
+    estadoEvaluacion?: 'pendiente' | 'borrador' | 'enviado';
+  }>;
+  totalEvaluadores: number;
 }

@@ -69,6 +69,7 @@ interface TeamMember9Box {
   potencialPorcentaje?: number;
   jefe?: string; // Para vista RRHH
   jefeNombre?: string; // Para vista RRHH
+  totalEvaluadores?: number; // Número de evaluadores para este colaborador
 }
 
 interface NineBoxData {
@@ -135,15 +136,16 @@ const Matriz9Box = () => {
       if (isRRHH) {
         console.log("🔍 RRHH cargando matriz 9-box para periodo:", periodoId);
 
-        // Obtener todos los resultados finales del período activo
+        // Obtener todos los resultados finales consolidados del período activo
         const { data: finalResults, error: finalResultsError } = await supabase
-          .from("final_evaluation_results")
+          .from("final_evaluation_results_consolidated")
           .select(`
             colaborador_id,
-            desempeno_final,
-            potencial,
-            posicion_9box,
-            users!final_evaluation_results_colaborador_id_fkey (
+            desempeno_final_promedio,
+            potencial_promedio,
+            posicion_9box_moda,
+            total_evaluadores,
+            users!final_evaluation_results_consolidated_colaborador_id_fkey (
               dpi,
               nombre,
               apellidos,
@@ -216,7 +218,7 @@ const Matriz9Box = () => {
             continue;
           }
 
-          if (!result.posicion_9box) {
+          if (!result.posicion_9box_moda) {
             console.warn("⚠️ Sin posición 9-box para:", colaborador.nombre, colaborador.apellidos);
             continue;
           }
@@ -229,11 +231,12 @@ const Matriz9Box = () => {
             cargo: colaborador.cargo,
             area: colaborador.area,
             nivel: colaborador.nivel,
-            desempenoFinal: result.desempeno_final,
-            potencial: result.potencial,
-            posicion9Box: result.posicion_9box,
-            desempenoPorcentaje: scoreToPercentage(result.desempeno_final),
-            potencialPorcentaje: result.potencial ? scoreToPercentage(result.potencial) : undefined,
+            desempenoFinal: result.desempeno_final_promedio,
+            potencial: result.potencial_promedio,
+            posicion9Box: result.posicion_9box_moda,
+            totalEvaluadores: result.total_evaluadores || 1,
+            desempenoPorcentaje: scoreToPercentage(result.desempeno_final_promedio),
+            potencialPorcentaje: result.potencial_promedio ? scoreToPercentage(result.potencial_promedio) : undefined,
             jefe: jefeInfo?.dpi,
             jefeNombre: jefeInfo?.nombre,
           });
@@ -270,7 +273,21 @@ const Matriz9Box = () => {
 
           if (!jefeEvaluado) continue;
 
-          let resultadoFinal = await getFinalResultFromSupabase(colaboradorDpi, periodoId);
+          // Intentar cargar resultado consolidado primero
+          const { getConsolidatedResult } = await import("@/lib/finalResultSupabase");
+          let resultadoConsolidado = await getConsolidatedResult(colaboradorDpi, periodoId);
+          
+          let resultadoFinal: any = null;
+          if (resultadoConsolidado && Object.keys(resultadoConsolidado).length > 0) {
+            resultadoFinal = {
+              desempenoFinal: resultadoConsolidado.desempeno_final_promedio || 0,
+              potencial: resultadoConsolidado.potencial_promedio,
+              posicion9Box: resultadoConsolidado.posicion_9box_moda,
+            };
+          } else {
+            // Fallback: usar getFinalResultFromSupabase
+            resultadoFinal = await getFinalResultFromSupabase(colaboradorDpi, periodoId);
+          }
 
           if (!resultadoFinal) {
             const evaluacionJefe = await getJefeEvaluationDraft(user.dpi, colaboradorDpi, periodoId);
@@ -370,6 +387,13 @@ const Matriz9Box = () => {
 
       // Filtro por jefe (RRHH)
       if (filters.jefe && member.jefe !== filters.jefe) return false;
+
+      // Filtro por número de evaluadores
+      if (filters.numEvaluadores) {
+        const numEvaluadores = member.totalEvaluadores || 1;
+        if (filters.numEvaluadores === "multiple" && numEvaluadores <= 1) return false;
+        if (filters.numEvaluadores === "single" && numEvaluadores > 1) return false;
+      }
 
       // Filtro por importancia estratégica
       if (filters.importancia) {
@@ -759,7 +783,15 @@ const Matriz9Box = () => {
                                           onClick={() => navigate(`/evaluacion-equipo/${member.dpi}/comparativa`)}
                                         >
                                           <CardContent className="p-4">
-                                            <p className="font-medium text-sm mb-1">{member.nombre}</p>
+                                            <div className="flex items-center gap-2 mb-1">
+                                              <p className="font-medium text-sm">{member.nombre}</p>
+                                              {member.totalEvaluadores && member.totalEvaluadores > 1 && (
+                                                <Badge variant="outline" className="text-xs">
+                                                  <Users className="h-3 w-3 mr-1" />
+                                                  {member.totalEvaluadores}
+                                                </Badge>
+                                              )}
+                                            </div>
                                             <p className="text-xs text-muted-foreground mb-2">
                                               {member.cargo} • {member.area}
                                             </p>

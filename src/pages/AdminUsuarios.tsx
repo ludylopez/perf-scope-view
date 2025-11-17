@@ -178,6 +178,7 @@ const AdminUsuarios = () => {
   const [usuarios, setUsuarios] = useState<User[]>([]);
   const [jobLevels, setJobLevels] = useState<JobLevel[]>([]);
   const [loading, setLoading] = useState(true);
+  const [evaluadoresPorUsuario, setEvaluadoresPorUsuario] = useState<Record<string, number>>({});
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -334,6 +335,23 @@ const AdminUsuarios = () => {
       }));
 
       setUsuarios(formattedData);
+
+      // Cargar número de evaluadores por usuario
+      if (formattedData.length > 0) {
+        const dpis = formattedData.map(u => u.dpi);
+        const { data: assignments } = await supabase
+          .from("user_assignments")
+          .select("colaborador_id")
+          .in("colaborador_id", dpis)
+          .eq("activo", true);
+
+        const evaluadoresMap: Record<string, number> = {};
+        assignments?.forEach((assignment: any) => {
+          evaluadoresMap[assignment.colaborador_id] = (evaluadoresMap[assignment.colaborador_id] || 0) + 1;
+        });
+
+        setEvaluadoresPorUsuario(evaluadoresMap);
+      }
     } catch (error: any) {
       console.error("Error loading usuarios:", error);
       toast.error("Error al cargar usuarios");
@@ -1041,6 +1059,7 @@ const AdminUsuarios = () => {
                   <TableHead>Nivel</TableHead>
                   <TableHead>Cargo</TableHead>
                   <TableHead>Área</TableHead>
+                  <TableHead>Evaluadores</TableHead>
                   <TableHead>Rol</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Acciones</TableHead>
@@ -1049,7 +1068,7 @@ const AdminUsuarios = () => {
               <TableBody>
                 {usuarios.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center text-muted-foreground">
                       No se encontraron usuarios
                     </TableCell>
                   </TableRow>
@@ -1065,6 +1084,16 @@ const AdminUsuarios = () => {
                       </TableCell>
                       <TableCell>{usuario.cargo}</TableCell>
                       <TableCell>{usuario.area}</TableCell>
+                      <TableCell>
+                        {evaluadoresPorUsuario[usuario.dpi] > 0 ? (
+                          <Badge variant="outline" className="flex items-center gap-1 w-fit">
+                            <Users className="h-3 w-3" />
+                            {evaluadoresPorUsuario[usuario.dpi]}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">-</span>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <Badge variant={
                           usuario.rol === "admin_general" ? "default" :

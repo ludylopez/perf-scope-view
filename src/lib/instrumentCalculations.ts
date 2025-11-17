@@ -46,6 +46,42 @@ export interface InstrumentCalculationConfig {
  * Cada uno de los 11 instrumentos puede tener su configuración
  */
 export const INSTRUMENT_CALCULATION_CONFIGS: Record<string, InstrumentCalculationConfig> = {
+  // Instrumento C1 - Concejo Municipal (solo autoevaluación, sin potencial)
+  C1: {
+    instrumentId: "C1",
+    nivel: "C1",
+    calcularDesempeno: (responses, dimensions) => {
+      // Cálculo estándar con pesos
+      let totalScore = 0;
+      for (const dimension of dimensions) {
+        const itemResponses = dimension.items
+          .map((item: any) => responses[item.id])
+          .filter((v: any) => v !== undefined);
+        if (itemResponses.length === 0) continue;
+
+        const avg = itemResponses.reduce((sum: number, val: number) => sum + val, 0) / itemResponses.length;
+        totalScore += avg * dimension.peso;
+      }
+      return Math.round(totalScore * 100) / 100;
+    },
+    calcularPotencial: (potencialResponses, potencialDimensions) => {
+      // C1 no tiene potencial, retornar undefined
+      return undefined as any;
+    },
+    calcularResultadoFinal: (desempenoAuto, desempenoJefe, potencial) => {
+      // C1 solo tiene autoevaluación (100% autoevaluación, 0% jefe)
+      // desempenoJefe puede ser 0 o undefined, pero usamos solo desempenoAuto
+      const desempenoFinal = Math.round(desempenoAuto * 100) / 100;
+      return { desempenoFinal, potencial: undefined };
+    },
+    pesoJefe: 0.0, // C1 no tiene evaluación de jefe
+    pesoAuto: 1.0, // 100% autoevaluación
+    thresholds9Box: {
+      desempeno: { bajo: 3, medio: 4, alto: 4.5 },
+      potencial: { bajo: 3, medio: 4, alto: 4.5 }, // No aplica, pero se mantiene para compatibilidad
+    },
+  },
+  
   // Instrumento A1 - Configuración con pesos especiales para Alta Dirección
   A1: {
     instrumentId: "A1",

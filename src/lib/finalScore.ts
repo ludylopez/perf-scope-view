@@ -241,3 +241,59 @@ export const calculateCompleteFinalScore = async (
   return resultadoFinal;
 };
 
+/**
+ * Calcula el resultado final consolidado cuando hay múltiples evaluadores
+ * Promedia los resultados de desempeño y potencial de todos los evaluadores
+ */
+export const calculateFinalScoreWithMultipleEvaluators = (
+  desempenoAuto: number,
+  resultadosJefe: Array<{
+    desempenoJefe: number;
+    potencial?: number;
+  }>
+): FinalScore => {
+  if (resultadosJefe.length === 0) {
+    // Si no hay evaluadores, retornar solo autoevaluación
+    return {
+      desempenoAuto,
+      desempenoJefe: desempenoAuto, // Usar autoevaluación como fallback
+      desempenoFinal: desempenoAuto,
+      potencial: undefined,
+    };
+  }
+
+  // Calcular promedio de desempeño de jefes
+  const desempenoJefePromedio = resultadosJefe.reduce(
+    (sum, r) => sum + r.desempenoJefe,
+    0
+  ) / resultadosJefe.length;
+
+  // Calcular promedio de potencial (solo si todos tienen potencial)
+  let potencialPromedio: number | undefined;
+  const resultadosConPotencial = resultadosJefe.filter(r => r.potencial !== undefined);
+  if (resultadosConPotencial.length === resultadosJefe.length && resultadosConPotencial.length > 0) {
+    potencialPromedio = resultadosConPotencial.reduce(
+      (sum, r) => sum + (r.potencial || 0),
+      0
+    ) / resultadosConPotencial.length;
+  }
+
+  // Para el desempeño final, usar promedio de desempeño de jefes
+  // (la autoevaluación ya está incluida en el cálculo individual de cada evaluador)
+  const desempenoFinal = Math.round(desempenoJefePromedio * 100) / 100;
+  const potencialFinal = potencialPromedio 
+    ? Math.round(potencialPromedio * 100) / 100 
+    : undefined;
+
+  // Calcular posición 9-box usando el promedio
+  const posicion9Box = calculateNineBoxPosition(desempenoFinal, potencialFinal);
+
+  return {
+    desempenoAuto,
+    desempenoJefe: Math.round(desempenoJefePromedio * 100) / 100,
+    desempenoFinal,
+    potencial: potencialFinal,
+    posicion9Box,
+  };
+};
+

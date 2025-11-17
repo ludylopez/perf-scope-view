@@ -19,7 +19,7 @@ import { scoreToPercentage, calculateDimensionPercentage, calculateDimensionAver
 import { perteneceACuadrilla, getGruposDelColaborador, getEquipoStats } from "@/lib/jerarquias";
 import { supabase } from "@/integrations/supabase/client";
 import { getActivePeriod, getEvaluationIdFromSupabase } from "@/lib/supabase";
-import { getFinalResultFromSupabase } from "@/lib/finalResultSupabase";
+import { getFinalResultFromSupabase, getConsolidatedResult, getResultsByEvaluator } from "@/lib/finalResultSupabase";
 import { getInstrumentConfigForUser } from "@/lib/backendCalculations";
 import { GenerarPlanDesarrollo } from "@/components/development/GenerarPlanDesarrollo";
 import { GenerarGuiaRetroalimentacion } from "@/components/development/GuiaRetroalimentacion";
@@ -75,8 +75,11 @@ const VistaComparativa = () => {
   const [autoevaluacion, setAutoevaluacion] = useState<any>(null);
   const [evaluacionJefe, setEvaluacionJefe] = useState<any>(null);
   const [resultadoFinal, setResultadoFinal] = useState<any>(null);
+  const [resultadoConsolidado, setResultadoConsolidado] = useState<any>(null);
+  const [resultadosPorEvaluador, setResultadosPorEvaluador] = useState<any[]>([]);
   const [comparativo, setComparativo] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [vistaEvaluador, setVistaEvaluador] = useState<"consolidado" | string>("consolidado");
   const [vistaModo, setVistaModo] = useState<"individual" | "grupal">("individual");
   const [perteneceCuadrilla, setPerteneceCuadrilla] = useState(false);
   const [gruposColaborador, setGruposColaborador] = useState<any[]>([]);
@@ -421,6 +424,28 @@ const VistaComparativa = () => {
         }
         
         setResultadoFinal(resultado);
+
+        // Cargar resultado consolidado y resultados por evaluador
+        const consolidado = await getConsolidatedResult(colaboradorFormatted.dpi, currentPeriodoId);
+        if (consolidado && Object.keys(consolidado).length > 0) {
+          setResultadoConsolidado(consolidado);
+          // Si hay múltiples evaluadores, usar el consolidado como resultado principal
+          if (consolidado.totalEvaluadores > 1) {
+            setResultadoFinal({
+              desempenoAuto: resultado?.desempenoAuto || 0,
+              desempenoJefe: consolidado.desempenoFinalPromedio || resultado?.desempenoJefe || 0,
+              desempenoFinal: consolidado.desempenoFinalPromedio || resultado?.desempenoFinal || 0,
+              potencial: consolidado.potencialPromedio || resultado?.potencial,
+              posicion9Box: consolidado.posicion9BoxModa || resultado?.posicion9Box,
+            });
+          }
+        }
+
+        // Cargar resultados individuales por evaluador
+        const resultadosEvaluadores = await getResultsByEvaluator(colaboradorFormatted.dpi, currentPeriodoId);
+        if (resultadosEvaluadores.length > 0) {
+          setResultadosPorEvaluador(resultadosEvaluadores);
+        }
 
         // Calcular comparativo por dimensión
         const comparativoData = userInstrument.dimensionesDesempeno.map((dim) => {
@@ -792,6 +817,33 @@ const VistaComparativa = () => {
                     <Badge className="text-lg px-4 py-2">
                       {getNineBoxDescription(resultadoFinal.posicion9Box)}
                     </Badge>
+                  </div>
+                )}
+
+                {/* Información de múltiples evaluadores */}
+                {resultadoConsolidado && resultadoConsolidado.totalEvaluadores > 1 && (
+                  <div className="mt-6 p-4 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Users2 className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                      <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                        Evaluado por {resultadoConsolidado.totalEvaluadores} evaluadores
+                      </p>
+                    </div>
+                    <p className="text-xs text-blue-700 dark:text-blue-300 mb-3">
+                      Los resultados mostrados son el promedio consolidado de todas las evaluaciones.
+                    </p>
+                    <div className="space-y-2">
+                      {resultadoConsolidado.resultadosPorEvaluador?.map((evalResult: any, idx: number) => (
+                        <div key={idx} className="text-xs p-2 bg-white dark:bg-gray-800 rounded border">
+                          <span className="font-medium">{evalResult.evaluadorNombre || `Evaluador ${idx + 1}`}:</span>
+                          <span className="ml-2">
+                            Desempeño: {scoreToPercentage(evalResult.desempenoFinal)}% | 
+                            Potencial: {evalResult.potencial ? `${scoreToPercentage(evalResult.potencial)}%` : 'N/A'} |
+                            9-Box: {evalResult.posicion9Box || 'N/A'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </CardContent>

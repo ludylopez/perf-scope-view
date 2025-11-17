@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, X, Filter, SlidersHorizontal } from "lucide-react";
+import { Search, X, Filter, SlidersHorizontal, Users } from "lucide-react";
 import {
   Popover,
   PopoverContent,
@@ -26,6 +26,7 @@ export interface FilterOptions {
   importancia?: "critical" | "high" | "medium" | "low";
   retencion?: "urgent" | "high" | "medium" | "low";
   jefe?: string; // Para vista RRHH
+  numEvaluadores?: "multiple" | "single"; // Filtro por número de evaluadores
 }
 
 interface NineBoxFiltersProps {
@@ -231,6 +232,28 @@ export function NineBoxFilters({
                     </div>
                   )}
 
+                  {isGlobalView && (
+                    <div>
+                      <label className="text-xs font-medium mb-1.5 block flex items-center gap-2">
+                        <Users className="h-3 w-3" />
+                        Número de Evaluadores
+                      </label>
+                      <Select
+                        value={filters.numEvaluadores || "all"}
+                        onValueChange={(value) => updateFilter("numEvaluadores", value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Todos" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos</SelectItem>
+                          <SelectItem value="single">Un solo evaluador</SelectItem>
+                          <SelectItem value="multiple">Múltiples evaluadores</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
                   <div>
                     <label className="text-xs font-medium mb-1.5 block">Cargo</label>
                     <Select
@@ -294,6 +317,28 @@ export function NineBoxFilters({
                       </SelectContent>
                     </Select>
                   </div>
+
+                  {isGlobalView && (
+                    <div>
+                      <label className="text-xs font-medium mb-1.5 block flex items-center gap-1">
+                        <Users className="h-3 w-3" />
+                        Número de Evaluadores
+                      </label>
+                      <Select
+                        value={filters.numEvaluadores || "all"}
+                        onValueChange={(value) => updateFilter("numEvaluadores", value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Todos" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos</SelectItem>
+                          <SelectItem value="multiple">Múltiples evaluadores</SelectItem>
+                          <SelectItem value="single">Un solo evaluador</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                 </div>
               </div>
             </PopoverContent>
@@ -381,6 +426,17 @@ export function NineBoxFilters({
                 <X
                   className="h-3 w-3 cursor-pointer"
                   onClick={() => updateFilter("retencion", undefined)}
+                />
+              </Badge>
+            )}
+
+            {filters.numEvaluadores && (
+              <Badge variant="secondary" className="gap-1">
+                <Users className="h-3 w-3" />
+                {filters.numEvaluadores === "multiple" ? "Múltiples evaluadores" : "Un solo evaluador"}
+                <X
+                  className="h-3 w-3 cursor-pointer"
+                  onClick={() => updateFilter("numEvaluadores", undefined)}
                 />
               </Badge>
             )}
