@@ -281,7 +281,7 @@ export const CompetenciasCardsPDF = ({
           const circleBgColor = esFortaleza ? '#22c55e' : esOportunidad ? '#f97316' : '#6b7280';
           const badgeBgColor = esFortaleza ? '#dcfce7' : esOportunidad ? '#ffedd5' : '#f3f4f6';
           const badgeTextColor = esFortaleza ? '#166534' : esOportunidad ? '#9a3412' : '#6b7280';
-          const badgeText = esFortaleza ? 'FORTALEZA' : esOportunidad ? 'OPORTUNIDAD' : '';
+          const badgeText = esFortaleza ? 'FORTALEZA' : esOportunidad ? 'OPORTUNIDAD' : null; // Usar null en lugar de '' para evitar problemas con React-PDF
           const barColor = esFortaleza ? '#22c55e' : esOportunidad ? '#f97316' : '#6b7280';
           
           const titulo = getDimensionFriendlyTitle(competencia.dimension);
@@ -321,7 +321,7 @@ export const CompetenciasCardsPDF = ({
                   </View>
                   
                   {/* Badge */}
-                  {badgeText && badgeText.trim() !== '' && (
+                  {badgeText && (
                     <View style={{
                       backgroundColor: badgeBgColor,
                       paddingHorizontal: 4,
@@ -330,7 +330,7 @@ export const CompetenciasCardsPDF = ({
                       flexShrink: 0,
                     }}>
                       <Text style={{ fontSize: 6.5, fontWeight: 'bold', color: badgeTextColor }}>
-                        {esFortaleza ? '✓ ' : esOportunidad ? '💡 ' : ''}{badgeText}
+                        {esFortaleza && '✓ '}{esOportunidad && '💡 '}{badgeText}
                       </Text>
                     </View>
                   )}
@@ -343,15 +343,17 @@ export const CompetenciasCardsPDF = ({
               </View>
 
               {/* Título */}
-              <Text style={{
-                fontSize: 7.5,
-                fontWeight: 'bold',
-                color: '#1f2937',
-                marginBottom: 3,
-                lineHeight: 1.2,
-              }}>
-                {titulo.toUpperCase()}
-              </Text>
+              {titulo && titulo.trim() !== '' && (
+                <Text style={{
+                  fontSize: 7.5,
+                  fontWeight: 'bold',
+                  color: '#1f2937',
+                  marginBottom: 3,
+                  lineHeight: 1.2,
+                }}>
+                  {titulo.toUpperCase()}
+                </Text>
+              )}
 
               {/* Descripción */}
               {descripcion && descripcion.trim() !== '' && (
