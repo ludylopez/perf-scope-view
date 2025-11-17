@@ -221,7 +221,8 @@ const EvaluacionEquipo = () => {
       // Agrupar por colaborador
       const infoMap: Record<string, MultipleEvaluatorsInfo> = {};
       
-      members.forEach((colaborador) => {
+      // Usar for...of para manejar await correctamente
+      for (const colaborador of members) {
         const asignaciones = allAssignments?.filter(a => a.colaborador_id === colaborador.dpi) || [];
         
         if (asignaciones.length > 0) {
@@ -234,19 +235,19 @@ const EvaluacionEquipo = () => {
             };
           });
 
-          // Verificar estados de evaluación
-          const evaluadoresConEstado = evaluadores.map(async (eval) => {
+          // Verificar estados de evaluación (cambiar 'eval' por 'evaluador' para evitar palabra reservada)
+          const evaluadoresConEstado = evaluadores.map(async (evaluador) => {
             const { data: evaluacion } = await supabase
               .from("evaluations")
               .select("estado")
               .eq("colaborador_id", colaborador.dpi)
-              .eq("evaluador_id", eval.evaluadorId)
+              .eq("evaluador_id", evaluador.evaluadorId)
               .eq("periodo_id", periodoIdParam)
               .eq("tipo", "jefe")
               .maybeSingle();
 
             return {
-              ...eval,
+              ...evaluador,
               estadoEvaluacion: evaluacion?.estado === "enviado" 
                 ? "enviado" 
                 : evaluacion?.estado === "borrador" 
@@ -263,7 +264,7 @@ const EvaluacionEquipo = () => {
             totalEvaluadores: evaluadoresCompletos.length,
           };
         }
-      });
+      }
 
       setMultipleEvaluatorsInfo(infoMap);
     } catch (error) {
