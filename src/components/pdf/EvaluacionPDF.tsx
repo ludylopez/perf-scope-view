@@ -5,7 +5,6 @@ import { CompetenciasCardsPDF } from './CompetenciasCardsPDF';
 import { PlanDesarrolloPDF } from './PlanDesarrolloPDF';
 import { FirmasPDF } from './FirmasPDF';
 import { pdfStyles } from './styles';
-import { format } from 'date-fns';
 
 interface EvaluacionPDFProps {
   empleado: {

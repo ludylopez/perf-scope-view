@@ -1,7 +1,5 @@
 import { View, Text } from '@react-pdf/renderer';
 import { pdfStyles } from './styles';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
 
 interface HeaderPDFProps {
   empleado: {
@@ -107,7 +105,13 @@ export const HeaderPDF = ({ empleado, periodo, fechaGeneracion, jefeCompleto }: 
           <View style={pdfStyles.infoRow}>
             <Text style={pdfStyles.infoLabel}>FECHA GENERACIÓN:</Text>
             <Text style={pdfStyles.infoValue}>
-              {fechaGeneracion ? format(fechaGeneracion, "d 'de' MMMM, yyyy 'a las' HH:mm", { locale: es }) : 'N/A'}
+              {fechaGeneracion ? new Date(fechaGeneracion).toLocaleDateString('es-ES', { 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+              }) : 'N/A'}
             </Text>
           </View>
         </View>

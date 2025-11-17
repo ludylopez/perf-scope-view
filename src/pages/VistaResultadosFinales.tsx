@@ -380,10 +380,7 @@ const VistaResultadosFinales = () => {
             </Button>
           )}
           {resultadoFinal && instrument && autoevaluacion && evaluacionJefe && (
-            <Button
-              variant="outline"
-              asChild
-            >
+            <Button variant="outline" asChild>
               <PDFDownloadLink
                 document={
                   <EvaluacionPDF
@@ -400,7 +397,7 @@ const VistaResultadosFinales = () => {
                       correo: user?.correo || "",
                       telefono: user?.telefono || "",
                       jefeNombre: user?.jefeInmediato || "N/A",
-                      directoraRRHHNombre: "Brenda Carolina López Pérez",
+                      directoraRRHHNombre: "Brenda Carolina Lopez Perez",
                     }}
                     periodo={activePeriod?.nombre || "N/A"}
                     fechaGeneracion={new Date()}
@@ -462,8 +459,8 @@ const VistaResultadosFinales = () => {
                     } : null}
                   />
                 }
-                fileName={`evaluacion_${user?.nombre}_${activePeriod?.nombre}_${new Date().toISOString().split('T')[0]}.pdf`}
-                style={{ textDecoration: 'none', color: 'inherit' }}
+                fileName={`evaluacion_${(user?.nombre || 'evaluacion').replace(/\s+/g, '_')}_${(activePeriod?.nombre || 'periodo').replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`}
+                style={{ textDecoration: 'none' }}
               >
                 <Download className="mr-2 h-4 w-4" />
                 Exportar PDF
