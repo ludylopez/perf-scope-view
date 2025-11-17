@@ -5,7 +5,7 @@ import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Grid3x3, Users, Info, BookOpen, Target, Download, List, AlertCircle } from "lucide-react";
+import { ArrowLeft, Grid3x3, Users, Info, BookOpen, Target, Download, List, AlertCircle, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { getActivePeriod, getEvaluationIdFromSupabase } from "@/lib/supabase";
@@ -20,6 +20,7 @@ import { QuadrantInfo } from "@/components/ninebox/QuadrantInfo";
 import { NineBoxFilters, FilterOptions } from "@/components/ninebox/NineBoxFilters";
 import { UrgentAlerts } from "@/components/ninebox/UrgentAlerts";
 import { AdvancedList } from "@/components/ninebox/AdvancedList";
+import { GlobalAnalytics } from "@/components/ninebox/GlobalAnalytics";
 import {
   NINE_BOX_METADATA,
   NineBoxPosition,
@@ -66,6 +67,8 @@ interface TeamMember9Box {
   posicion9Box: string;
   desempenoPorcentaje: number;
   potencialPorcentaje?: number;
+  jefe?: string; // Para vista RRHH
+  jefeNombre?: string; // Para vista RRHH
 }
 
 interface NineBoxData {
@@ -102,6 +105,10 @@ const Matriz9Box = () => {
     "bajo-bajo": [],
   });
 
+  // Detectar si el usuario es RRHH o Admin General
+  const isRRHH = user?.role === "admin_rrhh" || user?.role === "admin_general";
+  const isGlobalView = isRRHH;
+
   useEffect(() => {
     if (!user) {
       navigate("/login");
@@ -122,81 +129,157 @@ const Matriz9Box = () => {
       const periodoId = activePeriod.id;
       setActivePeriodName(activePeriod.nombre);
 
-      const { data: assignments, error: assignmentsError } = await supabase
-        .from("user_assignments")
-        .select(`
-          colaborador_id,
-          users!user_assignments_colaborador_id_fkey (
-            dpi,
-            nombre,
-            apellidos,
-            cargo,
-            nivel,
-            area
-          )
-        `)
-        .eq("jefe_id", user.dpi)
-        .eq("activo", true);
-
-      if (assignmentsError) throw assignmentsError;
-
       const members: TeamMember9Box[] = [];
 
-      for (const assignment of assignments || []) {
-        const colaborador = Array.isArray(assignment.users) ? assignment.users[0] : assignment.users;
-        if (!colaborador) continue;
+      // RRHH: Cargar TODOS los colaboradores evaluados de la municipalidad
+      if (isRRHH) {
+        // Obtener todos los resultados finales del período activo
+        const { data: finalResults, error: finalResultsError } = await supabase
+          .from("final_evaluation_results")
+          .select(`
+            colaborador_id,
+            desempeno_final,
+            potencial,
+            posicion_9box,
+            users!final_evaluation_results_colaborador_id_fkey (
+              dpi,
+              nombre,
+              apellidos,
+              cargo,
+              nivel,
+              area
+            )
+          `)
+          .eq("periodo_id", periodoId);
 
-        const colaboradorDpi = colaborador.dpi;
-        const jefeEvaluado = await hasJefeEvaluation(user.dpi, colaboradorDpi, periodoId);
+        if (finalResultsError) throw finalResultsError;
 
-        if (!jefeEvaluado) continue;
+        // Obtener información de jefes para cada colaborador
+        const { data: assignments, error: assignmentsError } = await supabase
+          .from("user_assignments")
+          .select(`
+            colaborador_id,
+            jefe_id,
+            jefe:users!user_assignments_jefe_id_fkey (
+              dpi,
+              nombre,
+              apellidos
+            )
+          `)
+          .eq("activo", true);
 
-        let resultadoFinal = await getFinalResultFromSupabase(colaboradorDpi, periodoId);
+        if (assignmentsError) throw assignmentsError;
 
-        if (!resultadoFinal) {
-          const evaluacionJefe = await getJefeEvaluationDraft(user.dpi, colaboradorDpi, periodoId);
-          const autoevaluacion = await getSubmittedEvaluation(colaboradorDpi, periodoId);
+        // Crear mapa de colaborador -> jefe
+        const jefeMap = new Map();
+        for (const assignment of assignments || []) {
+          const jefe = Array.isArray(assignment.jefe) ? assignment.jefe[0] : assignment.jefe;
+          if (jefe) {
+            jefeMap.set(assignment.colaborador_id, {
+              dpi: jefe.dpi,
+              nombre: `${jefe.nombre} ${jefe.apellidos}`
+            });
+          }
+        }
 
-          if (!evaluacionJefe || evaluacionJefe.estado !== "enviado" || !autoevaluacion) continue;
+        for (const result of finalResults || []) {
+          const colaborador = Array.isArray(result.users) ? result.users[0] : result.users;
+          if (!colaborador || !result.posicion_9box) continue;
 
-          const instrument = await getInstrumentForUser(colaborador.nivel);
-          if (!instrument) continue;
+          const jefeInfo = jefeMap.get(result.colaborador_id);
 
-          const autoevaluacionId = await getEvaluationIdFromSupabase(colaboradorDpi, periodoId, "auto");
-          const evaluacionJefeId = await getEvaluationIdFromSupabase(colaboradorDpi, periodoId, "jefe", user.dpi, colaboradorDpi);
-          const instrumentConfig = await getInstrumentConfigForUser(colaboradorDpi);
+          members.push({
+            dpi: colaborador.dpi,
+            nombre: `${colaborador.nombre} ${colaborador.apellidos}`,
+            cargo: colaborador.cargo,
+            area: colaborador.area,
+            nivel: colaborador.nivel,
+            desempenoFinal: result.desempeno_final,
+            potencial: result.potencial,
+            posicion9Box: result.posicion_9box,
+            desempenoPorcentaje: scoreToPercentage(result.desempeno_final),
+            potencialPorcentaje: result.potencial ? scoreToPercentage(result.potencial) : undefined,
+            jefe: jefeInfo?.dpi,
+            jefeNombre: jefeInfo?.nombre,
+          });
+        }
+      }
+      // JEFE: Cargar solo colaboradores asignados
+      else {
+        const { data: assignments, error: assignmentsError } = await supabase
+          .from("user_assignments")
+          .select(`
+            colaborador_id,
+            users!user_assignments_colaborador_id_fkey (
+              dpi,
+              nombre,
+              apellidos,
+              cargo,
+              nivel,
+              area
+            )
+          `)
+          .eq("jefe_id", user.dpi)
+          .eq("activo", true);
 
-          if (autoevaluacionId && evaluacionJefeId && instrumentConfig) {
-            try {
-              resultadoFinal = await calculateCompleteFinalScore(
-                autoevaluacion, evaluacionJefe, instrument.dimensionesDesempeno, instrument.dimensionesPotencial, true, autoevaluacionId, evaluacionJefeId, instrumentConfig
-              );
-            } catch (error) {
+        if (assignmentsError) throw assignmentsError;
+
+        for (const assignment of assignments || []) {
+          const colaborador = Array.isArray(assignment.users) ? assignment.users[0] : assignment.users;
+          if (!colaborador) continue;
+
+          const colaboradorDpi = colaborador.dpi;
+          const jefeEvaluado = await hasJefeEvaluation(user.dpi, colaboradorDpi, periodoId);
+
+          if (!jefeEvaluado) continue;
+
+          let resultadoFinal = await getFinalResultFromSupabase(colaboradorDpi, periodoId);
+
+          if (!resultadoFinal) {
+            const evaluacionJefe = await getJefeEvaluationDraft(user.dpi, colaboradorDpi, periodoId);
+            const autoevaluacion = await getSubmittedEvaluation(colaboradorDpi, periodoId);
+
+            if (!evaluacionJefe || evaluacionJefe.estado !== "enviado" || !autoevaluacion) continue;
+
+            const instrument = await getInstrumentForUser(colaborador.nivel);
+            if (!instrument) continue;
+
+            const autoevaluacionId = await getEvaluationIdFromSupabase(colaboradorDpi, periodoId, "auto");
+            const evaluacionJefeId = await getEvaluationIdFromSupabase(colaboradorDpi, periodoId, "jefe", user.dpi, colaboradorDpi);
+            const instrumentConfig = await getInstrumentConfigForUser(colaboradorDpi);
+
+            if (autoevaluacionId && evaluacionJefeId && instrumentConfig) {
+              try {
+                resultadoFinal = await calculateCompleteFinalScore(
+                  autoevaluacion, evaluacionJefe, instrument.dimensionesDesempeno, instrument.dimensionesPotencial, true, autoevaluacionId, evaluacionJefeId, instrumentConfig
+                );
+              } catch (error) {
+                resultadoFinal = await calculateCompleteFinalScore(
+                  autoevaluacion, evaluacionJefe, instrument.dimensionesDesempeno, instrument.dimensionesPotencial, false
+                );
+              }
+            } else {
               resultadoFinal = await calculateCompleteFinalScore(
                 autoevaluacion, evaluacionJefe, instrument.dimensionesDesempeno, instrument.dimensionesPotencial, false
               );
             }
-          } else {
-            resultadoFinal = await calculateCompleteFinalScore(
-              autoevaluacion, evaluacionJefe, instrument.dimensionesDesempeno, instrument.dimensionesPotencial, false
-            );
+
+            if (!resultadoFinal.posicion9Box) continue;
           }
 
-          if (!resultadoFinal.posicion9Box) continue;
+          members.push({
+            dpi: colaboradorDpi,
+            nombre: `${colaborador.nombre} ${colaborador.apellidos}`,
+            cargo: colaborador.cargo,
+            area: colaborador.area,
+            nivel: colaborador.nivel,
+            desempenoFinal: resultadoFinal.desempenoFinal,
+            potencial: resultadoFinal.potencial,
+            posicion9Box: resultadoFinal.posicion9Box || "medio-medio",
+            desempenoPorcentaje: scoreToPercentage(resultadoFinal.desempenoFinal),
+            potencialPorcentaje: resultadoFinal.potencial ? scoreToPercentage(resultadoFinal.potencial) : undefined,
+          });
         }
-
-        members.push({
-          dpi: colaboradorDpi,
-          nombre: `${colaborador.nombre} ${colaborador.apellidos}`,
-          cargo: colaborador.cargo,
-          area: colaborador.area,
-          nivel: colaborador.nivel,
-          desempenoFinal: resultadoFinal.desempenoFinal,
-          potencial: resultadoFinal.potencial,
-          posicion9Box: resultadoFinal.posicion9Box || "medio-medio",
-          desempenoPorcentaje: scoreToPercentage(resultadoFinal.desempenoFinal),
-          potencialPorcentaje: resultadoFinal.potencial ? scoreToPercentage(resultadoFinal.potencial) : undefined,
-        });
       }
 
       setTeamMembers(members);
@@ -231,7 +314,8 @@ const Matriz9Box = () => {
         const matchesSearch =
           member.nombre.toLowerCase().includes(searchLower) ||
           member.cargo.toLowerCase().includes(searchLower) ||
-          member.area.toLowerCase().includes(searchLower);
+          member.area.toLowerCase().includes(searchLower) ||
+          (member.jefeNombre && member.jefeNombre.toLowerCase().includes(searchLower));
         if (!matchesSearch) return false;
       }
 
@@ -246,6 +330,9 @@ const Matriz9Box = () => {
 
       // Filtro por cargo
       if (filters.cargo && member.cargo !== filters.cargo) return false;
+
+      // Filtro por jefe (RRHH)
+      if (filters.jefe && member.jefe !== filters.jefe) return false;
 
       // Filtro por importancia estratégica
       if (filters.importancia) {
@@ -284,6 +371,18 @@ const Matriz9Box = () => {
   const availableAreas = useMemo(() => [...new Set(teamMembers.map(m => m.area))].sort(), [teamMembers]);
   const availableNiveles = useMemo(() => [...new Set(teamMembers.map(m => m.nivel))].sort(), [teamMembers]);
   const availableCargos = useMemo(() => [...new Set(teamMembers.map(m => m.cargo))].sort(), [teamMembers]);
+  const availableJefes = useMemo(() => {
+    if (!isGlobalView) return [];
+    const jefesMap = new Map<string, string>();
+    teamMembers.forEach(m => {
+      if (m.jefe && m.jefeNombre) {
+        jefesMap.set(m.jefe, m.jefeNombre);
+      }
+    });
+    return Array.from(jefesMap.entries())
+      .map(([dpi, nombre]) => ({ dpi, nombre }))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre));
+  }, [teamMembers, isGlobalView]);
 
   const positions: Array<{ key: keyof NineBoxData; row: number; col: number }> = [
     { key: "bajo-alto", row: 0, col: 0 }, { key: "medio-alto", row: 0, col: 1 }, { key: "alto-alto", row: 0, col: 2 },
@@ -407,9 +506,17 @@ const Matriz9Box = () => {
           <div className="flex items-center gap-3 mb-2">
             <Grid3x3 className="h-8 w-8 text-primary" />
             <h1 className="text-3xl font-bold text-foreground">Matriz 9-Box de Talento</h1>
+            {isGlobalView && (
+              <Badge variant="default" className="bg-blue-600 text-white">
+                Vista Global - RRHH
+              </Badge>
+            )}
           </div>
           <p className="text-muted-foreground">
-            Análisis estratégico de talento basado en desempeño actual y potencial futuro
+            {isGlobalView
+              ? "Vista completa de toda la municipalidad - Análisis estratégico organizacional"
+              : "Análisis estratégico de talento basado en desempeño actual y potencial futuro"
+            }
           </p>
         </div>
 
@@ -438,15 +545,17 @@ const Matriz9Box = () => {
               availableAreas={availableAreas}
               availableNiveles={availableNiveles}
               availableCargos={availableCargos}
+              availableJefes={availableJefes}
               totalCount={totalEvaluados}
               filteredCount={filteredMembers.length}
+              isGlobalView={isGlobalView}
             />
 
             {/* Alertas Urgentes */}
             <UrgentAlerts teamMembers={filteredMembers} />
 
             <Tabs defaultValue="matriz" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className={`grid w-full ${isGlobalView ? "grid-cols-5" : "grid-cols-4"}`}>
                 <TabsTrigger value="matriz">
                   <Grid3x3 className="h-4 w-4 mr-2" />
                   Matriz Visual
@@ -455,6 +564,12 @@ const Matriz9Box = () => {
                   <List className="h-4 w-4 mr-2" />
                   Vista de Lista
                 </TabsTrigger>
+                {isGlobalView && (
+                  <TabsTrigger value="global">
+                    <BarChart3 className="h-4 w-4 mr-2" />
+                    Análisis Global
+                  </TabsTrigger>
+                )}
                 <TabsTrigger value="prioridades">
                   <Target className="h-4 w-4 mr-2" />
                   Prioridades
@@ -670,6 +785,13 @@ const Matriz9Box = () => {
               <TabsContent value="lista">
                 <AdvancedList members={filteredMembers} />
               </TabsContent>
+
+              {/* Tab: Análisis Global (Solo RRHH) */}
+              {isGlobalView && (
+                <TabsContent value="global">
+                  <GlobalAnalytics allMembers={teamMembers} />
+                </TabsContent>
+              )}
 
               {/* Tab: Prioridades Estratégicas */}
               <TabsContent value="prioridades" className="space-y-6">

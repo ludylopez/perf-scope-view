@@ -25,6 +25,7 @@ export interface FilterOptions {
   position?: string;
   importancia?: "critical" | "high" | "medium" | "low";
   retencion?: "urgent" | "high" | "medium" | "low";
+  jefe?: string; // Para vista RRHH
 }
 
 interface NineBoxFiltersProps {
@@ -33,8 +34,10 @@ interface NineBoxFiltersProps {
   availableAreas: string[];
   availableNiveles: string[];
   availableCargos: string[];
+  availableJefes?: { dpi: string; nombre: string }[]; // Para vista RRHH
   totalCount: number;
   filteredCount: number;
+  isGlobalView?: boolean; // Para mostrar filtros RRHH
 }
 
 const positionOptions = [
@@ -69,8 +72,10 @@ export function NineBoxFilters({
   availableAreas,
   availableNiveles,
   availableCargos,
+  availableJefes = [],
   totalCount,
   filteredCount,
+  isGlobalView = false,
 }: NineBoxFiltersProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
 
@@ -204,6 +209,28 @@ export function NineBoxFilters({
                 </div>
 
                 <div className="space-y-3">
+                  {isGlobalView && availableJefes.length > 0 && (
+                    <div>
+                      <label className="text-xs font-medium mb-1.5 block">Jefe Inmediato</label>
+                      <Select
+                        value={filters.jefe || "all"}
+                        onValueChange={(value) => updateFilter("jefe", value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Todos los jefes" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos los jefes</SelectItem>
+                          {availableJefes.map((jefe) => (
+                            <SelectItem key={jefe.dpi} value={jefe.dpi}>
+                              {jefe.nombre}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
                   <div>
                     <label className="text-xs font-medium mb-1.5 block">Cargo</label>
                     <Select
@@ -324,6 +351,16 @@ export function NineBoxFilters({
                 <X
                   className="h-3 w-3 cursor-pointer"
                   onClick={() => updateFilter("cargo", undefined)}
+                />
+              </Badge>
+            )}
+
+            {filters.jefe && (
+              <Badge variant="secondary" className="gap-1">
+                Jefe: {availableJefes.find(j => j.dpi === filters.jefe)?.nombre}
+                <X
+                  className="h-3 w-3 cursor-pointer"
+                  onClick={() => updateFilter("jefe", undefined)}
                 />
               </Badge>
             )}

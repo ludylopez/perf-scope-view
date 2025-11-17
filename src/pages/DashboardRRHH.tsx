@@ -37,6 +37,7 @@ interface DashboardStats {
   evaluacionesCompletadas: number;
   evaluacionesPendientes: number;
   evaluacionesEnProgreso: number;
+  reaperturas?: number; // Evaluaciones reaperturadas
   porcentajeCompletitud: number;
   promedioDesempeno: number;
   promedioPotencial: number;
@@ -514,6 +515,18 @@ const DashboardRRHH = () => {
               <p className="text-xs text-muted-foreground mt-1">Sin iniciar</p>
             </CardContent>
           </Card>
+
+          {stats.reaperturas !== undefined && stats.reaperturas > 0 && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium">Reaperturas</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold text-info">{stats.reaperturas}</p>
+                <p className="text-xs text-muted-foreground mt-1">Este período</p>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Promedios y Distribución */}
