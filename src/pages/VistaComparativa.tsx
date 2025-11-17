@@ -7,14 +7,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, BarChart3, TrendingUp, TrendingDown, Minus, Users2, User, Target, CheckCircle2, AlertCircle, FileText, MessageSquare, Shield, Briefcase, Award, Zap, Users, Heart, Building2 } from "lucide-react";
+import { ArrowLeft, BarChart3, TrendingUp, TrendingDown, Minus, Users2, User, Target, CheckCircle2, AlertCircle, FileText, MessageSquare, Shield, Briefcase, Award, Zap, Users, Heart, Building2, FileDown, Printer } from "lucide-react";
 import { toast } from "sonner";
+import { exportEvaluacionCompletaPDFReact } from "@/lib/exports";
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, Cell } from "recharts";
 import { getSubmittedEvaluation, getJefeEvaluationDraft, getMockColaboradorEvaluation } from "@/lib/storage";
 import { Instrument } from "@/types/evaluation";
 import { getInstrumentForUser } from "@/lib/instruments";
 import { getNineBoxDescription, calculateCompleteFinalScore } from "@/lib/finalScore";
-import { scoreToPercentage } from "@/lib/calculations";
+import { scoreToPercentage, calculateDimensionPercentage, calculateDimensionAverage } from "@/lib/calculations";
 import { perteneceACuadrilla, getGruposDelColaborador, getEquipoStats } from "@/lib/jerarquias";
 import { supabase } from "@/integrations/supabase/client";
 import { getActivePeriod, getEvaluationIdFromSupabase } from "@/lib/supabase";
@@ -38,6 +39,32 @@ const MOCK_COLABORADORES: Record<string, any> = {
   },
 };
 
+// Helper para obtener título amigable de dimensión
+const getDimensionFriendlyTitle = (dimension: any): string => {
+  const nombre = dimension.nombre.toLowerCase();
+  
+  // Casos específicos para S2
+  if (nombre.includes("servicio institucional") && nombre.includes("transparencia")) return "Servicio y Transparencia";
+  if (nombre.includes("liderazgo estratégico")) return "Liderazgo Estratégico";
+  if (nombre.includes("gestión") && nombre.includes("toma de decisiones")) return "Gestión y Decisiones";
+  if (nombre.includes("desarrollo") && nombre.includes("aprendizaje")) return "Desarrollo y Aprendizaje";
+  if (nombre.includes("visión institucional")) return "Visión Institucional";
+  
+  // Casos generales
+  if (nombre.includes("competencias laborales") && nombre.includes("técnica")) return "Competencias Laborales";
+  if (nombre.includes("comportamiento") && nombre.includes("organizacional")) return "Comportamiento Organizacional";
+  if (nombre.includes("relaciones interpersonales") || nombre.includes("trabajo en equipo")) return "Relaciones Interpersonales";
+  if (nombre.includes("orientación al servicio") || nombre.includes("atención al usuario")) return "Orientación al Servicio";
+  if (nombre.includes("calidad del trabajo") || nombre.includes("calidad")) return "Calidad";
+  if (nombre.includes("productividad") || nombre.includes("cumplimiento")) return "Productividad";
+  if (nombre.includes("liderazgo") || nombre.includes("dirección")) return "Liderazgo";
+  if (nombre.includes("ciudadan") || nombre.includes("servicio")) return "Servicio al Ciudadano";
+  if (nombre.includes("gestión") && nombre.includes("resultado")) return "Gestión de Resultados";
+  if (nombre.includes("transparencia") || nombre.includes("ética")) return "Ética y Transparencia";
+  
+  return dimension.nombre.length > 40 ? dimension.nombre.substring(0, 40) + "..." : dimension.nombre;
+};
+
 const VistaComparativa = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -58,6 +85,7 @@ const VistaComparativa = () => {
   const [mostrarGuiaFeedback, setMostrarGuiaFeedback] = useState(false);
   const [promedioGrupo, setPromedioGrupo] = useState<number | null>(null);
   const [periodoId, setPeriodoId] = useState<string>("");
+  const [periodoNombre, setPeriodoNombre] = useState<string>("");
   const [mostrarEditarPlan, setMostrarEditarPlan] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("resumen");
 
@@ -99,19 +127,23 @@ const VistaComparativa = () => {
         // Obtener período activo
         const activePeriod = await getActivePeriod();
         let currentPeriodoId = "2025-1";
+        let currentPeriodoNombre = "2025-1";
         if (activePeriod) {
           currentPeriodoId = activePeriod.id;
+          currentPeriodoNombre = activePeriod.nombre || activePeriod.id;
         } else {
           const { data: periodData } = await supabase
             .from("evaluation_periods")
-            .select("id")
+            .select("id, nombre")
             .eq("nombre", "2025-1")
             .single();
           if (periodData) {
             currentPeriodoId = periodData.id;
+            currentPeriodoNombre = periodData.nombre || periodData.id;
           }
         }
         setPeriodoId(currentPeriodoId);
+        setPeriodoNombre(currentPeriodoNombre);
 
         // Cargar colaborador desde Supabase
         const { data: colaboradorData, error: colaboradorError } = await supabase
@@ -450,6 +482,122 @@ const VistaComparativa = () => {
     };
   });
 
+  // Preparar datos para PDF del colaborador (usando resultado final ponderado)
+  const prepararDatosParaPDF = async () => {
+    // Usar evaluación del jefe como fuente principal (70% del resultado final)
+    const responsesToUse = evaluacionJefe.responses;
+    
+    // Preparar radarData con porcentajes finales (ponderado 70% jefe + 30% auto)
+    const radarDataPDF = instrument.dimensionesDesempeno.map((dim, idx) => {
+      const autoAvg = calculateDimensionAverage(autoevaluacion.responses, dim);
+      const jefeAvg = calculateDimensionAverage(evaluacionJefe.responses, dim);
+      // Calcular promedio ponderado: 70% jefe + 30% auto
+      const promedioPonderado = (jefeAvg * 0.7) + (autoAvg * 0.3);
+      const porcentajeFinal = scoreToPercentage(promedioPonderado);
+      
+      return {
+        dimension: getDimensionFriendlyTitle(dim),
+        nombreCompleto: dim.nombre,
+        numero: idx + 1,
+        tuEvaluacion: porcentajeFinal,
+        puntaje: promedioPonderado,
+        dimensionData: dim
+      };
+    });
+
+    // Calcular promedio municipal por dimensión (mismo nivel)
+    let promedioMunicipal: Record<string, number> = {};
+    try {
+      const { data: usuariosMismoNivel } = await supabase
+        .from('users')
+        .select('dpi')
+        .eq('nivel', colaborador.nivel)
+        .eq('estado', 'activo')
+        .in('rol', ['colaborador', 'jefe']);
+
+      const dpisMismoNivel = usuariosMismoNivel?.map(u => u.dpi) || [];
+      
+      if (dpisMismoNivel.length > 0) {
+        const { data: finalResults } = await supabase
+          .from('final_evaluation_results')
+          .select('colaborador_id, resultado_final, autoevaluacion_id, evaluacion_jefe_id')
+          .eq('periodo_id', periodoId)
+          .in('colaborador_id', dpisMismoNivel);
+
+        if (finalResults && finalResults.length > 0) {
+          const autoevaluacionIds = finalResults.map(r => r.autoevaluacion_id).filter(id => id);
+          const jefeEvaluacionIds = finalResults.map(r => r.evaluacion_jefe_id).filter(id => id);
+          
+          const { data: autoEvals } = await supabase
+            .from('evaluations')
+            .select('id, responses')
+            .in('id', autoevaluacionIds)
+            .eq('tipo', 'auto');
+
+          const { data: jefeEvals } = await supabase
+            .from('evaluations')
+            .select('id, responses')
+            .in('id', jefeEvaluacionIds)
+            .eq('tipo', 'jefe');
+
+          // Calcular promedio por dimensión
+          instrument.dimensionesDesempeno.forEach((dim) => {
+            const promedios: number[] = [];
+            
+            finalResults.forEach((result) => {
+              const autoEval = autoEvals?.find(e => e.id === result.autoevaluacion_id);
+              const jefeEval = jefeEvals?.find(e => e.id === result.evaluacion_jefe_id);
+              
+              if (autoEval && jefeEval) {
+                const autoAvg = calculateDimensionAverage(autoEval.responses, dim);
+                const jefeAvg = calculateDimensionAverage(jefeEval.responses, dim);
+                const promedioPonderado = (jefeAvg * 0.7) + (autoAvg * 0.3);
+                promedios.push(promedioPonderado);
+              }
+            });
+            
+            if (promedios.length > 0) {
+              const promedio = promedios.reduce((sum, val) => sum + val, 0) / promedios.length;
+              promedioMunicipal[dim.id] = scoreToPercentage(promedio);
+            }
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Error calculando promedio municipal:", error);
+    }
+
+    // Identificar fortalezas y áreas de oportunidad
+    const sortedDimensions = [...radarDataPDF].sort((a, b) => b.tuEvaluacion - a.tuEvaluacion);
+    const fortalezas = sortedDimensions.slice(0, 3).map(f => ({
+      dimension: f.dimension,
+      nombreCompleto: f.nombreCompleto,
+      tuEvaluacion: f.tuEvaluacion,
+      promedioMunicipal: promedioMunicipal[f.dimensionData.id] || 0
+    }));
+    
+    const areasOportunidad = sortedDimensions.slice(-3).reverse().map(a => ({
+      dimension: a.dimension,
+      nombreCompleto: a.nombreCompleto,
+      tuEvaluacion: a.tuEvaluacion,
+      promedioMunicipal: promedioMunicipal[a.dimensionData.id] || 0
+    }));
+
+    return {
+      radarDataPDF: radarDataPDF.map(d => ({
+        dimension: d.dimension,
+        tuEvaluacion: d.tuEvaluacion,
+        promedioMunicipal: promedioMunicipal[d.dimensionData.id] || 0,
+        dimensionId: d.dimensionData?.id,
+        descripcion: d.dimensionData?.descripcion
+      })),
+      fortalezas,
+      areasOportunidad,
+      performancePercentage: scoreToPercentage(resultadoFinal.desempenoFinal),
+      jefeCompleto: true // Siempre completo en vista del jefe
+    };
+  };
+
   const barData = comparativo.map((item) => ({
     dimension: item.nombre.substring(0, 15),
     autoevaluacion: scoreToPercentage(item.autoevaluacion),
@@ -482,6 +630,56 @@ const VistaComparativa = () => {
             <p className="text-muted-foreground mt-2">
               Comparación entre autoevaluación y evaluación del jefe
             </p>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="default"
+              size="lg"
+              onClick={async () => {
+                try {
+                  toast.info("Preparando reporte PDF para impresión...");
+                  const datosPDF = await prepararDatosParaPDF();
+                  
+                  await exportEvaluacionCompletaPDFReact(
+                    {
+                      nombre: colaborador.nombre,
+                      apellidos: colaborador.apellidos,
+                      dpi: colaborador.dpi,
+                      cargo: colaborador.cargo,
+                      area: colaborador.area,
+                      nivel: colaborador.nivel,
+                      direccionUnidad: colaborador.direccionUnidad,
+                      departamentoDependencia: colaborador.departamentoDependencia,
+                      profesion: colaborador.profesion,
+                      correo: colaborador.correo,
+                      telefono: colaborador.telefono
+                    },
+                    periodoNombre || periodoId || "N/A",
+                    new Date(),
+                    {
+                      performancePercentage: datosPDF.performancePercentage,
+                      jefeCompleto: datosPDF.jefeCompleto,
+                      fortalezas: datosPDF.fortalezas,
+                      areasOportunidad: datosPDF.areasOportunidad,
+                      radarData: datosPDF.radarDataPDF
+                    },
+                    planDesarrollo ? {
+                      planEstructurado: planDesarrollo.planEstructurado,
+                      recomendaciones: planDesarrollo.recomendaciones || []
+                    } : null
+                  );
+                  
+                  toast.success("PDF generado. Listo para imprimir y firmar.");
+                } catch (error) {
+                  console.error("Error al generar PDF:", error);
+                  toast.error("Error al generar el PDF del reporte");
+                }
+              }}
+              className="gap-2 bg-primary hover:bg-primary/90"
+            >
+              <Printer className="h-4 w-4" />
+              Imprimir Reporte PDF
+            </Button>
           </div>
         </div>
 

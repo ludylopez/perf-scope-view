@@ -8,10 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
-import { 
-  ClipboardCheck, 
-  Users, 
-  BarChart3, 
+import {
+  ClipboardCheck,
+  Users,
+  BarChart3,
   Settings,
   AlertCircle,
   CheckCircle2,
@@ -19,7 +19,8 @@ import {
   FileText,
   PlayCircle,
   Sparkles,
-  Database
+  Database,
+  Grid3x3
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { getEvaluationDraft, hasSubmittedEvaluation, submitEvaluation, EvaluationDraft, getSubmittedEvaluation, hasJefeEvaluation, getJefeEvaluationDraft } from "@/lib/storage";
@@ -1307,9 +1308,16 @@ const Dashboard = () => {
                     </div>
                   </div>
                   
-                  <Button className="w-full" size="lg" onClick={() => navigate("/evaluacion-equipo")}>
-                    Evaluar Mi Equipo
-                  </Button>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <Button className="w-full" size="lg" onClick={() => navigate("/evaluacion-equipo")}>
+                      <Users className="mr-2 h-4 w-4" />
+                      Evaluar Mi Equipo
+                    </Button>
+                    <Button className="w-full" size="lg" variant="outline" onClick={() => navigate("/matriz-9box")}>
+                      <Grid3x3 className="mr-2 h-4 w-4" />
+                      Matriz 9-Box
+                    </Button>
+                  </div>
               </CardContent>
             </Card>
             )}
@@ -1434,40 +1442,48 @@ const Dashboard = () => {
               </CardHeader>
               <CardContent>
                 <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
+                    className="justify-start"
+                    onClick={() => navigate("/matriz-9box")}
+                  >
+                    <Grid3x3 className="mr-2 h-4 w-4" />
+                    Matriz 9-Box
+                  </Button>
+                  <Button
+                    variant="outline"
                     className="justify-start"
                     onClick={() => navigate("/admin/grupos")}
                   >
                     <Users className="mr-2 h-4 w-4" />
                     Grupos/Cuadrillas
                   </Button>
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     className="justify-start"
                     onClick={() => navigate("/admin/asignaciones")}
                   >
                     <Settings className="mr-2 h-4 w-4" />
                     Asignaciones
                   </Button>
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     className="justify-start"
                     onClick={() => navigate("/admin/dashboard")}
                   >
                     <BarChart3 className="mr-2 h-4 w-4" />
                     Monitoreo
                   </Button>
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     className="justify-start"
                     onClick={() => navigate("/admin/supabase-utils")}
                   >
                     <Database className="mr-2 h-4 w-4" />
                     Estado Base de Datos
                   </Button>
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     className="justify-start"
                     onClick={() => navigate("/admin/configuracion")}
                   >
@@ -1546,8 +1562,22 @@ const Dashboard = () => {
               </CardHeader>
               <CardContent>
                 <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
+                    className="justify-start h-auto py-4"
+                    onClick={() => navigate("/matriz-9box")}
+                  >
+                    <div className="flex flex-col items-start">
+                      <div className="flex items-center gap-2">
+                        <Grid3x3 className="h-4 w-4" />
+                        <span className="font-medium">Matriz 9-Box</span>
+                      </div>
+                      <span className="text-xs text-muted-foreground">Análisis de talento</span>
+                    </div>
+                  </Button>
+
+                  <Button
+                    variant="outline"
                     className="justify-start h-auto py-4"
                     onClick={() => navigate("/admin/periodos")}
                   >
@@ -1559,9 +1589,9 @@ const Dashboard = () => {
                       <span className="text-xs text-muted-foreground">Crear y gestionar periodos</span>
                     </div>
                   </Button>
-                  
-                  <Button 
-                    variant="outline" 
+
+                  <Button
+                    variant="outline"
                     className="justify-start h-auto py-4"
                     onClick={() => navigate("/admin/instrumentos")}
                   >
@@ -1573,9 +1603,9 @@ const Dashboard = () => {
                       <span className="text-xs text-muted-foreground">Editar evaluaciones</span>
                     </div>
                   </Button>
-                  
-                  <Button 
-                    variant="outline" 
+
+                  <Button
+                    variant="outline"
                     className="justify-start h-auto py-4"
                     onClick={() => navigate("/admin/usuarios")}
                   >
@@ -1587,9 +1617,9 @@ const Dashboard = () => {
                       <span className="text-xs text-muted-foreground">Gestión completa</span>
                     </div>
                   </Button>
-                  
-                  <Button 
-                    variant="outline" 
+
+                  <Button
+                    variant="outline"
                     className="justify-start h-auto py-4"
                     onClick={() => navigate("/admin/dashboard")}
                   >
