@@ -1445,6 +1445,14 @@ const Dashboard = () => {
                   <Button
                     variant="outline"
                     className="justify-start"
+                    onClick={() => navigate("/admin/personal")}
+                  >
+                    <Users className="mr-2 h-4 w-4" />
+                    Análisis de Personal
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="justify-start"
                     onClick={() => navigate("/matriz-9box")}
                   >
                     <Grid3x3 className="mr-2 h-4 w-4" />

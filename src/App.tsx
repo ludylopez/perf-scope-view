@@ -31,6 +31,7 @@ import DashboardConsolidado from "./pages/DashboardConsolidado";
 import NotFound from "./pages/NotFound";
 import ConfiguracionSistema from "./pages/ConfiguracionSistema";
 import PopulateExplanations from "./pages/PopulateExplanations";
+import DashboardPersonal from "./pages/DashboardPersonal";
 
 const queryClient = new QueryClient();
 
@@ -252,6 +253,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <DashboardConsolidado />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/personal"
+              element={
+                <ProtectedRoute>
+                  <DashboardPersonal />
                 </ProtectedRoute>
               }
             />
