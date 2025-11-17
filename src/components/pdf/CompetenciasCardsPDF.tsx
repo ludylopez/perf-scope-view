@@ -358,7 +358,8 @@ const ExplanationBox = ({ competencia, nivel, barColor }: {
       padding: 5,
       borderRadius: 3,
       marginBottom: 4,
-      borderLeft: `2px solid ${barColor}`,
+      borderLeftWidth: 2,
+      borderLeftColor: barColor || '#6b7280',
     }}>
       <Text style={{
         fontSize: 6,
@@ -430,11 +431,13 @@ export const CompetenciasCardsPDF = ({
               style={{
                 width: '48%',
                 backgroundColor: cardBgColor,
-                border: `1.5px solid ${cardBorderColor}`,
+                borderWidth: 1.5,
+                borderColor: cardBorderColor || '#e5e7eb',
                 borderRadius: 6,
                 padding: 8,
                 marginBottom: 6,
-                borderLeft: `4px solid ${cardBorderColor}`,
+                borderLeftWidth: 4,
+                borderLeftColor: cardBorderColor || '#e5e7eb',
               }}
             >
               {/* Header con número y badge */}

@@ -1673,6 +1673,57 @@ export const exportEvaluacionCompletaPDFReact = async (
     const { EvaluacionPDF } = await import("@/components/pdf/EvaluacionPDF");
     const { pdf, Document } = await import("@react-pdf/renderer");
     
+    // DIAGNÓSTICO: Intentar generar PDF por partes para identificar el problema
+    console.log('🔍 [PDF DEBUG] Intentando generar PDF en modo diagnóstico...');
+    
+    try {
+      // Intentar con un PDF minimalista primero
+      const { Page, View, Text } = await import("@react-pdf/renderer");
+      
+      console.log('🧪 [PDF DEBUG] Paso 1: Probando PDF minimalista...');
+      const testBlob = await pdf(
+        React.createElement(Document, {},
+          React.createElement(Page, { size: "A4" },
+            React.createElement(View, { style: { padding: 20 } },
+              React.createElement(Text, {}, "Test PDF")
+            )
+          )
+        )
+      ).toBlob();
+      
+      console.log('✅ [PDF DEBUG] PDF minimalista funciona. El problema está en los componentes...');
+      
+      // Si llegamos aquí, el problema está en algún componente
+      // Intentar sin el planDesarrollo primero
+      console.log('🧪 [PDF DEBUG] Paso 2: Probando sin plan de desarrollo...');
+      const blobSinPlan = await pdf(
+        React.createElement(Document, {},
+          React.createElement(EvaluacionPDF, {
+            empleado: {
+              ...empleado,
+              jefeNombre: nombreJefe,
+              directoraRRHHNombre: nombreDirectoraRRHH,
+            },
+            periodo,
+            fechaGeneracion,
+            resultadoData: resultadoDataWithExplanations,
+            planDesarrollo: null, // Probar sin plan
+          })
+        )
+      ).toBlob();
+      
+      console.log('✅ [PDF DEBUG] PDF sin plan funciona. El problema está en planDesarrollo.');
+      // Si llegamos aquí, usar el PDF sin plan
+      return blobSinPlan;
+      
+    } catch (testError) {
+      console.error('❌ [PDF DEBUG] Error en diagnóstico:', testError);
+      
+      // El problema está en los datos base, no en el plan
+      // Generar PDF sin nada adicional
+      throw testError;
+    }
+    
     // Generar PDF usando React.createElement para evitar problemas con JSX en archivo .ts
     const blob = await pdf(
       React.createElement(Document, {},

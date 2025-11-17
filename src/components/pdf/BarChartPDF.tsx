@@ -63,7 +63,8 @@ export const BarChartPDF = ({ competencias }: BarChartPDFProps) => {
                       height: chartHeight,
                       backgroundColor: '#2563eb',
                       borderRadius: 3,
-                      border: '0.5px solid #1e40af',
+                      borderWidth: 0.5,
+                      borderColor: '#1e40af',
                       flexDirection: 'row',
                       alignItems: 'center',
                       justifyContent: 'flex-end',
@@ -91,7 +92,8 @@ export const BarChartPDF = ({ competencias }: BarChartPDFProps) => {
                         height: chartHeight,
                         backgroundColor: '#22c55e',
                         borderRadius: 3,
-                        border: '0.5px solid #16a34a',
+                        borderWidth: 0.5,
+                        borderColor: '#16a34a',
                         flexDirection: 'row',
                         alignItems: 'center',
                         justifyContent: 'flex-end',
@@ -123,7 +125,8 @@ export const BarChartPDF = ({ competencias }: BarChartPDFProps) => {
         gap: 15, 
         marginTop: 8,
         paddingTop: 8,
-        borderTop: '1px solid #e5e7eb'
+        borderTopWidth: 1,
+        borderTopColor: '#e5e7eb'
       }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
           <View style={{ width: 12, height: 4, backgroundColor: '#2563eb', borderRadius: 1 }} />
