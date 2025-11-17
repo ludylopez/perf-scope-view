@@ -492,7 +492,7 @@ export const INSTRUMENT_O1: Instrument = {
       items: [
         { id: "d4_i1_o1", texto: "Cumple las reglas de la municipalidad y se presenta bien con su uniforme", orden: 13 },
         { id: "d4_i2_o1", texto: "Tiene buena actitud para hacer su trabajo", orden: 14 },
-        { id: "d4_i3_o1", texto: "Hace caso a las instrucciones de su jefe con respeto", orden: 15 },
+        { id: "d4_i3_o1", texto: "¿Sigue las instrucciones de su jefe con respeto?", orden: 15 },
         { id: "d4_i4_o1", texto: "Es honesto y actúa correctamente en su trabajo", orden: 16 },
       ],
     },
