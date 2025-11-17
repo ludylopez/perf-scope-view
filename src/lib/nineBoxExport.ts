@@ -325,8 +325,8 @@ export function exportNineBoxToExcel(
       member.area,
       member.nivel,
       metadata?.shortName || member.posicion9Box,
-      member.desempenoPorcentaje,
-      member.potencialPorcentaje || "N/A",
+      member.desempenoPorcentaje.toString(),
+      member.potencialPorcentaje?.toString() || "N/A",
       metadata?.strategicImportance === "critical" ? "Crítica" :
       metadata?.strategicImportance === "high" ? "Alta" :
       metadata?.strategicImportance === "medium" ? "Media" : "Baja",
@@ -357,8 +357,8 @@ export function exportNineBoxToExcel(
         member.cargo,
         member.area,
         member.nivel,
-        member.desempenoPorcentaje,
-        member.potencialPorcentaje || "N/A"
+        member.desempenoPorcentaje.toString(),
+        member.potencialPorcentaje?.toString() || "N/A"
       ]);
     });
 

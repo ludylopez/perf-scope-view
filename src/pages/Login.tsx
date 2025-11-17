@@ -6,8 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, ShieldCheck } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import logoMunicipalidad from "@/assets/logo-municipalidad.png";
 
 const Login = () => {
   const [dpi, setDpi] = useState("");
@@ -37,8 +38,12 @@ const Login = () => {
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-secondary/20 to-background p-4">
       <Card className="w-full max-w-md shadow-lg">
         <CardHeader className="space-y-3 text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-primary">
-            <ShieldCheck className="h-8 w-8 text-primary-foreground" />
+          <div className="mx-auto flex h-20 w-20 items-center justify-center">
+            <img 
+              src={logoMunicipalidad} 
+              alt="Logo Municipalidad de Esquipulas" 
+              className="h-full w-full object-contain"
+            />
           </div>
           <CardTitle className="text-2xl font-bold">
             Sistema de Evaluación 180°

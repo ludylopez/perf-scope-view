@@ -72,6 +72,7 @@ interface TeamMember9Box {
 }
 
 interface NineBoxData {
+  [key: string]: TeamMember9Box[];
   "alto-alto": TeamMember9Box[];
   "alto-medio": TeamMember9Box[];
   "alto-bajo": TeamMember9Box[];
@@ -166,11 +167,7 @@ const Matriz9Box = () => {
         // Si no hay resultados, mostrar mensaje informativo
         if (!finalResults || finalResults.length === 0) {
           console.warn("⚠️ No se encontraron resultados finales para el período:", periodoId);
-          toast({
-            title: "Sin datos para mostrar",
-            description: `No se encontraron evaluaciones completadas para el período "${activePeriod.nombre}". Asegúrate de que las evaluaciones hayan sido enviadas por los jefes y colaboradores.`,
-            variant: "default",
-          });
+          toast.info(`No se encontraron evaluaciones completadas para el período "${activePeriod.nombre}". Asegúrate de que las evaluaciones hayan sido enviadas por los jefes y colaboradores.`);
           setTeamMembers([]);
           setNineBoxData({
             "alto-alto": [], "alto-medio": [], "alto-bajo": [],
@@ -681,7 +678,7 @@ const Matriz9Box = () => {
                       <div className="grid grid-cols-3 gap-3">
                         {positions.map((pos) => {
                           const members = filteredNineBoxData[pos.key];
-                          const metadata = getQuadrantMetadata(pos.key);
+                          const metadata = getQuadrantMetadata(pos.key as string);
 
                           return (
                             <Dialog key={pos.key}>
@@ -746,7 +743,7 @@ const Matriz9Box = () => {
                                   </DialogDescription>
                                 </DialogHeader>
 
-                                <QuadrantInfo position={pos.key} showActions={true} />
+                                <QuadrantInfo position={pos.key as string} showActions={true} />
 
                                 {members.length > 0 && (
                                   <div className="mt-6">

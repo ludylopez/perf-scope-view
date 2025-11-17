@@ -43,12 +43,14 @@ export async function executeDimensionExplanationsMigration(): Promise<void> {
           // Intentar método alternativo usando función directa
           console.warn("⚠️ RPC no disponible, intentando método alternativo...");
           // Ejecutar directamente usando fetch a la API de Supabase
-          const response = await fetch(`${supabase.supabaseUrl}/rest/v1/rpc/exec_sql`, {
+          const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+          const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+          const response = await fetch(`${supabaseUrl}/rest/v1/rpc/exec_sql`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'apikey': supabase.supabaseKey || '',
-              'Authorization': `Bearer ${supabase.supabaseKey || ''}`
+              'apikey': supabaseKey || '',
+              'Authorization': `Bearer ${supabaseKey || ''}`
             },
             body: JSON.stringify({ sql: query.trim() + ';' })
           });

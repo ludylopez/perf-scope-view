@@ -310,7 +310,6 @@ export const pdfStyles = StyleSheet.create({
   tableCell: {
     fontSize: 6.5,
     padding: 3,
-    verticalAlign: 'top',
   },
   tableCellNumber: {
     width: '5%',
