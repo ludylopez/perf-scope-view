@@ -640,57 +640,6 @@ const Dashboard = () => {
     }
   };
 
-  const fillSampleData = async () => {
-    if (!user || !activePeriodId) return;
-
-    const instrument = await getInstrumentForUser(user.nivel, undefined, user.cargo);
-    if (!instrument) {
-      toast({ title: "Error", description: "No se encontró instrumento para su nivel", variant: "destructive" });
-      return;
-    }
-    const allItems = instrument.dimensionesDesempeno.flatMap(d => d.items);
-    
-    // Create varied responses (mix of 3, 4, and 5 for realistic data)
-    const responses: Record<string, number> = {};
-    allItems.forEach((item, idx) => {
-      // Create a pattern: mostly 4s and 5s, some 3s
-      const value = idx % 5 === 0 ? 3 : idx % 3 === 0 ? 5 : 4;
-      responses[item.id] = value;
-    });
-
-    // Add sample comments for each dimension
-    const comments: Record<string, string> = {
-      "dim-1": "He cumplido con todos los objetivos propuestos para el periodo, incluyendo la implementación de nuevos procesos de gestión que han mejorado la eficiencia del área en un 15%. Ejemplo: Proyecto de modernización administrativa completado antes del plazo.",
-      "dim-2": "La calidad de mi trabajo se ha mantenido consistentemente alta, cumpliendo con todos los estándares normativos. He implementado controles adicionales que han reducido errores en un 20%.",
-      "dim-3": "He desarrollado nuevas competencias técnicas mediante capacitaciones en gestión pública moderna. Las competencias conductuales se reflejan en el liderazgo positivo del equipo y la mejora del clima laboral.",
-      "dim-4": "Mi conducta ética ha sido intachable, siempre actuando con transparencia y responsabilidad. He participado activamente en iniciativas de gobierno abierto y rendición de cuentas.",
-      "dim-5": "Como líder del equipo directivo, he fomentado la colaboración interdepartamental y he coordinado exitosamente proyectos transversales. El equipo ha mostrado mejora en indicadores de satisfacción.",
-      "dim-6": "He priorizado la atención ciudadana, implementando canales de comunicación más efectivos y reduciendo tiempos de respuesta en un 30%. La satisfacción ciudadana ha aumentado según encuestas."
-    };
-
-    const draft: EvaluationDraft = {
-      usuarioId: user.dpi,
-      periodoId: activePeriodId, // Usar período activo real
-      tipo: "auto",
-      responses,
-      comments,
-      estado: "enviado",
-      progreso: 100,
-      fechaUltimaModificacion: new Date().toISOString(),
-      fechaEnvio: new Date().toISOString()
-    };
-
-    submitEvaluation(draft);
-    
-    toast({
-      title: "✓ Datos de ejemplo cargados",
-      description: "Se ha completado una autoevaluación de ejemplo. Redirigiendo...",
-    });
-
-    setTimeout(() => {
-      navigate("/mi-autoevaluacion");
-    }, 1500);
-  };
 
   const getActionButton = () => {
     switch (evaluationStatus) {
@@ -717,24 +666,13 @@ const Dashboard = () => {
         );
       default:
         return (
-          <div className="space-y-2">
-            <Button 
-              className="w-full" 
-              size="lg"
-              onClick={() => navigate("/autoevaluacion")}
-            >
-              Comenzar Autoevaluación
-            </Button>
-            <Button 
-              className="w-full" 
-              size="sm"
-              variant="outline"
-              onClick={fillSampleData}
-            >
-              <Sparkles className="mr-2 h-4 w-4" />
-              Llenar datos de ejemplo
-            </Button>
-          </div>
+          <Button 
+            className="w-full" 
+            size="lg"
+            onClick={() => navigate("/autoevaluacion")}
+          >
+            Comenzar Autoevaluación
+          </Button>
         );
     }
   };
