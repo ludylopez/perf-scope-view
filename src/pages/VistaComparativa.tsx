@@ -15,7 +15,7 @@ import { getSubmittedEvaluation, getJefeEvaluationDraft, getMockColaboradorEvalu
 import { Instrument } from "@/types/evaluation";
 import { getInstrumentForUser } from "@/lib/instruments";
 import { getNineBoxDescription, calculateCompleteFinalScore } from "@/lib/finalScore";
-import { scoreToPercentage, calculateDimensionPercentage, calculateDimensionAverage } from "@/lib/calculations";
+import { scoreToPercentage, calculateDimensionPercentage, calculateDimensionAverage, calculatePerformanceScore } from "@/lib/calculations";
 import { perteneceACuadrilla, getGruposDelColaborador, getEquipoStats } from "@/lib/jerarquias";
 import { supabase } from "@/integrations/supabase/client";
 import { getActivePeriod, getEvaluationIdFromSupabase } from "@/lib/supabase";
@@ -482,25 +482,67 @@ const VistaComparativa = () => {
     };
   });
 
-  // Preparar datos para PDF del colaborador (usando resultado final ponderado)
-  const prepararDatosParaPDF = async () => {
-    // Usar evaluación del jefe como fuente principal (70% del resultado final)
-    const responsesToUse = evaluacionJefe.responses;
+  // Helper para calcular respuestas consolidadas (70% jefe + 30% auto) - IGUAL QUE DASHBOARD
+  const calculateConsolidatedResponses = (
+    autoResponses: Record<string, number>,
+    jefeResponses: Record<string, number>
+  ): Record<string, number> => {
+    const consolidated: Record<string, number> = {};
     
-    // Preparar radarData con porcentajes finales (ponderado 70% jefe + 30% auto)
+    const allItemIds = new Set([
+      ...Object.keys(autoResponses),
+      ...Object.keys(jefeResponses)
+    ]);
+    
+    allItemIds.forEach((itemId) => {
+      const autoValue = autoResponses[itemId] || 0;
+      const jefeValue = jefeResponses[itemId] || 0;
+      
+      if (autoResponses[itemId] !== undefined && jefeResponses[itemId] !== undefined) {
+        consolidated[itemId] = Math.round((jefeValue * 0.7 + autoValue * 0.3) * 100) / 100;
+      } else if (autoResponses[itemId] !== undefined) {
+        consolidated[itemId] = autoValue;
+      } else if (jefeResponses[itemId] !== undefined) {
+        consolidated[itemId] = jefeValue;
+      }
+    });
+    
+    return consolidated;
+  };
+
+  // Preparar datos para PDF del colaborador (usando EXACTAMENTE el mismo método que Dashboard)
+  const prepararDatosParaPDF = async () => {
+    // Consolidar respuestas a nivel de ítem (igual que Dashboard)
+    const responsesToUse = calculateConsolidatedResponses(
+      autoevaluacion.responses,
+      evaluacionJefe.responses
+    );
+    
+    // Calcular performance score y percentage (igual que Dashboard)
+    const performanceScore = calculatePerformanceScore(responsesToUse, instrument.dimensionesDesempeno);
+    const performancePercentage = scoreToPercentage(performanceScore);
+    
+    // Preparar radarData usando las respuestas consolidadas (igual que Dashboard)
+    const titulosGenerados: string[] = [];
     const radarDataPDF = instrument.dimensionesDesempeno.map((dim, idx) => {
-      const autoAvg = calculateDimensionAverage(autoevaluacion.responses, dim);
-      const jefeAvg = calculateDimensionAverage(evaluacionJefe.responses, dim);
-      // Calcular promedio ponderado: 70% jefe + 30% auto
-      const promedioPonderado = (jefeAvg * 0.7) + (autoAvg * 0.3);
-      const porcentajeFinal = scoreToPercentage(promedioPonderado);
+      const promedio = calculateDimensionAverage(responsesToUse, dim);
+      const porcentaje = calculateDimensionPercentage(responsesToUse, dim);
+      
+      // Generar título único para evitar duplicados
+      let dimensionTitle = getDimensionFriendlyTitle(dim);
+      if (titulosGenerados.includes(dimensionTitle)) {
+        dimensionTitle = dim.nombre.length <= 30 
+          ? dim.nombre 
+          : `${dimensionTitle} (${idx + 1})`;
+      }
+      titulosGenerados.push(dimensionTitle);
       
       return {
-        dimension: getDimensionFriendlyTitle(dim),
+        dimension: dimensionTitle,
         nombreCompleto: dim.nombre,
         numero: idx + 1,
-        tuEvaluacion: porcentajeFinal,
-        puntaje: promedioPonderado,
+        tuEvaluacion: porcentaje,
+        puntaje: promedio,
         dimensionData: dim
       };
     });
@@ -540,26 +582,26 @@ const VistaComparativa = () => {
             .in('id', jefeEvaluacionIds)
             .eq('tipo', 'jefe');
 
-          // Calcular promedio por dimensión
+          // Calcular promedio por dimensión usando respuestas consolidadas (EXACTAMENTE igual que Dashboard)
+          const autoEvalMap = new Map((autoEvals || []).map(e => [e.id, (e.responses as Record<string, number>) || {}]));
+          const jefeEvalMap = new Map((jefeEvals || []).map(e => [e.id, (e.responses as Record<string, number>) || {}]));
+
           instrument.dimensionesDesempeno.forEach((dim) => {
-            const promedios: number[] = [];
-            
-            finalResults.forEach((result) => {
-              const autoEval = autoEvals?.find(e => e.id === result.autoevaluacion_id);
-              const jefeEval = jefeEvals?.find(e => e.id === result.evaluacion_jefe_id);
-              
-              if (autoEval && jefeEval) {
-                const autoAvg = calculateDimensionAverage(autoEval.responses, dim);
-                const jefeAvg = calculateDimensionAverage(jefeEval.responses, dim);
-                const promedioPonderado = (jefeAvg * 0.7) + (autoAvg * 0.3);
-                promedios.push(promedioPonderado);
+            let sumaPorcentajes = 0;
+            let contador = 0;
+
+            finalResults.forEach((resultado) => {
+              const autoResponses = autoEvalMap.get(resultado.autoevaluacion_id) || {};
+              const jefeResponses = jefeEvalMap.get(resultado.evaluacion_jefe_id) || {};
+              const consolidadas = calculateConsolidatedResponses(autoResponses, jefeResponses);
+              const porcentaje = calculateDimensionPercentage(consolidadas, dim);
+              if (porcentaje > 0) {
+                sumaPorcentajes += porcentaje;
+                contador++;
               }
             });
-            
-            if (promedios.length > 0) {
-              const promedio = promedios.reduce((sum, val) => sum + val, 0) / promedios.length;
-              promedioMunicipal[dim.id] = scoreToPercentage(promedio);
-            }
+
+            promedioMunicipal[dim.id] = contador > 0 ? Math.round(sumaPorcentajes / contador) : 0;
           });
         }
       }
@@ -593,7 +635,7 @@ const VistaComparativa = () => {
       })),
       fortalezas,
       areasOportunidad,
-      performancePercentage: scoreToPercentage(resultadoFinal.desempenoFinal),
+      performancePercentage: performancePercentage, // Usar el mismo cálculo que Dashboard
       jefeCompleto: true // Siempre completo en vista del jefe
     };
   };

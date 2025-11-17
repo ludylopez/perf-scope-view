@@ -106,7 +106,7 @@ const Matriz9Box = () => {
   });
 
   // Detectar si el usuario es RRHH o Admin General
-  const isRRHH = user?.role === "admin_rrhh" || user?.role === "admin_general";
+  const isRRHH = user?.rol === "admin_rrhh" || user?.rol === "admin_general";
   const isGlobalView = isRRHH;
 
   useEffect(() => {
@@ -133,6 +133,8 @@ const Matriz9Box = () => {
 
       // RRHH: Cargar TODOS los colaboradores evaluados de la municipalidad
       if (isRRHH) {
+        console.log("🔍 RRHH cargando matriz 9-box para periodo:", periodoId);
+
         // Obtener todos los resultados finales del período activo
         const { data: finalResults, error: finalResultsError } = await supabase
           .from("final_evaluation_results")
@@ -152,7 +154,31 @@ const Matriz9Box = () => {
           `)
           .eq("periodo_id", periodoId);
 
-        if (finalResultsError) throw finalResultsError;
+        console.log("📊 Resultados obtenidos:", finalResults?.length || 0);
+        console.log("❌ Error:", finalResultsError);
+
+        if (finalResultsError) {
+          console.error("Error cargando resultados finales:", finalResultsError);
+          toast.error(`Error al cargar resultados: ${finalResultsError.message}`);
+          throw finalResultsError;
+        }
+
+        // Si no hay resultados, mostrar mensaje informativo
+        if (!finalResults || finalResults.length === 0) {
+          console.warn("⚠️ No se encontraron resultados finales para el período:", periodoId);
+          toast({
+            title: "Sin datos para mostrar",
+            description: `No se encontraron evaluaciones completadas para el período "${activePeriod.nombre}". Asegúrate de que las evaluaciones hayan sido enviadas por los jefes y colaboradores.`,
+            variant: "default",
+          });
+          setTeamMembers([]);
+          setNineBoxData({
+            "alto-alto": [], "alto-medio": [], "alto-bajo": [],
+            "medio-alto": [], "medio-medio": [], "medio-bajo": [],
+            "bajo-alto": [], "bajo-medio": [], "bajo-bajo": [],
+          });
+          return;
+        }
 
         // Obtener información de jefes para cada colaborador
         const { data: assignments, error: assignmentsError } = await supabase
@@ -184,7 +210,16 @@ const Matriz9Box = () => {
 
         for (const result of finalResults || []) {
           const colaborador = Array.isArray(result.users) ? result.users[0] : result.users;
-          if (!colaborador || !result.posicion_9box) continue;
+
+          if (!colaborador) {
+            console.warn("⚠️ Colaborador no encontrado para resultado:", result.colaborador_id);
+            continue;
+          }
+
+          if (!result.posicion_9box) {
+            console.warn("⚠️ Sin posición 9-box para:", colaborador.nombre, colaborador.apellidos);
+            continue;
+          }
 
           const jefeInfo = jefeMap.get(result.colaborador_id);
 
@@ -203,6 +238,8 @@ const Matriz9Box = () => {
             jefeNombre: jefeInfo?.nombre,
           });
         }
+
+        console.log("✅ Total miembros cargados para RRHH:", members.length);
       }
       // JEFE: Cargar solo colaboradores asignados
       else {
