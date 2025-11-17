@@ -178,6 +178,99 @@ export type Database = {
         }
         Relationships: []
       }
+      evaluation_results_by_evaluator: {
+        Row: {
+          autoevaluacion_id: string
+          colaborador_id: string
+          comparativo: Json
+          created_at: string | null
+          desempeno_final: number | null
+          desempeno_porcentaje: number | null
+          evaluacion_jefe_id: string
+          evaluador_id: string
+          fecha_generacion: string | null
+          id: string
+          periodo_id: string
+          posicion_9box: string | null
+          potencial: number | null
+          potencial_porcentaje: number | null
+          resultado_final: Json
+          updated_at: string | null
+        }
+        Insert: {
+          autoevaluacion_id: string
+          colaborador_id: string
+          comparativo?: Json
+          created_at?: string | null
+          desempeno_final?: number | null
+          desempeno_porcentaje?: number | null
+          evaluacion_jefe_id: string
+          evaluador_id: string
+          fecha_generacion?: string | null
+          id?: string
+          periodo_id: string
+          posicion_9box?: string | null
+          potencial?: number | null
+          potencial_porcentaje?: number | null
+          resultado_final?: Json
+          updated_at?: string | null
+        }
+        Update: {
+          autoevaluacion_id?: string
+          colaborador_id?: string
+          comparativo?: Json
+          created_at?: string | null
+          desempeno_final?: number | null
+          desempeno_porcentaje?: number | null
+          evaluacion_jefe_id?: string
+          evaluador_id?: string
+          fecha_generacion?: string | null
+          id?: string
+          periodo_id?: string
+          posicion_9box?: string | null
+          potencial?: number | null
+          potencial_porcentaje?: number | null
+          resultado_final?: Json
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evaluation_results_by_evaluator_autoevaluacion_id_fkey"
+            columns: ["autoevaluacion_id"]
+            isOneToOne: false
+            referencedRelation: "evaluations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evaluation_results_by_evaluator_colaborador_id_fkey"
+            columns: ["colaborador_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["dpi"]
+          },
+          {
+            foreignKeyName: "evaluation_results_by_evaluator_evaluacion_jefe_id_fkey"
+            columns: ["evaluacion_jefe_id"]
+            isOneToOne: false
+            referencedRelation: "evaluations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evaluation_results_by_evaluator_evaluador_id_fkey"
+            columns: ["evaluador_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["dpi"]
+          },
+          {
+            foreignKeyName: "evaluation_results_by_evaluator_periodo_id_fkey"
+            columns: ["periodo_id"]
+            isOneToOne: false
+            referencedRelation: "evaluation_periods"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       evaluations: {
         Row: {
           colaborador_id: string | null
@@ -415,6 +508,60 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      final_evaluation_results_backup: {
+        Row: {
+          autoevaluacion_id: string | null
+          colaborador_id: string | null
+          comparativo: Json | null
+          created_at: string | null
+          desempeno_final: number | null
+          desempeno_porcentaje: number | null
+          evaluacion_jefe_id: string | null
+          fecha_generacion: string | null
+          id: string | null
+          periodo_id: string | null
+          plan_desarrollo_id: string | null
+          posicion_9box: string | null
+          potencial: number | null
+          potencial_porcentaje: number | null
+          resultado_final: Json | null
+        }
+        Insert: {
+          autoevaluacion_id?: string | null
+          colaborador_id?: string | null
+          comparativo?: Json | null
+          created_at?: string | null
+          desempeno_final?: number | null
+          desempeno_porcentaje?: number | null
+          evaluacion_jefe_id?: string | null
+          fecha_generacion?: string | null
+          id?: string | null
+          periodo_id?: string | null
+          plan_desarrollo_id?: string | null
+          posicion_9box?: string | null
+          potencial?: number | null
+          potencial_porcentaje?: number | null
+          resultado_final?: Json | null
+        }
+        Update: {
+          autoevaluacion_id?: string | null
+          colaborador_id?: string | null
+          comparativo?: Json | null
+          created_at?: string | null
+          desempeno_final?: number | null
+          desempeno_porcentaje?: number | null
+          evaluacion_jefe_id?: string | null
+          fecha_generacion?: string | null
+          id?: string | null
+          periodo_id?: string | null
+          plan_desarrollo_id?: string | null
+          posicion_9box?: string | null
+          potencial?: number | null
+          potencial_porcentaje?: number | null
+          resultado_final?: Json | null
+        }
+        Relationships: []
       }
       group_members: {
         Row: {
@@ -840,7 +987,87 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      final_evaluation_results_consolidated: {
+        Row: {
+          colaborador_id: string | null
+          desempeno_final_maximo: number | null
+          desempeno_final_minimo: number | null
+          desempeno_final_promedio: number | null
+          desempeno_porcentaje_maximo: number | null
+          desempeno_porcentaje_minimo: number | null
+          desempeno_porcentaje_promedio: number | null
+          periodo_id: string | null
+          posicion_9box_moda: string | null
+          potencial_porcentaje_promedio: number | null
+          potencial_promedio: number | null
+          resultados_por_evaluador: Json | null
+          total_evaluadores: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evaluation_results_by_evaluator_colaborador_id_fkey"
+            columns: ["colaborador_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["dpi"]
+          },
+          {
+            foreignKeyName: "evaluation_results_by_evaluator_periodo_id_fkey"
+            columns: ["periodo_id"]
+            isOneToOne: false
+            referencedRelation: "evaluation_periods"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      final_evaluation_results_legacy: {
+        Row: {
+          autoevaluacion_id: string | null
+          colaborador_id: string | null
+          comparativo: Json | null
+          created_at: string | null
+          desempeno_final: number | null
+          desempeno_porcentaje: number | null
+          evaluacion_jefe_id: string | null
+          fecha_generacion: string | null
+          id: string | null
+          periodo_id: string | null
+          posicion_9box: string | null
+          potencial: number | null
+          potencial_porcentaje: number | null
+          resultado_final: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evaluation_results_by_evaluator_autoevaluacion_id_fkey"
+            columns: ["autoevaluacion_id"]
+            isOneToOne: false
+            referencedRelation: "evaluations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evaluation_results_by_evaluator_colaborador_id_fkey"
+            columns: ["colaborador_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["dpi"]
+          },
+          {
+            foreignKeyName: "evaluation_results_by_evaluator_evaluacion_jefe_id_fkey"
+            columns: ["evaluacion_jefe_id"]
+            isOneToOne: false
+            referencedRelation: "evaluations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evaluation_results_by_evaluator_periodo_id_fkey"
+            columns: ["periodo_id"]
+            isOneToOne: false
+            referencedRelation: "evaluation_periods"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       calcular_antiguedad_meses: {
@@ -939,6 +1166,10 @@ export type Database = {
         Args: { jefe_superior_dpi: string; periodo_id_param: string }
         Returns: Json
       }
+      get_consolidated_result: {
+        Args: { p_colaborador_id: string; p_periodo_id: string }
+        Returns: Json
+      }
       get_dashboard_stats: { Args: { periodo_id_param: string }; Returns: Json }
       get_desarrollo_metrics: {
         Args: { periodo_actual_id: string; periodo_anterior_id: string }
@@ -979,6 +1210,10 @@ export type Database = {
       get_jerarquia_abajo: { Args: { usuario_dpi: string }; Returns: Json }
       get_jerarquia_arriba: { Args: { usuario_dpi: string }; Returns: Json }
       get_job_level_info: { Args: { p_code: string }; Returns: Json }
+      get_multiple_evaluators_stats: {
+        Args: { periodo_id_param: string }
+        Returns: Json
+      }
       get_nivel_antiguedad_stats: { Args: never; Returns: Json }
       get_openai_usage_stats: {
         Args: {
@@ -1035,6 +1270,10 @@ export type Database = {
         }
         Returns: string
       }
+      migrate_single_result_to_multiple_evaluators: {
+        Args: { p_colaborador_id: string; p_periodo_id: string }
+        Returns: Json
+      }
       score_to_percentage: { Args: { score: number }; Returns: number }
       update_job_level: {
         Args: {
@@ -1046,9 +1285,21 @@ export type Database = {
         }
         Returns: Json
       }
+      validate_alcalde_evaluation: {
+        Args: { p_alcalde_id: string; p_colaborador_id: string }
+        Returns: Json
+      }
+      validate_concejo_evaluation: {
+        Args: { p_colaborador_id: string; p_concejo_id: string }
+        Returns: Json
+      }
       validate_evaluation_complete: {
         Args: { dimensions: Json; responses: Json }
         Returns: boolean
+      }
+      validate_evaluation_permission: {
+        Args: { p_colaborador_id: string; p_evaluador_id: string }
+        Returns: Json
       }
       validate_period_active: {
         Args: { periodo_id: string; tipo_evaluacion: string }
