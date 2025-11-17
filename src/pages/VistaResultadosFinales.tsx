@@ -13,12 +13,13 @@ import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Responsi
 import { getSubmittedEvaluation } from "@/lib/storage";
 import { getNineBoxDescription } from "@/lib/finalScore";
 import { toast } from "sonner";
-import { exportResultadoIndividualPDF } from "@/lib/exports";
 import { scoreToPercentage } from "@/lib/calculations";
 import { PerformanceRadarAnalysis } from "@/components/evaluation/PerformanceRadarAnalysis";
 import { getInstrumentForUser } from "@/lib/instruments";
 import { supabase } from "@/integrations/supabase/client";
 import { getConsolidatedResult, getResultsByEvaluator } from "@/lib/finalResultSupabase";
+import { PDFDownloadLink } from "@react-pdf/renderer";
+import { EvaluacionPDF } from "@/components/pdf/EvaluacionPDF";
 
 const VistaResultadosFinales = () => {
   const { user } = useAuth();
@@ -378,21 +379,92 @@ const VistaResultadosFinales = () => {
               Ver Plan de Desarrollo Completo
             </Button>
           )}
-          {resultadoFinal && (
-            <Button 
-              variant="outline"
-              onClick={() => {
-                exportResultadoIndividualPDF(
-                  `${user?.nombre} ${user?.apellidos}`,
-                  activePeriod?.nombre || "N/A",
-                  resultadoFinal,
-                  planDesarrollo
-                );
-                toast.success("Resultado exportado a PDF");
-              }}
-            >
-              <Download className="mr-2 h-4 w-4" />
-              Exportar PDF
+          {resultadoFinal && instrument && autoevaluacion && evaluacionJefe && (
+            <Button variant="outline" asChild>
+              <PDFDownloadLink
+                document={
+                  <EvaluacionPDF
+                    empleado={{
+                      nombre: user?.nombre || "",
+                      apellidos: user?.apellidos || "",
+                      dpi: user?.dpi || "",
+                      cargo: user?.cargo || "",
+                      area: user?.area || "",
+                      nivel: user?.nivel || "",
+                      direccionUnidad: user?.direccionUnidad || "",
+                      departamentoDependencia: user?.departamentoDependencia || "",
+                      profesion: user?.profesion || "",
+                      correo: user?.correo || "",
+                      telefono: user?.telefono || "",
+                      jefeNombre: user?.jefeInmediato || "N/A",
+                      directoraRRHHNombre: "Brenda Carolina Lopez Perez",
+                    }}
+                    periodo={activePeriod?.nombre || "N/A"}
+                    fechaGeneracion={new Date()}
+                    resultadoData={{
+                      performancePercentage: resultadoFinal.desempenoFinal ? scoreToPercentage(resultadoFinal.desempenoFinal) : 0,
+                      jefeCompleto: !!evaluacionJefe,
+                      fortalezas: instrument.dimensionesDesempeno
+                        .map((dim: any) => {
+                          const autoItems = dim.items.map((item: any) => autoevaluacion.responses[item.id]).filter((v: any) => v !== undefined);
+                          const jefeItems = dim.items.map((item: any) => evaluacionJefe.responses[item.id]).filter((v: any) => v !== undefined);
+                          
+                          const autoAvg = autoItems.length > 0 ? autoItems.reduce((sum: number, val: number) => sum + val, 0) / autoItems.length : 0;
+                          const jefeAvg = jefeItems.length > 0 ? jefeItems.reduce((sum: number, val: number) => sum + val, 0) / jefeItems.length : 0;
+                          
+                          return {
+                            dimension: dim.nombre,
+                            nombreCompleto: dim.nombre,
+                            tuEvaluacion: jefeAvg,
+                            promedioMunicipal: autoAvg,
+                          };
+                        })
+                        .sort((a: any, b: any) => b.tuEvaluacion - a.tuEvaluacion)
+                        .slice(0, 3),
+                      areasOportunidad: instrument.dimensionesDesempeno
+                        .map((dim: any) => {
+                          const autoItems = dim.items.map((item: any) => autoevaluacion.responses[item.id]).filter((v: any) => v !== undefined);
+                          const jefeItems = dim.items.map((item: any) => evaluacionJefe.responses[item.id]).filter((v: any) => v !== undefined);
+                          
+                          const autoAvg = autoItems.length > 0 ? autoItems.reduce((sum: number, val: number) => sum + val, 0) / autoItems.length : 0;
+                          const jefeAvg = jefeItems.length > 0 ? jefeItems.reduce((sum: number, val: number) => sum + val, 0) / jefeItems.length : 0;
+                          
+                          return {
+                            dimension: dim.nombre,
+                            nombreCompleto: dim.nombre,
+                            tuEvaluacion: jefeAvg,
+                            promedioMunicipal: autoAvg,
+                          };
+                        })
+                        .sort((a: any, b: any) => a.tuEvaluacion - b.tuEvaluacion)
+                        .slice(0, 3),
+                      radarData: instrument.dimensionesDesempeno.map((dim: any) => {
+                        const autoItems = dim.items.map((item: any) => autoevaluacion.responses[item.id]).filter((v: any) => v !== undefined);
+                        const jefeItems = dim.items.map((item: any) => evaluacionJefe.responses[item.id]).filter((v: any) => v !== undefined);
+                        
+                        const autoAvg = autoItems.length > 0 ? autoItems.reduce((sum: number, val: number) => sum + val, 0) / autoItems.length : 0;
+                        const jefeAvg = jefeItems.length > 0 ? jefeItems.reduce((sum: number, val: number) => sum + val, 0) / jefeItems.length : 0;
+                        
+                        return {
+                          dimension: dim.nombre.substring(0, 20),
+                          tuEvaluacion: jefeAvg,
+                          promedioMunicipal: autoAvg,
+                        };
+                      }),
+                      resultadoConsolidado: resultadoConsolidado,
+                    }}
+                    planDesarrollo={planDesarrollo ? {
+                      planEstructurado: planDesarrollo.planEstructurado || (typeof planDesarrollo.competenciasDesarrollar === 'object' && planDesarrollo.competenciasDesarrollar?.acciones ? planDesarrollo.competenciasDesarrollar : null),
+                      recomendaciones: planDesarrollo.recomendaciones || [],
+                    } : null}
+                  />
+                }
+                fileName={`evaluacion_${(user?.nombre || 'evaluacion').replace(/\s+/g, '_')}_${(activePeriod?.nombre || 'periodo').replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`}
+                style={{ textDecoration: 'none' }}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Exportar PDF
+              </PDFDownloadLink>
             </Button>
           )}
         </div>

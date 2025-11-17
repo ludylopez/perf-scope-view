@@ -5,7 +5,6 @@ import { CompetenciasCardsPDF } from './CompetenciasCardsPDF';
 import { PlanDesarrolloPDF } from './PlanDesarrolloPDF';
 import { FirmasPDF } from './FirmasPDF';
 import { pdfStyles } from './styles';
-import { format } from 'date-fns';
 
 interface EvaluacionPDFProps {
   empleado: {
@@ -159,12 +158,12 @@ export const EvaluacionPDF = ({
         <Page size="A4" style={pdfStyles.page}>
           {/* Plan de Desarrollo - Objetivos y Acciones */}
           <View style={pdfStyles.planSection}>
-            <Text style={pdfStyles.planTitle}>🎯 PLAN DE DESARROLLO PERSONALIZADO</Text>
+            <Text style={pdfStyles.planTitle}>PLAN DE DESARROLLO PERSONALIZADO</Text>
 
             {/* Objetivos */}
             {objetivos.length > 0 && (
               <View style={pdfStyles.objetivosSection}>
-                <Text style={pdfStyles.planSubtitle}>🎯 OBJETIVOS DE DESARROLLO</Text>
+                <Text style={pdfStyles.planSubtitle}>OBJETIVOS DE DESARROLLO</Text>
                 <View style={pdfStyles.objetivosList}>
                   {objetivos
                     .filter((objetivo) => objetivo && objetivo.trim() !== '')
@@ -178,9 +177,9 @@ export const EvaluacionPDF = ({
             )}
 
                     {/* Acciones en tabla */}
-                    {acciones.length > 0 && (
-                      <View>
-                        <Text style={pdfStyles.planSubtitle}>📋 PLAN DE ACCIÓN DETALLADO</Text>
+            {acciones.length > 0 && (
+              <View>
+                <Text style={pdfStyles.planSubtitle}>PLAN DE ACCIÓN DETALLADO</Text>
                 <Text style={pdfStyles.planSubtitleDescription}>
                   Acciones concretas con responsables, fechas e indicadores
                 </Text>
@@ -253,9 +252,9 @@ export const EvaluacionPDF = ({
           </View>
 
                   {/* Dimensiones Débiles */}
-                  {dimensionesDebiles.length > 0 && (
-                    <View style={{ marginBottom: 8 }}>
-                      <Text style={pdfStyles.sectionTitle}>⚠️ DIMENSIONES QUE REQUIEREN ATENCIÓN</Text>
+          {dimensionesDebiles.length > 0 && (
+            <View style={{ marginBottom: 8 }}>
+              <Text style={pdfStyles.sectionTitle}>DIMENSIONES QUE REQUIEREN ATENCIÓN</Text>
               {dimensionesDebiles
                 .filter((dim) => dim && dim.dimension && dim.dimension.trim() !== '')
                 .map((dim, idx) => (
@@ -285,9 +284,9 @@ export const EvaluacionPDF = ({
           )}
 
                   {/* Recomendaciones */}
-                  {recomendaciones.length > 0 && (
-                    <View style={{ marginBottom: 10 }}>
-                      <Text style={pdfStyles.sectionTitle}>💬 RECOMENDACIONES GENERALES</Text>
+          {recomendaciones.length > 0 && (
+            <View style={{ marginBottom: 10 }}>
+              <Text style={pdfStyles.sectionTitle}>RECOMENDACIONES GENERALES</Text>
               <View style={pdfStyles.recomendacionesList}>
                 {recomendaciones
                   .filter((rec) => rec && rec.trim() !== '')
