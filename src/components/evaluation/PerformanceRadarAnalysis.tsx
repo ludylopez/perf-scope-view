@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip, Legend } from "recharts";
 import { TrendingUp, Target, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useState, useEffect } from "react";
 
 interface DimensionAnalysis {
   nombre: string;
@@ -25,6 +26,18 @@ export const PerformanceRadarAnalysis = ({
   title = "Panorama de Competencias",
   description = "Vista integral de tu desempeño por dimensión comparado con el promedio municipal"
 }: PerformanceRadarAnalysisProps) => {
+  // Detectar si es móvil
+  const [isMobile, setIsMobile] = useState(false);
+  
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
   
   // Log para debug
   console.log('📊 [PerformanceRadarAnalysis] Datos recibidos:', {
@@ -119,9 +132,9 @@ export const PerformanceRadarAnalysis = ({
           </div>
           <CardDescription>{description}</CardDescription>
         </CardHeader>
-        <CardContent className="p-8">
-          <ResponsiveContainer width="100%" height={450}>
-            <RadarChart data={normalizedRadarData}>
+        <CardContent className="p-4 md:p-8">
+          <ResponsiveContainer width="100%" height={400} className="md:h-[450px]">
+            <RadarChart data={normalizedRadarData} margin={{ top: 20, right: 30, bottom: 20, left: 30 }}>
               <defs>
                 <linearGradient id="radarGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.8}/>
@@ -140,12 +153,48 @@ export const PerformanceRadarAnalysis = ({
               />
               <PolarAngleAxis 
                 dataKey="dimension" 
-                tick={{ fill: 'hsl(var(--foreground))', fontSize: 13, fontWeight: 600 }}
+                tick={({ payload, x, y, textAnchor, ...props }: any) => {
+                  let displayText = payload.value;
+                  
+                  // Abreviaciones para dimensiones comunes (más cortas para móvil)
+                  const abbreviations: Record<string, string> = {
+                    'ASISTENCIA Y PARTICIPACIÓN EN SESIONES': isMobile ? 'ASISTENCIA' : 'ASISTENCIA Y PARTICIPACIÓN',
+                    'TRABAJO EN COMISIONES MUNICIPALES': isMobile ? 'COMISIONES' : 'TRABAJO EN COMISIONES',
+                    'INICIATIVA Y PROPUESTAS PARA EL DESARROLLO MUNICIPAL': isMobile ? 'INICIATIVA' : 'INICIATIVA Y PROPUESTAS',
+                    'FISCALIZACIÓN Y CONTROL DEL GOBIERNO MUNICIPAL': isMobile ? 'FISCALIZACIÓN' : 'FISCALIZACIÓN Y CONTROL',
+                    'APROBACIÓN Y CONTROL PRESUPUESTARIO': isMobile ? 'PRESUPUESTARIO' : 'CONTROL PRESUPUESTARIO',
+                    'EMISIÓN DE NORMATIVA Y POLÍTICAS PÚBLICAS MUNICIPALES': isMobile ? 'NORMATIVA' : 'NORMATIVA Y POLÍTICAS',
+                    'TRANSPARENCIA, RENDICIÓN DE CUENTAS Y PROBIDAD': isMobile ? 'TRANSPARENCIA' : 'TRANSPARENCIA Y PROBIDAD',
+                  };
+                  
+                  displayText = abbreviations[payload.value] || (isMobile && payload.value.length > 15 
+                    ? payload.value.substring(0, 12) + '...' 
+                    : payload.value);
+                  
+                  return (
+                    <text
+                      {...props}
+                      x={x}
+                      y={y}
+                      textAnchor={textAnchor}
+                      fill="hsl(var(--foreground))"
+                      fontSize={isMobile ? 10 : 13}
+                      fontWeight={600}
+                      className="select-none"
+                    >
+                      {displayText.split(' ').map((word: string, i: number) => (
+                        <tspan key={i} x={x} dy={i === 0 ? 0 : isMobile ? 10 : 12}>
+                          {word}
+                        </tspan>
+                      ))}
+                    </text>
+                  );
+                }}
               />
               <PolarRadiusAxis 
                 angle={90} 
                 domain={[0, 100]} 
-                tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
+                tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: isMobile ? 9 : 11 }}
                 tickCount={6}
               />
               <Radar
@@ -197,8 +246,8 @@ export const PerformanceRadarAnalysis = ({
         </CardContent>
       </Card>
 
-      {/* Análisis de Dimensiones - Sin scroll, compacto */}
-      <div className="grid gap-3 md:grid-cols-2">
+      {/* Análisis de Dimensiones - Mejorado para móvil */}
+      <div className="grid gap-4 md:grid-cols-2">
         {/* Fortalezas */}
         {fortalezas.length > 0 && fortalezas.map((dim, idx) => (
           <Card
@@ -206,26 +255,29 @@ export const PerformanceRadarAnalysis = ({
             className="group relative overflow-hidden border-l-4 border-l-success bg-gradient-to-br from-success/5 to-transparent hover:shadow-lg transition-all duration-300 animate-fade-in"
             style={{ animationDelay: `${idx * 100}ms` }}
           >
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between gap-3 mb-3">
-                <div className="flex items-center gap-3 flex-1 min-w-0">
+            <CardContent className="p-4 md:p-5">
+              {/* Layout móvil: vertical, desktop: horizontal */}
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
+                <div className="flex items-start gap-3 flex-1 min-w-0">
                   <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-full bg-success text-success-foreground text-sm font-bold shadow-md">
                     {idx + 1}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h4 className="font-bold text-sm leading-tight truncate">{dim.nombre}</h4>
-                      <Badge variant="outline" className="bg-success/10 text-success border-success/30 text-xs font-semibold whitespace-nowrap">
+                    <div className="flex flex-col md:flex-row md:items-center gap-2 mb-2">
+                      <h4 className="font-bold text-sm md:text-base leading-tight break-words">{dim.nombre}</h4>
+                      <Badge variant="outline" className="bg-success/10 text-success border-success/30 text-xs font-semibold whitespace-nowrap w-fit">
                         <TrendingUp className="h-3 w-3 mr-1" />
                         FORTALEZA
                       </Badge>
                     </div>
                     {dim.descripcion && (
-                      <p className="text-xs text-muted-foreground leading-relaxed">{dim.descripcion}</p>
+                      <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2 md:line-clamp-none">{dim.descripcion}</p>
                     )}
                   </div>
                 </div>
-                <span className="text-3xl font-bold text-success flex-shrink-0">{dim.porcentaje}%</span>
+                <div className="flex items-center justify-between md:flex-col md:items-end gap-2 md:gap-0">
+                  <span className="text-2xl md:text-3xl font-bold text-success">{dim.porcentaje}%</span>
+                </div>
               </div>
               <div className="relative h-2 w-full overflow-hidden rounded-full bg-success/20">
                 <div 
@@ -244,26 +296,29 @@ export const PerformanceRadarAnalysis = ({
             className="group relative overflow-hidden border-l-4 border-l-warning bg-gradient-to-br from-warning/5 to-transparent hover:shadow-lg transition-all duration-300 animate-fade-in"
             style={{ animationDelay: `${(fortalezas.length + idx) * 100}ms` }}
           >
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between gap-3 mb-3">
-                <div className="flex items-center gap-3 flex-1 min-w-0">
+            <CardContent className="p-4 md:p-5">
+              {/* Layout móvil: vertical, desktop: horizontal */}
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
+                <div className="flex items-start gap-3 flex-1 min-w-0">
                   <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-full bg-warning text-white text-sm font-bold shadow-md">
                     {fortalezas.length + idx + 1}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h4 className="font-bold text-sm leading-tight truncate">{dim.nombre}</h4>
-                      <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30 text-xs font-semibold whitespace-nowrap">
+                    <div className="flex flex-col md:flex-row md:items-center gap-2 mb-2">
+                      <h4 className="font-bold text-sm md:text-base leading-tight break-words">{dim.nombre}</h4>
+                      <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30 text-xs font-semibold whitespace-nowrap w-fit">
                         <Target className="h-3 w-3 mr-1" />
                         OPORTUNIDAD
                       </Badge>
                     </div>
                     {dim.descripcion && (
-                      <p className="text-xs text-muted-foreground leading-relaxed">{dim.descripcion}</p>
+                      <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2 md:line-clamp-none">{dim.descripcion}</p>
                     )}
                   </div>
                 </div>
-                <span className="text-3xl font-bold text-warning flex-shrink-0">{dim.porcentaje}%</span>
+                <div className="flex items-center justify-between md:flex-col md:items-end gap-2 md:gap-0">
+                  <span className="text-2xl md:text-3xl font-bold text-warning">{dim.porcentaje}%</span>
+                </div>
               </div>
               <div className="relative h-2 w-full overflow-hidden rounded-full bg-warning/20">
                 <div 
