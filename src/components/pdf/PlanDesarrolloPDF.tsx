@@ -57,7 +57,8 @@ const getPrioridadText = (prioridad: string) => {
 
 export const PlanDesarrolloPDF = ({ planDesarrollo }: PlanDesarrolloPDFProps) => {
   if (!planDesarrollo || !planDesarrollo.planEstructurado) {
-    return null;
+    // Retornar View vacío en lugar de null para evitar problemas con React-PDF
+    return <View />;
   }
 
   const { planEstructurado, recomendaciones } = planDesarrollo;

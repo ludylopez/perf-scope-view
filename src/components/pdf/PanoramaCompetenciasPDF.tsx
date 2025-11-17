@@ -13,7 +13,8 @@ interface PanoramaCompetenciasPDFProps {
 
 export const PanoramaCompetenciasPDF = ({ competencias }: PanoramaCompetenciasPDFProps) => {
   if (!competencias || competencias.length === 0) {
-    return null;
+    // Retornar View vacío en lugar de null para evitar problemas con React-PDF
+    return <View />;
   }
 
   return (

@@ -14,7 +14,8 @@ interface FortalezasPDFProps {
 
 export const FortalezasPDF = ({ fortalezas }: FortalezasPDFProps) => {
   if (!fortalezas || fortalezas.length === 0) {
-    return null;
+    // Retornar View vacío en lugar de null para evitar problemas con React-PDF
+    return <View />;
   }
 
   return (

@@ -14,7 +14,8 @@ interface AreasOportunidadPDFProps {
 
 export const AreasOportunidadPDF = ({ areasOportunidad }: AreasOportunidadPDFProps) => {
   if (!areasOportunidad || areasOportunidad.length === 0) {
-    return null;
+    // Retornar View vacío en lugar de null para evitar problemas con React-PDF
+    return <View />;
   }
 
   return (

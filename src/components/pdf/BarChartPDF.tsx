@@ -13,7 +13,8 @@ interface BarChartPDFProps {
 
 export const BarChartPDF = ({ competencias }: BarChartPDFProps) => {
   if (!competencias || competencias.length === 0) {
-    return null;
+    // Retornar View vacío en lugar de null para evitar problemas con React-PDF
+    return <View />;
   }
 
   const maxValue = Math.max(

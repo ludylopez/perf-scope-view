@@ -8,7 +8,8 @@ interface RadarChartPDFProps {
 
 export const RadarChartPDF = ({ radarImage, jefeCompleto }: RadarChartPDFProps) => {
   if (!radarImage) {
-    return null;
+    // Retornar View vacío en lugar de null para evitar problemas con React-PDF
+    return <View />;
   }
 
   return (

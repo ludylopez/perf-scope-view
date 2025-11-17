@@ -87,11 +87,25 @@ export const EvaluacionPDF = ({
     ? `${empleado.nombre} ${empleado.apellidos}` 
     : empleado.nombre;
 
-  // Separar plan de desarrollo en partes
-  const objetivos = planDesarrollo?.planEstructurado?.objetivos || [];
-  const acciones = planDesarrollo?.planEstructurado?.acciones || [];
-  const dimensionesDebiles = planDesarrollo?.planEstructurado?.dimensionesDebiles || [];
-  const recomendaciones = planDesarrollo?.recomendaciones || [];
+  // Separar plan de desarrollo en partes y filtrar valores inválidos
+  const objetivos = (planDesarrollo?.planEstructurado?.objetivos || []).filter((o): o is string => 
+    typeof o === 'string' && o.trim() !== ''
+  );
+  const acciones = (planDesarrollo?.planEstructurado?.acciones || []).filter((a): a is NonNullable<typeof a> => 
+    a && 
+    typeof a.descripcion === 'string' && a.descripcion.trim() !== '' &&
+    typeof a.responsable === 'string' && a.responsable.trim() !== '' &&
+    typeof a.fecha === 'string' && a.fecha.trim() !== '' &&
+    typeof a.indicador === 'string' && a.indicador.trim() !== '' &&
+    typeof a.prioridad === 'string'
+  );
+  const dimensionesDebiles = (planDesarrollo?.planEstructurado?.dimensionesDebiles || []).filter((d): d is NonNullable<typeof d> => 
+    d && 
+    typeof d.dimension === 'string' && d.dimension.trim() !== ''
+  );
+  const recomendaciones = (planDesarrollo?.recomendaciones || []).filter((r): r is string => 
+    typeof r === 'string' && r.trim() !== ''
+  );
 
   return (
     <Document>
@@ -152,11 +166,13 @@ export const EvaluacionPDF = ({
               <View style={pdfStyles.objetivosSection}>
                 <Text style={pdfStyles.planSubtitle}>🎯 OBJETIVOS DE DESARROLLO</Text>
                 <View style={pdfStyles.objetivosList}>
-                  {objetivos.map((objetivo, idx) => (
-                    <Text key={idx} style={pdfStyles.objetivoItem}>
-                      • {objetivo}
-                    </Text>
-                  ))}
+                  {objetivos
+                    .filter((objetivo) => objetivo && objetivo.trim() !== '')
+                    .map((objetivo, idx) => (
+                      <Text key={idx} style={pdfStyles.objetivoItem}>
+                        • {objetivo}
+                      </Text>
+                    ))}
                 </View>
               </View>
             )}
@@ -181,7 +197,15 @@ export const EvaluacionPDF = ({
                   </View>
 
                   {/* Filas de acciones */}
-                  {acciones.map((accion, idx) => {
+                  {acciones
+                    .filter((accion) => 
+                      accion && 
+                      accion.descripcion && 
+                      accion.responsable && 
+                      accion.fecha && 
+                      accion.indicador
+                    )
+                    .map((accion, idx) => {
                     const getPrioridadBadgeStyle = (p: string) => {
                       switch (p) {
                         case 'alta': return pdfStyles.badgeAlta;
@@ -195,7 +219,7 @@ export const EvaluacionPDF = ({
                         case 'alta': return 'Alta';
                         case 'media': return 'Media';
                         case 'baja': return 'Baja';
-                        default: return p;
+                        default: return p || 'Media';
                       }
                     };
                     return (
@@ -204,21 +228,21 @@ export const EvaluacionPDF = ({
                           {idx + 1}
                         </Text>
                         <Text style={[pdfStyles.tableCell, pdfStyles.tableCellAccion]}>
-                          {accion.descripcion}
+                          {accion.descripcion || ''}
                         </Text>
                         <View style={[pdfStyles.tableCell, pdfStyles.tableCellPrioridad]}>
-                          <Text style={[pdfStyles.badge, getPrioridadBadgeStyle(accion.prioridad)]}>
-                            {getPrioridadText(accion.prioridad)}
+                          <Text style={[pdfStyles.badge, getPrioridadBadgeStyle(accion.prioridad || 'media')]}>
+                            {getPrioridadText(accion.prioridad || 'media')}
                           </Text>
                         </View>
                         <Text style={[pdfStyles.tableCell, pdfStyles.tableCellResponsable]}>
-                          {accion.responsable}
+                          {accion.responsable || ''}
                         </Text>
                         <Text style={[pdfStyles.tableCell, pdfStyles.tableCellFecha]}>
-                          {accion.fecha}
+                          {accion.fecha || ''}
                         </Text>
                         <Text style={[pdfStyles.tableCell, pdfStyles.tableCellIndicador]}>
-                          {accion.indicador}
+                          {accion.indicador || ''}
                         </Text>
                       </View>
                     );
@@ -232,27 +256,31 @@ export const EvaluacionPDF = ({
                   {dimensionesDebiles.length > 0 && (
                     <View style={{ marginBottom: 8 }}>
                       <Text style={pdfStyles.sectionTitle}>⚠️ DIMENSIONES QUE REQUIEREN ATENCIÓN</Text>
-              {dimensionesDebiles.map((dim, idx) => (
-                <View key={idx} style={pdfStyles.dimensionDebilCard}>
-                  <View style={pdfStyles.dimensionDebilHeader}>
-                    <Text style={pdfStyles.dimensionDebilTitle}>{dim.dimension}</Text>
-                    {dim.score !== undefined && (
-                      <Text style={pdfStyles.dimensionDebilScore}>
-                        Score: {dim.score.toFixed(2)}/5.0 ({(dim.score / 5 * 100).toFixed(0)}%)
-                      </Text>
+              {dimensionesDebiles
+                .filter((dim) => dim && dim.dimension && dim.dimension.trim() !== '')
+                .map((dim, idx) => (
+                  <View key={idx} style={pdfStyles.dimensionDebilCard}>
+                    <View style={pdfStyles.dimensionDebilHeader}>
+                      <Text style={pdfStyles.dimensionDebilTitle}>{dim.dimension}</Text>
+                      {dim.score !== undefined && typeof dim.score === 'number' && !isNaN(dim.score) && (
+                        <Text style={pdfStyles.dimensionDebilScore}>
+                          Score: {dim.score.toFixed(2)}/5.0 ({(dim.score / 5 * 100).toFixed(0)}%)
+                        </Text>
+                      )}
+                    </View>
+                    {dim.accionesEspecificas && Array.isArray(dim.accionesEspecificas) && dim.accionesEspecificas.length > 0 && (
+                      <View>
+                        {dim.accionesEspecificas
+                          .filter((accion): accion is string => typeof accion === 'string' && accion.trim() !== '')
+                          .map((accion, i) => (
+                            <Text key={i} style={pdfStyles.dimensionDebilActions}>
+                              • {accion}
+                            </Text>
+                          ))}
+                      </View>
                     )}
                   </View>
-                  {dim.accionesEspecificas && dim.accionesEspecificas.length > 0 && (
-                    <View>
-                      {dim.accionesEspecificas.map((accion, i) => (
-                        <Text key={i} style={pdfStyles.dimensionDebilActions}>
-                          • {accion}
-                        </Text>
-                      ))}
-                    </View>
-                  )}
-                </View>
-              ))}
+                ))}
             </View>
           )}
 
@@ -261,11 +289,13 @@ export const EvaluacionPDF = ({
                     <View style={{ marginBottom: 10 }}>
                       <Text style={pdfStyles.sectionTitle}>💬 RECOMENDACIONES GENERALES</Text>
               <View style={pdfStyles.recomendacionesList}>
-                {recomendaciones.map((rec, idx) => (
-                  <Text key={idx} style={pdfStyles.recomendacionItem}>
-                    • {rec}
-                  </Text>
-                ))}
+                {recomendaciones
+                  .filter((rec) => rec && rec.trim() !== '')
+                  .map((rec, idx) => (
+                    <Text key={idx} style={pdfStyles.recomendacionItem}>
+                      • {rec}
+                    </Text>
+                  ))}
               </View>
             </View>
           )}
