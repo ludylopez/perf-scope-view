@@ -9,6 +9,8 @@ export interface APIUsageStats {
   successfulCalls: number;
   failedCalls: number;
   lastCallDate?: string;
+  costoEstimadoUSD?: number;
+  tasaExito?: number;
 }
 
 // Obtener API key desde variables de entorno o configuración global

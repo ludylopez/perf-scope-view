@@ -204,17 +204,32 @@ const DashboardRRHH = () => {
           periodo_id_param: currentPeriodId
         });
 
-      if (!openaiStatsError && openaiStatsData) {
+      if (openaiStatsError) {
+        console.error("Error loading OpenAI usage stats:", openaiStatsError);
+        // Fallback a localStorage si la función SQL falla
+        setApiUsageStats(getAPIUsageStats());
+      } else if (openaiStatsData) {
+        console.log("OpenAI usage stats loaded:", openaiStatsData);
         setApiUsageStats({
           totalCalls: openaiStatsData.totalLlamadas || 0,
           totalTokens: openaiStatsData.totalTokens || 0,
           successfulCalls: openaiStatsData.llamadasExitosas || 0,
           failedCalls: openaiStatsData.llamadasFallidas || 0,
           lastCallDate: openaiStatsData.ultimaLlamada || undefined,
+          costoEstimadoUSD: openaiStatsData.costoEstimadoUSD || 0,
+          tasaExito: openaiStatsData.tasaExito || 0,
         });
       } else {
-        // Fallback a localStorage si la función SQL falla
-        setApiUsageStats(getAPIUsageStats());
+        // Si no hay datos, inicializar con ceros
+        setApiUsageStats({
+          totalCalls: 0,
+          totalTokens: 0,
+          successfulCalls: 0,
+          failedCalls: 0,
+          lastCallDate: undefined,
+          costoEstimadoUSD: 0,
+          tasaExito: 0,
+        });
       }
     } catch (error: any) {
       console.error("Error loading stats:", error);
@@ -687,22 +702,41 @@ const DashboardRRHH = () => {
                 <p className="text-2xl font-bold text-destructive">{apiUsageStats.failedCalls || 0}</p>
               </div>
               <div className="p-4 rounded-lg border">
-                <p className="text-sm text-muted-foreground mb-1">Tokens Estimados</p>
+                <p className="text-sm text-muted-foreground mb-1">Tokens Consumidos</p>
                 <p className="text-2xl font-bold text-info">{(apiUsageStats.totalTokens || 0).toLocaleString()}</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  ~${((apiUsageStats.totalTokens || 0) / 1000000 * 0.10).toFixed(4)} USD
+                  ${(apiUsageStats.costoEstimadoUSD || 0).toFixed(4)} USD estimado
                 </p>
               </div>
             </div>
-            {apiUsageStats.lastCallDate && (
-              <div className="mt-4 p-3 rounded-lg bg-muted/50">
-                <p className="text-sm text-muted-foreground">
-                  Última llamada: {new Date(apiUsageStats.lastCallDate).toLocaleString("es-GT", {
-                    dateStyle: "short",
-                    timeStyle: "short",
-                  })}
+            {apiUsageStats.totalCalls === 0 ? (
+              <div className="mt-4 p-4 rounded-lg bg-yellow-50 border border-yellow-200">
+                <p className="text-sm text-yellow-800">
+                  <strong>ℹ️ No hay registros de uso de API aún.</strong>
+                </p>
+                <p className="text-xs text-yellow-700 mt-1">
+                  Los datos aparecerán automáticamente cuando se generen planes de desarrollo usando la API de OpenAI.
+                  Asegúrate de que la Edge Function <code className="bg-yellow-100 px-1 rounded">generate-development-plan</code> esté desplegada con el código actualizado.
                 </p>
               </div>
+            ) : (
+              <>
+                {apiUsageStats.lastCallDate && (
+                  <div className="mt-4 p-3 rounded-lg bg-muted/50">
+                    <p className="text-sm text-muted-foreground">
+                      Última llamada: {new Date(apiUsageStats.lastCallDate).toLocaleString("es-GT", {
+                        dateStyle: "short",
+                        timeStyle: "short",
+                      })}
+                    </p>
+                    {apiUsageStats.tasaExito > 0 && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Tasa de éxito: {apiUsageStats.tasaExito.toFixed(1)}%
+                      </p>
+                    )}
+                  </div>
+                )}
+              </>
             )}
           </CardContent>
         </Card>
