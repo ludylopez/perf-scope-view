@@ -1453,8 +1453,9 @@ export const exportEvaluacionCompletaPDFReact = async (
     });
     
     // Obtener nombre del jefe inmediato si no está proporcionado
+    // IMPORTANTE: C1 (Concejo Municipal) no tiene jefe, así que no intentar obtenerlo
     let nombreJefe = empleado.jefeNombre;
-    if (!nombreJefe && empleado.dpi) {
+    if (!nombreJefe && empleado.dpi && empleado.nivel !== 'C1') {
       try {
         const { supabase } = await import("@/integrations/supabase/client");
         
@@ -1615,15 +1616,17 @@ export const exportEvaluacionCompletaPDFReact = async (
     }));
     
     // Crear resultadoData con explicaciones pre-cargadas y datos validados
+    // IMPORTANTE: Para C1 (Concejo Municipal), jefeCompleto siempre es false y no hay resultadoConsolidado
+    const esC1 = empleado.nivel === 'C1';
     const resultadoDataWithExplanations = {
       performancePercentage: typeof resultadoData.performancePercentage === 'number' && !isNaN(resultadoData.performancePercentage) 
         ? resultadoData.performancePercentage 
         : 0,
-      jefeCompleto: resultadoData.jefeCompleto || false,
+      jefeCompleto: esC1 ? false : (resultadoData.jefeCompleto || false), // C1 nunca tiene evaluación de jefe
       fortalezas: fortalezasValidas,
       areasOportunidad: areasOportunidadValidas,
       radarData: radarDataWithExplanations,
-      resultadoConsolidado: resultadoData.resultadoConsolidado || undefined
+      resultadoConsolidado: esC1 ? undefined : (resultadoData.resultadoConsolidado || undefined) // C1 no tiene múltiples evaluadores
     };
     
     // Validar datos antes de generar PDF
@@ -1643,12 +1646,28 @@ export const exportEvaluacionCompletaPDFReact = async (
     
     console.log('📄 [PDF] Generando PDF con React-PDF, datos validados:', {
       empleado: empleado.nombre,
+      nivel: empleado.nivel,
+      esC1: esC1,
       periodo,
       radarDataCount: resultadoDataWithExplanations.radarData.length,
       fortalezasCount: resultadoDataWithExplanations.fortalezas?.length || 0,
       areasOportunidadCount: resultadoDataWithExplanations.areasOportunidad?.length || 0,
+      jefeCompleto: resultadoDataWithExplanations.jefeCompleto,
+      tieneResultadoConsolidado: !!resultadoDataWithExplanations.resultadoConsolidado,
       tienePlanDesarrollo: !!planDesarrollo
     });
+    
+    // Validación adicional para C1: asegurar que jefeCompleto sea false y no haya resultadoConsolidado
+    if (esC1) {
+      if (resultadoDataWithExplanations.jefeCompleto !== false) {
+        console.warn('⚠️ [PDF] C1 tiene jefeCompleto diferente de false, corrigiendo...');
+        resultadoDataWithExplanations.jefeCompleto = false;
+      }
+      if (resultadoDataWithExplanations.resultadoConsolidado !== undefined) {
+        console.warn('⚠️ [PDF] C1 tiene resultadoConsolidado, eliminando...');
+        resultadoDataWithExplanations.resultadoConsolidado = undefined;
+      }
+    }
     
     // Importar componente PDF y renderer dinámicamente
     const { EvaluacionPDF } = await import("@/components/pdf/EvaluacionPDF");

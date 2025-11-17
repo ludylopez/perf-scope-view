@@ -305,6 +305,7 @@ export const EvaluacionPDF = ({
             nombreEmpleado={nombreCompleto}
             nombreJefe={empleado.jefeNombre}
             nombreDirectoraRRHH={empleado.directoraRRHHNombre}
+            esC1={empleado.nivel === 'C1'}
           />
 
           {/* Footer */}

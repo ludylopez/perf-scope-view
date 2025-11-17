@@ -115,7 +115,11 @@ export const HeaderPDF = ({ empleado, periodo, fechaGeneracion, jefeCompleto }: 
         <View style={pdfStyles.infoRow}>
           <Text style={pdfStyles.infoLabel}>ESTADO:</Text>
           <Text style={pdfStyles.infoEstado}>
-            {jefeCompleto ? 'Resultado Consolidado' : 'Autoevaluación Enviada'}
+            {empleado.nivel === 'C1' 
+              ? 'Resultado Final (Autoevaluación Concejo Municipal)' 
+              : jefeCompleto 
+                ? 'Resultado Consolidado' 
+                : 'Autoevaluación Enviada'}
           </Text>
         </View>
       </View>
