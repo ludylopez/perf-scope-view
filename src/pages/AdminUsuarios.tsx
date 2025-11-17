@@ -94,6 +94,84 @@ const normalizeFechaNacimientoDDMMAAAA = (value: string): string => {
   return "";
 };
 
+// Función para calcular edad desde fecha (formato YYYY-MM-DD o DDMMAAAA)
+const calcularEdadDesdeFecha = (fecha: string): string | null => {
+  if (!fecha) return null;
+  
+  try {
+    let fechaNacimiento: Date;
+    
+    // Si está en formato YYYY-MM-DD (input date)
+    if (/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+      fechaNacimiento = new Date(fecha);
+    } 
+    // Si está en formato DDMMAAAA
+    else if (/^\d{8}$/.test(fecha)) {
+      const day = parseInt(fecha.substring(0, 2));
+      const month = parseInt(fecha.substring(2, 4)) - 1; // Meses en JS son 0-11
+      const year = parseInt(fecha.substring(4, 8));
+      fechaNacimiento = new Date(year, month, day);
+    } else {
+      return null;
+    }
+    
+    if (isNaN(fechaNacimiento.getTime())) {
+      return null;
+    }
+    
+    const hoy = new Date();
+    let edad = hoy.getFullYear() - fechaNacimiento.getFullYear();
+    const mesDiff = hoy.getMonth() - fechaNacimiento.getMonth();
+    
+    if (mesDiff < 0 || (mesDiff === 0 && hoy.getDate() < fechaNacimiento.getDate())) {
+      edad--;
+    }
+    
+    return edad >= 0 ? `${edad} años` : null;
+  } catch (error) {
+    return null;
+  }
+};
+
+// Función para calcular antigüedad en meses desde fecha de ingreso (formato YYYY-MM-DD)
+const calcularAntiguedadDesdeFecha = (fecha: string): string | null => {
+  if (!fecha) return null;
+  
+  try {
+    const fechaIngreso = new Date(fecha);
+    
+    if (isNaN(fechaIngreso.getTime())) {
+      return null;
+    }
+    
+    const hoy = new Date();
+    let meses = (hoy.getFullYear() - fechaIngreso.getFullYear()) * 12;
+    meses += hoy.getMonth() - fechaIngreso.getMonth();
+    
+    // Ajustar si el día de hoy es menor al día de ingreso
+    if (hoy.getDate() < fechaIngreso.getDate()) {
+      meses--;
+    }
+    
+    if (meses < 0) {
+      return null;
+    }
+    
+    const años = Math.floor(meses / 12);
+    const mesesRestantes = meses % 12;
+    
+    if (años > 0 && mesesRestantes > 0) {
+      return `${años} año${años > 1 ? 's' : ''} ${mesesRestantes} mes${mesesRestantes > 1 ? 'es' : ''}`;
+    } else if (años > 0) {
+      return `${años} año${años > 1 ? 's' : ''}`;
+    } else {
+      return `${mesesRestantes} mes${mesesRestantes > 1 ? 'es' : ''}`;
+    }
+  } catch (error) {
+    return null;
+  }
+};
+
 const AdminUsuarios = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -677,6 +755,17 @@ const AdminUsuarios = () => {
                     />
                   </div>
                   <div className="space-y-2">
+                    <Label>Edad (calculada)</Label>
+                    <Input
+                      type="text"
+                      value={newUser.fechaNacimiento ? calcularEdadDesdeFecha(newUser.fechaNacimiento) || '' : ''}
+                      readOnly
+                      className="bg-muted"
+                      placeholder="Se calculará automáticamente"
+                    />
+                    <p className="text-xs text-muted-foreground">Calculada automáticamente desde la fecha de nacimiento</p>
+                  </div>
+                  <div className="space-y-2">
                     <Label>Fecha de Ingreso</Label>
                     <Input
                       type="date"
@@ -684,6 +773,17 @@ const AdminUsuarios = () => {
                       onChange={(e) => setNewUser({ ...newUser, fechaIngreso: e.target.value })}
                     />
                     <p className="text-xs text-muted-foreground">Necesaria para determinar elegibilidad de evaluación</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Antigüedad (calculada)</Label>
+                    <Input
+                      type="text"
+                      value={newUser.fechaIngreso ? calcularAntiguedadDesdeFecha(newUser.fechaIngreso) || '' : ''}
+                      readOnly
+                      className="bg-muted"
+                      placeholder="Se calculará automáticamente"
+                    />
+                    <p className="text-xs text-muted-foreground">Calculada automáticamente en meses desde la fecha de ingreso</p>
                   </div>
                   <div className="space-y-2">
                     <Label>Tipo de Puesto</Label>
@@ -1024,13 +1124,34 @@ const AdminUsuarios = () => {
                     />
                   </div>
                   <div className="space-y-2">
+                    <Label>Edad (calculada)</Label>
+                    <Input
+                      type="text"
+                      value={editingUser.fechaNacimiento ? calcularEdadDesdeFecha(formatDDMMAAAAToISO(editingUser.fechaNacimiento)) || '' : ''}
+                      readOnly
+                      className="bg-muted"
+                      placeholder="Se calculará automáticamente"
+                    />
+                    <p className="text-xs text-muted-foreground">Calculada automáticamente desde la fecha de nacimiento</p>
+                  </div>
+                  <div className="space-y-2">
                     <Label>Fecha de Ingreso</Label>
                     <Input
                       type="date"
                       value={(editingUser as any).fechaIngreso || ""}
                       onChange={(e) => setEditingUser({ ...editingUser, fechaIngreso: e.target.value } as any)}
                     />
-                    <p className="text-xs text-muted-foreground">Para cálculo de elegibilidad</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Antigüedad (calculada)</Label>
+                    <Input
+                      type="text"
+                      value={(editingUser as any).fechaIngreso ? calcularAntiguedadDesdeFecha((editingUser as any).fechaIngreso) || '' : ''}
+                      readOnly
+                      className="bg-muted"
+                      placeholder="Se calculará automáticamente"
+                    />
+                    <p className="text-xs text-muted-foreground">Calculada automáticamente en meses desde la fecha de ingreso</p>
                   </div>
                   <div className="space-y-2">
                     <Label>Tipo de Puesto</Label>
