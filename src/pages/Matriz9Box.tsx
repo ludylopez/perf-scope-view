@@ -134,6 +134,9 @@ const Matriz9Box = () => {
       const members: TeamMember9Box[] = [];
 
       // RRHH: Cargar TODOS los colaboradores evaluados de la municipalidad
+      // NOTA: Los miembros del Concejo (C1) se excluyen de la matriz 9-Box porque
+      // solo tienen autoevaluación de desempeño (sin evaluación de potencial),
+      // y la matriz 9-Box requiere ambas dimensiones.
       if (isRRHH) {
         console.log("🔍 RRHH cargando matriz 9-box para periodo:", periodoId);
 
@@ -215,6 +218,12 @@ const Matriz9Box = () => {
             continue;
           }
 
+          // Excluir miembros del Concejo (C1) de la matriz 9-Box ya que no tienen evaluación de potencial
+          if (colaborador.nivel === 'C1') {
+            console.log("ℹ️ Excluyendo miembro del Concejo (C1) de matriz 9-Box:", colaborador.nombre, colaborador.apellidos);
+            continue;
+          }
+
           if (!result.posicion_9box_moda) {
             console.warn("⚠️ Sin posición 9-box para:", colaborador.nombre, colaborador.apellidos);
             continue;
@@ -242,6 +251,9 @@ const Matriz9Box = () => {
         console.log("✅ Total miembros cargados para RRHH:", members.length);
       }
       // JEFE: Cargar solo colaboradores asignados
+      // NOTA: Los miembros del Concejo (C1) se excluyen de la matriz 9-Box porque
+      // solo tienen autoevaluación de desempeño (sin evaluación de potencial),
+      // y la matriz 9-Box requiere ambas dimensiones.
       else {
         const { data: assignments, error: assignmentsError } = await supabase
           .from("user_assignments")
@@ -264,6 +276,12 @@ const Matriz9Box = () => {
         for (const assignment of assignments || []) {
           const colaborador = Array.isArray(assignment.users) ? assignment.users[0] : assignment.users;
           if (!colaborador) continue;
+
+          // Excluir miembros del Concejo (C1) de la matriz 9-Box ya que no tienen evaluación de potencial
+          if (colaborador.nivel === 'C1') {
+            console.log("ℹ️ Excluyendo miembro del Concejo (C1) de matriz 9-Box:", colaborador.nombre, colaborador.apellidos);
+            continue;
+          }
 
           const colaboradorDpi = colaborador.dpi;
           const jefeEvaluado = await hasJefeEvaluation(user.dpi, colaboradorDpi, periodoId);
