@@ -176,11 +176,13 @@ const AdminAsignaciones = () => {
     }
 
     // Validaciones específicas para C1 y A1
-    if (colaborador.nivel === 'C1') {
-      toast.error("El Concejo Municipal (C1) solo puede realizar autoevaluaciones. No puede ser asignado a un jefe.");
+    // C1 solo puede ser evaluado por A1 (Alcalde)
+    if (colaborador.nivel === 'C1' && jefe.nivel !== 'A1') {
+      toast.error("El Concejo Municipal (C1) solo puede ser evaluado por el Alcalde Municipal (A1).");
       return;
     }
 
+    // A1 solo puede ser evaluado por C1 (Concejo)
     if (colaborador.nivel === 'A1' && jefe.nivel !== 'C1') {
       toast.error("El Alcalde Municipal (A1) solo puede ser evaluado por miembros del Concejo Municipal (C1).");
       return;

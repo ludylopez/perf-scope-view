@@ -163,10 +163,11 @@ export const validateAlcaldeEvaluation = async (
       };
     }
 
-    if (colaborador.nivel !== "D1") {
+    // El Alcalde puede evaluar a Directores (D1) y miembros del Concejo (C1)
+    if (colaborador.nivel !== "D1" && colaborador.nivel !== "C1") {
       return {
         valid: false,
-        error: `El Alcalde solo puede evaluar a Directores (D1), pero el colaborador es nivel ${colaborador.nivel}`,
+        error: `El Alcalde solo puede evaluar a Directores (D1) o miembros del Concejo (C1), pero el colaborador es nivel ${colaborador.nivel}`,
       };
     }
 
@@ -188,7 +189,7 @@ export const validateAlcaldeEvaluation = async (
 
     return {
       valid: true,
-      message: `Validación exitosa: Alcalde puede evaluar a ${colaborador.nombre} ${colaborador.apellidos} (Director)`,
+      message: `Validación exitosa: Alcalde puede evaluar a ${colaborador.nombre} ${colaborador.apellidos} (${colaborador.nivel === "D1" ? "Director" : "Concejo"})`,
     };
   } catch (error) {
     console.error("Error in validateAlcaldeEvaluation:", error);

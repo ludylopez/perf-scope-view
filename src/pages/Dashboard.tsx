@@ -239,7 +239,7 @@ const Dashboard = () => {
       try {
         console.log('🔍 [Dashboard] Iniciando carga de resultados para:', { dpi: user.dpi, nivel: user.nivel, periodo: activePeriodId });
         
-        const instrument = await getInstrumentForUser(user.nivel, undefined, user.cargo);
+        const instrument = await getInstrumentForUser(user.nivel, user.instrumentoId, user.cargo);
         if (!instrument) {
           console.error('❌ [Dashboard] No se encontró instrumento para nivel:', user.nivel);
           return;
