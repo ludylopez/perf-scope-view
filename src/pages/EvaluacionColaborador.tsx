@@ -16,8 +16,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { LikertScale } from "@/components/evaluation/LikertScale";
+import { MobileLikertScale } from "@/components/evaluation/MobileLikertScale";
 import { DimensionProgress } from "@/components/evaluation/DimensionProgress";
 import { AutoSaveIndicator } from "@/components/evaluation/AutoSaveIndicator";
+import { WizardHeader } from "@/components/evaluation/wizard/WizardHeader";
+import { WizardStep } from "@/components/evaluation/wizard/WizardStep";
+import { WizardFooter } from "@/components/evaluation/wizard/WizardFooter";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -88,7 +92,7 @@ const EvaluacionColaborador = () => {
   const [colaborador, setColaborador] = useState<any>(null);
   const [autoevaluacion, setAutoevaluacion] = useState<any>(null);
   const [jefeAlreadyEvaluated, setJefeAlreadyEvaluated] = useState(false);
-  const [evaluacionTab, setEvaluacionTab] = useState<"auto" | "desempeno" | "potencial">("desempeno");
+  const [evaluacionTab, setEvaluacionTab] = useState<"auto" | "evaluacion" | "desempeno" | "potencial">("evaluacion");
   const [perteneceACuadrilla, setPerteneceACuadrilla] = useState(false);
   const [gruposColaborador, setGruposColaborador] = useState<any[]>([]);
   const [generarFeedbackGrupal, setGenerarFeedbackGrupal] = useState(false);
@@ -100,6 +104,9 @@ const EvaluacionColaborador = () => {
   const [potencialResponses, setPotencialResponses] = useState<Record<string, number>>({});
   const [potencialComments, setPotencialComments] = useState<Record<string, string>>({});
   const [currentPotencialDimension, setCurrentPotencialDimension] = useState(0);
+  
+  // Wizard state - unificar desempeño y potencial en un flujo continuo
+  const [currentWizardStep, setCurrentWizardStep] = useState(0);
   
   const [autoSaveStatus, setAutoSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
@@ -130,6 +137,78 @@ const EvaluacionColaborador = () => {
   );
   
   const isComplete = desempenoComplete && potencialComplete;
+
+  // Wizard steps: combinar dimensiones de desempeño y potencial en un flujo continuo
+  const wizardSteps = useMemo(() => {
+    const steps: Array<{
+      id: string;
+      label: string;
+      completed: boolean;
+      type: "desempeno" | "potencial";
+      data?: any; // Dimension data
+      section: "desempeno" | "potencial";
+    }> = [];
+
+    // Agregar dimensiones de desempeño
+    desempenoDimensions.forEach((dim) => {
+      const dimProgress = getDimensionProgress(desempenoResponses, dim);
+      steps.push({
+        id: `desempeno-${dim.id}`,
+        label: dim.nombre,
+        completed: dimProgress.answered === dimProgress.total,
+        type: "desempeno",
+        data: dim,
+        section: "desempeno",
+      });
+    });
+
+    // Agregar dimensiones de potencial
+    potencialDimensions.forEach((dim) => {
+      const dimProgress = getDimensionProgress(potencialResponses, dim);
+      steps.push({
+        id: `potencial-${dim.id}`,
+        label: dim.nombre,
+        completed: dimProgress.answered === dimProgress.total,
+        type: "potencial",
+        data: dim,
+        section: "potencial",
+      });
+    });
+
+    return steps;
+  }, [desempenoDimensions, potencialDimensions, desempenoResponses, potencialResponses]);
+
+  const totalWizardItems = desempenoTotalItems + potencialTotalItems;
+  const totalWizardAnswered = desempenoAnsweredItems + potencialAnsweredItems;
+  const totalWizardProgress = totalWizardItems > 0 
+    ? Math.round((totalWizardAnswered / totalWizardItems) * 100) 
+    : 0;
+
+  const currentStepData = wizardSteps[currentWizardStep];
+  const isLastWizardStep = currentWizardStep === wizardSteps.length - 1;
+
+  // Validación del paso actual del wizard
+  const canGoNextWizard = useMemo(() => {
+    if (!currentStepData || !currentStepData.data) return false;
+    
+    if (currentStepData.type === "desempeno") {
+      return currentStepData.data.items.every((item: any) => desempenoResponses[item.id] !== undefined);
+    } else if (currentStepData.type === "potencial") {
+      return currentStepData.data.items.every((item: any) => potencialResponses[item.id] !== undefined);
+    }
+    
+    return false;
+  }, [currentStepData, desempenoResponses, potencialResponses]);
+
+  // Posicionar wizard en el primer paso incompleto cuando se cargan los datos
+  useEffect(() => {
+    if (wizardSteps.length > 0 && instrument) {
+      const firstIncompleteIndex = wizardSteps.findIndex(step => !step.completed);
+      if (firstIncompleteIndex !== -1 && firstIncompleteIndex !== currentWizardStep) {
+        setCurrentWizardStep(firstIncompleteIndex);
+      }
+    }
+  }, [instrument, wizardSteps.length]); // Solo cuando se carga el instrumento inicialmente
 
   useEffect(() => {
     if (!id || !user) {
@@ -248,18 +327,6 @@ const EvaluacionColaborador = () => {
         const jefeCompleto = jefeDraft?.estado === "enviado";
         setJefeAlreadyEvaluated(jefeCompleto);
         
-        if (jefeCompleto && currentPeriodoId) {
-          // Solo mostrar autoevaluación si el jefe ya completó su evaluación
-          const submittedAuto = await getSubmittedEvaluation(colaboradorFormatted.dpi, currentPeriodoId);
-          const mockAuto = getMockColaboradorEvaluation(colaboradorFormatted.dpi);
-          setAutoevaluacion(submittedAuto || mockAuto);
-          // Cambiar a la pestaña de autoevaluación cuando está disponible
-          setEvaluacionTab("auto");
-        } else {
-          // Si el jefe no ha completado, empezar en desempeño
-          setEvaluacionTab("desempeno");
-        }
-
         // Cargar evaluación del jefe si existe
         if (jefeDraft) {
           setDesempenoResponses(jefeDraft.responses);
@@ -271,9 +338,21 @@ const EvaluacionColaborador = () => {
           
           if (jefeDraft.estado === "enviado") {
             toast.info("Esta evaluación ya fue enviada");
+            // Si está completada, mostrar autoevaluación
+            if (currentPeriodoId) {
+              const submittedAuto = await getSubmittedEvaluation(colaboradorFormatted.dpi, currentPeriodoId);
+              const mockAuto = getMockColaboradorEvaluation(colaboradorFormatted.dpi);
+              setAutoevaluacion(submittedAuto || mockAuto);
+              setEvaluacionTab("auto");
+            }
           } else {
             toast.info("Se ha cargado su borrador guardado");
+            // Si hay borrador, empezar en evaluación (wizard)
+            setEvaluacionTab("evaluacion");
           }
+        } else {
+          // Si no hay draft, empezar en evaluación (wizard)
+          setEvaluacionTab("evaluacion");
         }
       } catch (error) {
         console.error("Error loading data:", error);
@@ -348,10 +427,145 @@ const EvaluacionColaborador = () => {
     toast.success("Borrador guardado correctamente");
   };
 
+  // Encontrar la primera pregunta sin responder en el paso actual
+  const findFirstUnansweredQuestion = useCallback(() => {
+    if (!currentStepData || !currentStepData.data) return null;
+    
+    const unansweredItem = currentStepData.data.items.find((item: any) => {
+      if (currentStepData.type === "desempeno") {
+        return desempenoResponses[item.id] === undefined;
+      } else if (currentStepData.type === "potencial") {
+        return potencialResponses[item.id] === undefined;
+      }
+      return false;
+    });
+    
+    return unansweredItem;
+  }, [currentStepData, desempenoResponses, potencialResponses]);
+
+  // Wizard navigation handlers
+  const handleWizardNext = () => {
+    if (!canGoNextWizard) {
+      const unansweredItem = findFirstUnansweredQuestion();
+      if (unansweredItem) {
+        // Hacer scroll a la primera pregunta sin responder
+        const questionElement = document.getElementById(`likert-${unansweredItem.id}`);
+        if (questionElement) {
+          questionElement.scrollIntoView({ behavior: "smooth", block: "center" });
+          // Resaltar brevemente la pregunta
+          questionElement.classList.add("ring-2", "ring-destructive", "ring-offset-2");
+          setTimeout(() => {
+            questionElement.classList.remove("ring-2", "ring-destructive", "ring-offset-2");
+          }, 2000);
+        }
+        
+        const totalItems = currentStepData?.data?.items?.length || 0;
+        const answeredCount = currentStepData?.type === "desempeno"
+          ? currentStepData.data.items.filter((item: any) => desempenoResponses[item.id] !== undefined).length
+          : currentStepData.data.items.filter((item: any) => potencialResponses[item.id] !== undefined).length;
+        const missingCount = totalItems - answeredCount;
+        
+        toast.error(
+          `Faltan ${missingCount} pregunta${missingCount > 1 ? 's' : ''} por responder en esta dimensión`,
+          { duration: 4000 }
+        );
+      } else {
+        toast.error("Por favor completa todas las respuestas antes de continuar");
+      }
+      return;
+    }
+    if (currentWizardStep < wizardSteps.length - 1) {
+      const nextStep = currentWizardStep + 1;
+      const nextStepData = wizardSteps[nextStep];
+      
+      // Detectar si está pasando de desempeño a potencial
+      const isTransitioningToPotencial = currentStepData?.type === "desempeno" && 
+                                         nextStepData?.type === "potencial";
+      
+      setCurrentWizardStep(nextStep);
+      
+      // Scroll suave al inicio
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      
+      // Mostrar mensaje de éxito cuando completa desempeño
+      if (isTransitioningToPotencial && desempenoComplete) {
+        setTimeout(() => {
+          toast.success("¡Desempeño completado! Continúa con la evaluación de Potencial", {
+            duration: 4000,
+            description: "Has terminado todas las dimensiones de desempeño"
+          });
+        }, 300);
+      }
+    }
+  };
+
+  const handleWizardPrevious = () => {
+    if (currentWizardStep > 0) {
+      setCurrentWizardStep(currentWizardStep - 1);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
   const handleSubmitClick = () => {
+    // Si estamos en el wizard, validar el paso actual primero
+    if (evaluacionTab === "evaluacion" && !canGoNextWizard) {
+      const unansweredItem = findFirstUnansweredQuestion();
+      if (unansweredItem) {
+        const questionElement = document.getElementById(`likert-${unansweredItem.id}`);
+        if (questionElement) {
+          questionElement.scrollIntoView({ behavior: "smooth", block: "center" });
+          questionElement.classList.add("ring-2", "ring-destructive", "ring-offset-2");
+          setTimeout(() => {
+            questionElement.classList.remove("ring-2", "ring-destructive", "ring-offset-2");
+          }, 2000);
+        }
+        
+        const totalItems = currentStepData?.data?.items?.length || 0;
+        const answeredCount = currentStepData?.type === "desempeno"
+          ? currentStepData.data.items.filter((item: any) => desempenoResponses[item.id] !== undefined).length
+          : currentStepData.data.items.filter((item: any) => potencialResponses[item.id] !== undefined).length;
+        const missingCount = totalItems - answeredCount;
+        
+        toast.error(
+          `Faltan ${missingCount} pregunta${missingCount > 1 ? 's' : ''} por responder en esta dimensión antes de enviar`,
+          { duration: 5000 }
+        );
+      }
+      return;
+    }
+
+    // Validar desempeño completo
     if (!desempenoComplete) {
       const incompleteDims = getIncompleteDimensions(desempenoResponses, desempenoDimensions);
       const dimNames = incompleteDims.map((d) => d.nombre).join(", ");
+      
+      // Encontrar la primera dimensión incompleta y navegar a ella
+      const firstIncompleteDim = incompleteDims[0];
+      if (firstIncompleteDim && wizardSteps.length > 0) {
+        const stepIndex = wizardSteps.findIndex(step => 
+          step.type === "desempeno" && step.data?.id === firstIncompleteDim.id
+        );
+        if (stepIndex !== -1) {
+          setCurrentWizardStep(stepIndex);
+          setEvaluacionTab("evaluacion");
+          setTimeout(() => {
+            const firstUnanswered = firstIncompleteDim.items.find((item: any) => 
+              desempenoResponses[item.id] === undefined
+            );
+            if (firstUnanswered) {
+              const questionElement = document.getElementById(`likert-${firstUnanswered.id}`);
+              if (questionElement) {
+                questionElement.scrollIntoView({ behavior: "smooth", block: "center" });
+                questionElement.classList.add("ring-2", "ring-destructive", "ring-offset-2");
+                setTimeout(() => {
+                  questionElement.classList.remove("ring-2", "ring-destructive", "ring-offset-2");
+                }, 2000);
+              }
+            }
+          }, 300);
+        }
+      }
+      
       toast.error(
         `Faltan ítems por responder en Desempeño: ${dimNames}`,
         { duration: 5000 }
@@ -359,9 +573,38 @@ const EvaluacionColaborador = () => {
       return;
     }
 
+    // Validar potencial completo
     if (!potencialComplete) {
       const incompleteDims = getIncompleteDimensions(potencialResponses, potencialDimensions);
       const dimNames = incompleteDims.map((d) => d.nombre).join(", ");
+      
+      // Encontrar la primera dimensión incompleta y navegar a ella
+      const firstIncompleteDim = incompleteDims[0];
+      if (firstIncompleteDim && wizardSteps.length > 0) {
+        const stepIndex = wizardSteps.findIndex(step => 
+          step.type === "potencial" && step.data?.id === firstIncompleteDim.id
+        );
+        if (stepIndex !== -1) {
+          setCurrentWizardStep(stepIndex);
+          setEvaluacionTab("evaluacion");
+          setTimeout(() => {
+            const firstUnanswered = firstIncompleteDim.items.find((item: any) => 
+              potencialResponses[item.id] === undefined
+            );
+            if (firstUnanswered) {
+              const questionElement = document.getElementById(`likert-${firstUnanswered.id}`);
+              if (questionElement) {
+                questionElement.scrollIntoView({ behavior: "smooth", block: "center" });
+                questionElement.classList.add("ring-2", "ring-destructive", "ring-offset-2");
+                setTimeout(() => {
+                  questionElement.classList.remove("ring-2", "ring-destructive", "ring-offset-2");
+                }, 2000);
+              }
+            }
+          }, 300);
+        }
+      }
+      
       toast.error(
         `Faltan ítems por responder en Potencial: ${dimNames}`,
         { duration: 5000 }
@@ -501,19 +744,20 @@ const EvaluacionColaborador = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-20">
       <Header />
 
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-4 py-6 sm:py-8">
         {/* Header */}
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <Button variant="ghost" onClick={() => navigate("/evaluacion-equipo")}>
+        <div className="mb-4 sm:mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <Button variant="ghost" size="sm" onClick={() => navigate("/evaluacion-equipo")}>
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Volver al Equipo
+            <span className="hidden sm:inline">Volver al Equipo</span>
+            <span className="sm:hidden">Volver</span>
           </Button>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 sm:gap-4">
             {!jefeAlreadyEvaluated && <AutoSaveIndicator status={autoSaveStatus} />}
-            <div className="text-right text-sm text-muted-foreground">
+            <div className="text-right text-xs sm:text-sm text-muted-foreground">
               <p>Periodo: {periodoActivo?.nombre ?? periodoId ?? "Sin periodo"}</p>
               <p>Colaborador: {colaborador.nivel}</p>
             </div>
@@ -522,8 +766,8 @@ const EvaluacionColaborador = () => {
 
         {/* Title and description */}
         <div className="mb-6 space-y-2">
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold text-foreground">
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
               Evaluación de {colaborador.nombre}
             </h1>
             {jefeAlreadyEvaluated && (
@@ -541,10 +785,10 @@ const EvaluacionColaborador = () => {
               </>
             )}
           </div>
-          <p className="text-xl text-muted-foreground">
+          <p className="text-base sm:text-xl text-muted-foreground">
             {colaborador.cargo} - {colaborador.area} - Nivel {colaborador.nivel}
           </p>
-          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
             <p>
               <strong>Evaluador:</strong> {user?.nombre} {user?.apellidos}
             </p>
@@ -554,33 +798,7 @@ const EvaluacionColaborador = () => {
           </div>
         </div>
 
-        {/* Banner informativo cuando desempeño está completo pero potencial no */}
-        {desempenoComplete && !potencialComplete && !jefeAlreadyEvaluated && (
-          <div className="mb-4 p-4 bg-success/10 border border-success/20 rounded-lg">
-            <div className="flex items-start gap-3">
-              <CheckCircle2 className="h-5 w-5 text-success mt-0.5 flex-shrink-0" />
-              <div className="flex-1">
-                <h3 className="font-semibold text-success mb-1">
-                  ¡Evaluación de Desempeño Completada!
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  Ahora debe completar la <strong>Evaluación de Potencial</strong> para poder enviar la evaluación completa. 
-                  Haga clic en la pestaña "Evaluación de Potencial" o use el botón de continuación al final de esta sección.
-                </p>
-              </div>
-              <Button
-                variant="default"
-                size="sm"
-                onClick={() => setEvaluacionTab("potencial")}
-              >
-                Ir a Potencial
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* Tabs principales */}
+        {/* Tabs principales - Solo Autoevaluación y Evaluación (wizard) */}
         <Tabs value={evaluacionTab} onValueChange={(v) => setEvaluacionTab(v as any)} className="mb-6">
           <TabsList className="w-full">
             <TabsTrigger 
@@ -592,25 +810,14 @@ const EvaluacionColaborador = () => {
               Autoevaluación del Colaborador
               {!jefeAlreadyEvaluated && <AlertTriangle className="ml-2 h-4 w-4 text-warning" />}
             </TabsTrigger>
-            <TabsTrigger value="desempeno" className="flex-1">
+            <TabsTrigger value="evaluacion" className="flex-1">
               <FileEdit className="mr-2 h-4 w-4" />
-              Evaluación de Desempeño
-              {desempenoComplete ? (
+              Evaluación
+              {isComplete ? (
                 <CheckCircle2 className="ml-2 h-4 w-4 text-success" />
               ) : (
                 <Badge variant="secondary" className="ml-2 text-xs">
-                  {Math.round(desempenoProgress)}%
-                </Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="potencial" className="flex-1">
-              <FileEdit className="mr-2 h-4 w-4" />
-              Evaluación de Potencial
-              {potencialComplete ? (
-                <CheckCircle2 className="ml-2 h-4 w-4 text-success" />
-              ) : (
-                <Badge variant="secondary" className="ml-2 text-xs">
-                  {Math.round(potencialProgress)}%
+                  {totalWizardProgress}%
                 </Badge>
               )}
             </TabsTrigger>
@@ -686,8 +893,184 @@ const EvaluacionColaborador = () => {
             )}
           </TabsContent>
 
-          {/* Tab: Evaluación de Desempeño del Jefe */}
-          <TabsContent value="desempeno" className="space-y-6">
+          {/* Tab: Evaluación del Jefe (Wizard estilo Typeform) */}
+          <TabsContent value="evaluacion" className="space-y-6">
+            {!jefeAlreadyEvaluated && wizardSteps.length > 0 && currentStepData ? (
+              <>
+                {/* Wizard Header */}
+                <WizardHeader
+                  steps={wizardSteps.map(step => ({
+                    id: step.id,
+                    label: step.label,
+                    completed: step.completed,
+                  }))}
+                  currentStep={currentWizardStep}
+                  totalProgress={totalWizardProgress}
+                  answeredItems={totalWizardAnswered}
+                  totalItems={totalWizardItems}
+                />
+
+                {/* Banner informativo cuando pasa de Desempeño a Potencial */}
+                {currentStepData.type === "potencial" && 
+                 currentWizardStep === desempenoDimensions.length && 
+                 desempenoComplete && 
+                 !jefeAlreadyEvaluated && (
+                  <div className="mb-6 p-4 sm:p-6 bg-success/10 border-2 border-success/20 rounded-lg animate-in fade-in slide-in-from-top-2 duration-500">
+                    <div className="flex items-start gap-3 sm:gap-4">
+                      <CheckCircle2 className="h-5 w-5 sm:h-6 sm:w-6 text-success mt-0.5 flex-shrink-0" />
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-success mb-1 text-base sm:text-lg">
+                          ¡Evaluación de Desempeño Completada!
+                        </h3>
+                        <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
+                          Has completado todas las dimensiones de <strong>Desempeño</strong>. 
+                          Ahora continúa con la evaluación de <strong>Potencial</strong> para finalizar la evaluación completa.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Wizard Step Content */}
+                <WizardStep
+                  title={currentStepData.data.nombre}
+                  description={currentStepData.data.descripcion}
+                  weight={currentStepData.data.peso}
+                  currentStep={currentWizardStep}
+                  totalSteps={wizardSteps.length}
+                  answered={
+                    currentStepData.type === "desempeno"
+                      ? getDimensionProgress(desempenoResponses, currentStepData.data).answered
+                      : getDimensionProgress(potencialResponses, currentStepData.data).answered
+                  }
+                  total={
+                    currentStepData.type === "desempeno"
+                      ? getDimensionProgress(desempenoResponses, currentStepData.data).total
+                      : getDimensionProgress(potencialResponses, currentStepData.data).total
+                  }
+                >
+                  <div className="space-y-6">
+                    {/* Badge de sección mejorado */}
+                    <div className="flex items-center gap-3 pb-2 border-b border-border/50">
+                      <Badge 
+                        variant={currentStepData.type === "desempeno" ? "default" : "secondary"}
+                        className="text-sm sm:text-base px-3 sm:px-4 py-1.5 sm:py-2 font-semibold"
+                      >
+                        {currentStepData.type === "desempeno" ? "📊 Desempeño" : "🚀 Potencial"}
+                      </Badge>
+                      <div className="flex-1 text-xs sm:text-sm text-muted-foreground">
+                        {currentStepData.type === "desempeno" 
+                          ? `${desempenoDimensions.length} dimensión${desempenoDimensions.length > 1 ? 'es' : ''} de desempeño`
+                          : `${potencialDimensions.length} dimensión${potencialDimensions.length > 1 ? 'es' : ''} de potencial`}
+                      </div>
+                    </div>
+
+                    {/* Items de la dimensión */}
+                    {currentStepData.data.items.map((item: any) => (
+                      <MobileLikertScale
+                        key={item.id}
+                        itemId={item.id}
+                        itemText={`${item.orden}. ${item.texto}`}
+                        value={
+                          currentStepData.type === "desempeno"
+                            ? desempenoResponses[item.id]
+                            : potencialResponses[item.id]
+                        }
+                        onChange={(value) => {
+                          if (currentStepData.type === "desempeno") {
+                            handleDesempenoResponseChange(item.id, value);
+                          } else {
+                            handlePotencialResponseChange(item.id, value);
+                          }
+                        }}
+                        disabled={jefeAlreadyEvaluated}
+                      />
+                    ))}
+
+                    {/* Comentarios */}
+                    <div className="mt-8 space-y-3 pt-6 border-t-2">
+                      <Label
+                        htmlFor={`comment-${currentStepData.id}`}
+                        className="text-base font-semibold"
+                      >
+                        Comentarios y observaciones
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        {currentStepData.type === "desempeno"
+                          ? "Agregue comentarios, ejemplos concretos o observaciones sobre el desempeño del colaborador en esta dimensión."
+                          : "Agregue comentarios sobre el potencial del colaborador en esta dimensión."}
+                      </p>
+                      <Textarea
+                        id={`comment-${currentStepData.id}`}
+                        placeholder="Escriba sus comentarios aquí..."
+                        value={
+                          currentStepData.type === "desempeno"
+                            ? desempenoComments[currentStepData.data.id] || ""
+                            : potencialComments[currentStepData.data.id] || ""
+                        }
+                        onChange={(e) => {
+                          if (currentStepData.type === "desempeno") {
+                            handleDesempenoCommentChange(currentStepData.data.id, e.target.value);
+                          } else {
+                            handlePotencialCommentChange(currentStepData.data.id, e.target.value);
+                          }
+                        }}
+                        rows={5}
+                        maxLength={1000}
+                        className="resize-none text-base"
+                        disabled={jefeAlreadyEvaluated}
+                      />
+                      <p className="text-xs text-muted-foreground text-right">
+                        {(
+                          currentStepData.type === "desempeno"
+                            ? desempenoComments[currentStepData.data.id]?.length || 0
+                            : potencialComments[currentStepData.data.id]?.length || 0
+                        )}/1000 caracteres
+                      </p>
+                    </div>
+                  </div>
+                </WizardStep>
+
+                {/* Wizard Footer */}
+                <WizardFooter
+                  currentStep={currentWizardStep}
+                  totalSteps={wizardSteps.length}
+                  onPrevious={handleWizardPrevious}
+                  onNext={handleWizardNext}
+                  onSubmit={handleSubmitClick}
+                  canGoNext={canGoNextWizard}
+                  isLastStep={isLastWizardStep}
+                />
+              </>
+            ) : !jefeAlreadyEvaluated && wizardSteps.length === 0 ? (
+              <Card>
+                <CardContent className="py-8 text-center text-muted-foreground">
+                  Cargando dimensiones de evaluación...
+                </CardContent>
+              </Card>
+            ) : null}
+
+            {jefeAlreadyEvaluated && (
+              <Card>
+                <CardContent className="py-8 text-center">
+                  <CheckCircle2 className="h-12 w-12 text-success mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">Evaluación completada</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Esta evaluación ya fue enviada y no puede ser modificada.
+                  </p>
+                  <Button
+                    variant="outline"
+                    onClick={() => navigate(`/evaluacion-equipo/${id}/comparativa`)}
+                  >
+                    Ver Comparativa
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          {/* Tab: Evaluación de Desempeño del Jefe - DEPRECADO, mantener por compatibilidad */}
+          <TabsContent value="desempeno" className="space-y-6 hidden">
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
@@ -869,8 +1252,8 @@ const EvaluacionColaborador = () => {
             </Card>
           </TabsContent>
 
-          {/* Tab: Evaluación de Potencial del Jefe */}
-          <TabsContent value="potencial" className="space-y-6">
+          {/* Tab: Evaluación de Potencial del Jefe - DEPRECADO, mantener por compatibilidad */}
+          <TabsContent value="potencial" className="space-y-6 hidden">
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
@@ -1012,36 +1395,13 @@ const EvaluacionColaborador = () => {
           </TabsContent>
         </Tabs>
 
-        {/* Action buttons */}
-        {!jefeAlreadyEvaluated && (
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
-            <Button variant="outline" onClick={handleSaveDraft}>
-              <Save className="mr-2 h-4 w-4" />
+        {/* Botón de guardar manual (opcional, el auto-guardado ya funciona) */}
+        {!jefeAlreadyEvaluated && evaluacionTab === "evaluacion" && (
+          <div className="mt-4 flex justify-center sm:justify-end">
+            <Button variant="outline" size="sm" onClick={handleSaveDraft}>
+              <Save className="mr-2 h-3 w-3" />
               Guardar Borrador
             </Button>
-            <Button 
-              onClick={handleSubmitClick}
-              disabled={!isComplete}
-              className="relative"
-            >
-              <Send className="mr-2 h-4 w-4" />
-              Enviar Evaluación Completa
-            </Button>
-          </div>
-        )}
-
-        {!isComplete && !jefeAlreadyEvaluated && (
-          <div className="mt-4 space-y-2">
-            <div className="flex items-center gap-2 text-sm text-warning">
-              <AlertTriangle className="h-4 w-4" />
-              <span>
-                Complete todas las secciones (Desempeño y Potencial) para poder enviar la evaluación
-              </span>
-            </div>
-            <div className="text-xs text-muted-foreground space-y-1">
-              <p>Estado Desempeño: {desempenoComplete ? "✓ Completo" : `Faltan ${desempenoTotalItems - desempenoAnsweredItems} ítems`}</p>
-              <p>Estado Potencial: {potencialComplete ? "✓ Completo" : `Faltan ${potencialTotalItems - potencialAnsweredItems} ítems`}</p>
-            </div>
           </div>
         )}
       </main>

@@ -1,5 +1,3 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { TrendingUp } from "lucide-react";
 
@@ -9,27 +7,11 @@ interface MobileNPSQuestionProps {
 }
 
 export const MobileNPSQuestion = ({ value, onChange }: MobileNPSQuestionProps) => {
-  const getNPSCategory = (score: number | undefined) => {
-    if (score === undefined) return null;
-    if (score >= 9) return { label: "Promotor", color: "bg-success text-success-foreground" };
-    if (score >= 7) return { label: "Pasivo", color: "bg-warning text-warning-foreground" };
-    return { label: "Detractor", color: "bg-destructive text-destructive-foreground" };
-  };
-
-  const category = getNPSCategory(value);
-
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <TrendingUp className="h-5 w-5 text-primary" />
-          <h3 className="text-lg font-semibold">Recomendación Institucional</h3>
-        </div>
-        {category && (
-          <Badge className={category.color}>
-            {category.label}
-          </Badge>
-        )}
+      <div className="flex items-center gap-2">
+        <TrendingUp className="h-5 w-5 text-primary" />
+        <h3 className="text-lg font-semibold">Recomendación Institucional</h3>
       </div>
       
       <p className="text-base text-muted-foreground leading-relaxed">
@@ -111,21 +93,6 @@ export const MobileNPSQuestion = ({ value, onChange }: MobileNPSQuestionProps) =
           <div className="mt-4 p-4 bg-muted/50 rounded-lg">
             <p className="text-sm">
               <strong>Tu puntuación: {value}/10</strong>
-              {value >= 9 && (
-                <span className="text-success ml-2">
-                  - ¡Gracias por ser promotor de nuestra institución!
-                </span>
-              )}
-              {value >= 7 && value < 9 && (
-                <span className="text-warning ml-2">
-                  - Tu opinión es valiosa para mejorar
-                </span>
-              )}
-              {value < 7 && (
-                <span className="text-destructive ml-2">
-                  - Queremos mejorar, tu feedback es importante
-                </span>
-              )}
             </p>
           </div>
         )}

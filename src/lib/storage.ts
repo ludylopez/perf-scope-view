@@ -25,11 +25,11 @@ export interface EvaluationDraft {
 const STORAGE_KEY_PREFIX = "evaluation_";
 const JEFE_EVALUATION_PREFIX = "jefe_evaluation_";
 
-export const saveEvaluationDraft = async (draft: EvaluationDraft): Promise<void> => {
+export const saveEvaluationDraft = async (draft: EvaluationDraft): Promise<string | null> => {
   // Validar que periodoId sea un UUID válido antes de guardar
   if (!isValidUUID(draft.periodoId)) {
     console.error('❌ No se puede guardar draft con periodoId inválido:', draft.periodoId);
-    return;
+    return null;
   }
   
   draft.fechaUltimaModificacion = new Date().toISOString();
@@ -43,7 +43,11 @@ export const saveEvaluationDraft = async (draft: EvaluationDraft): Promise<void>
       ? `${JEFE_EVALUATION_PREFIX}${draft.evaluadorId}_${draft.colaboradorId}_${draft.periodoId}`
       : `${STORAGE_KEY_PREFIX}${draft.usuarioId}_${draft.periodoId}`;
     localStorage.setItem(key, JSON.stringify(draft));
+    return null;
   }
+  
+  // Retornar el ID de la evaluación para poder guardar preguntas abiertas
+  return supabaseId;
 };
 
 export const getEvaluationDraft = async (

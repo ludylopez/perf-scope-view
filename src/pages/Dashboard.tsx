@@ -189,6 +189,10 @@ const Dashboard = () => {
   } | null>(null);
   const [planDesarrollo, setPlanDesarrollo] = useState<any>(null);
   const [dashboardStats, setDashboardStats] = useState<any>(null);
+  const [jefesEvaluacionInfo, setJefesEvaluacionInfo] = useState<{
+    totalJefes: number;
+    jefesCompletados: number;
+  } | null>(null);
 
   const focusResultadosSection = () => {
     const element = document.getElementById("resultados-evaluacion-container");
@@ -262,24 +266,75 @@ const Dashboard = () => {
           setProgress(100);
           
           // Cargar datos de resultados si está enviada
-          // IMPORTANTE: Para C1 (Concejo Municipal) y A1 (Alcalde), cargar resultados inmediatamente ya que solo tienen autoevaluación
-          // Para otros niveles, solo cargar resultados si el jefe completó su evaluación
-          if (user.nivel === 'C1' || user.nivel === 'A1') {
-            // C1 y A1 solo tienen autoevaluación, cargar resultados inmediatamente
+          // IMPORTANTE: C1 (Concejo Municipal) solo tiene autoevaluación, cargar resultados inmediatamente
+          // A1 (Alcalde) es evaluado por el Concejo, debe esperar a que todos completen
+          // Otros niveles también esperan a que todos sus jefes completen
+          if (user.nivel === 'C1') {
+            // C1 solo tiene autoevaluación, cargar resultados inmediatamente
             await loadResultadosData();
-          } else if (isColaborador) {
-            const jefeId = await getColaboradorJefe(user.dpi);
-            if (jefeId) {
-              const jefeCompleto = await hasJefeEvaluation(jefeId, user.dpi, activePeriodId);
-              if (jefeCompleto) {
+          } else if (isColaborador || user.nivel === 'A1') {
+            // Obtener TODOS los jefes asignados al colaborador
+            const { supabase } = await import("@/integrations/supabase/client");
+            const { data: asignaciones } = await supabase
+              .from("user_assignments")
+              .select("jefe_id")
+              .eq("colaborador_id", user.dpi)
+              .eq("activo", true);
+            
+            const jefesAsignados = asignaciones?.map(a => a.jefe_id) || [];
+            const totalJefes = jefesAsignados.length;
+            
+            if (totalJefes === 0) {
+              // Si no tiene jefes, cargar resultados de autoevaluación
+              console.log('✅ [Dashboard] Colaborador sin jefes asignados, cargando autoevaluación...');
+              await loadResultadosData();
+            } else {
+              // Verificar cuántos jefes han completado su evaluación
+              // Primero verificar directamente en evaluations (más confiable)
+              const { data: evaluacionesJefes, count: countEvaluaciones } = await supabase
+                .from("evaluations")
+                .select("evaluador_id", { count: 'exact' })
+                .eq("colaborador_id", user.dpi)
+                .eq("periodo_id", activePeriodId)
+                .eq("tipo", "jefe")
+                .eq("estado", "enviado")
+                .in("evaluador_id", jefesAsignados);
+              
+              // También verificar en evaluation_results_by_evaluator (por si el trigger ya corrió)
+              const { data: resultadosExistentes, count: countResultados } = await supabase
+                .from("evaluation_results_by_evaluator")
+                .select("evaluador_id", { count: 'exact' })
+                .eq("colaborador_id", user.dpi)
+                .eq("periodo_id", activePeriodId)
+                .in("evaluador_id", jefesAsignados);
+              
+              // Usar el máximo entre ambos para asegurar que contamos correctamente
+              // Si hay evaluación enviada pero no resultado, el trigger puede no haberse ejecutado aún
+              const jefesCompletadosEvaluaciones = countEvaluaciones || (evaluacionesJefes?.length || 0);
+              const jefesCompletadosResultados = countResultados || (resultadosExistentes?.length || 0);
+              const jefesCompletados = Math.max(jefesCompletadosEvaluaciones, jefesCompletadosResultados);
+              const todosCompletaron = jefesCompletados === totalJefes;
+              
+              // Guardar información de progreso de jefes
+              setJefesEvaluacionInfo({
+                totalJefes,
+                jefesCompletados
+              });
+              
+              console.log('📊 [Dashboard] Estado de evaluaciones de jefes:', {
+                totalJefes,
+                jefesCompletados,
+                todosCompletaron,
+                faltan: totalJefes - jefesCompletados
+              });
+              
+              if (todosCompletaron) {
+                console.log('✅ [Dashboard] Todos los jefes han completado, cargando resultado consolidado...');
                 await loadResultadosData();
               } else {
-                console.log('⏳ [Dashboard] Autoevaluación enviada, pero jefe aún no ha completado. No se mostrarán resultados.');
+                console.log(`⏳ [Dashboard] Autoevaluación enviada, pero solo ${jefesCompletados} de ${totalJefes} jefe(s) han completado. Esperando a que todos completen.`);
                 setResultadoData(null);
               }
-            } else {
-              // Si no tiene jefe, cargar resultados de autoevaluación
-              await loadResultadosData();
             }
           }
         } else {
@@ -324,26 +379,115 @@ const Dashboard = () => {
           respuestas: submitted.responses 
         });
 
-        const jefeId = await getColaboradorJefe(user.dpi);
+        // Obtener TODOS los jefes asignados y verificar que todos hayan completado
+        const { supabase } = await import("@/integrations/supabase/client");
+        const { data: asignaciones } = await supabase
+          .from("user_assignments")
+          .select("jefe_id")
+          .eq("colaborador_id", user.dpi)
+          .eq("activo", true);
+        
+        const jefesAsignados = asignaciones?.map(a => a.jefe_id) || [];
+        const totalJefes = jefesAsignados.length;
         let jefeCompleto = false;
         let responsesToUse = submitted.responses;
 
-        if (jefeId) {
-          jefeCompleto = await hasJefeEvaluation(jefeId, user.dpi, activePeriodId);
-          console.log('📊 [Dashboard] Estado evaluación jefe:', { jefeId, jefeCompleto });
+        if (totalJefes === 0) {
+          // Si no tiene jefes, usar solo autoevaluación
+          jefeCompleto = false; // No hay jefe que complete
+          console.log('📊 [Dashboard] Sin jefes asignados, usando solo autoevaluación');
+        } else {
+          // Verificar que TODOS los jefes hayan completado
+          // Primero verificar directamente en evaluations (más confiable)
+          const { data: evaluacionesJefes, count: countEvaluaciones } = await supabase
+            .from("evaluations")
+            .select("evaluador_id", { count: 'exact' })
+            .eq("colaborador_id", user.dpi)
+            .eq("periodo_id", activePeriodId)
+            .eq("tipo", "jefe")
+            .eq("estado", "enviado")
+            .in("evaluador_id", jefesAsignados);
+          
+          // También verificar en evaluation_results_by_evaluator (por si el trigger ya corrió)
+          const { data: resultadosExistentes, count: countResultados } = await supabase
+            .from("evaluation_results_by_evaluator")
+            .select("evaluador_id", { count: 'exact' })
+            .eq("colaborador_id", user.dpi)
+            .eq("periodo_id", activePeriodId)
+            .in("evaluador_id", jefesAsignados);
+          
+          // Usar el máximo entre ambos para asegurar que contamos correctamente
+          const jefesCompletadosEvaluaciones = countEvaluaciones || (evaluacionesJefes?.length || 0);
+          const jefesCompletadosResultados = countResultados || (resultadosExistentes?.length || 0);
+          const jefesCompletados = Math.max(jefesCompletadosEvaluaciones, jefesCompletadosResultados);
+          jefeCompleto = jefesCompletados === totalJefes;
+          
+          console.log('📊 [Dashboard] Estado de evaluaciones:', { 
+            totalJefes,
+            jefesCompletados,
+            jefeCompleto,
+            faltan: totalJefes - jefesCompletados
+          });
+          
           if (jefeCompleto) {
-            const jefeEval = await getJefeEvaluationDraft(jefeId, user.dpi, activePeriodId);
-            if (jefeEval) {
-              // Pasar el ID del instrumento para obtener los pesos correctos (A1=45/55, otros=70/30)
-              const instrumentId = instrument?.id || user?.nivel;
-              responsesToUse = calculateConsolidatedResponses(submitted.responses, jefeEval.responses, instrumentId);
-              console.log('✅ [Dashboard] Usando respuestas consolidadas:', { 
-                autoCount: Object.keys(submitted.responses).length,
-                jefeCount: Object.keys(jefeEval.responses).length,
-                consolidadasCount: Object.keys(responsesToUse).length,
-                instrumentId
+            // Si todos completaron, usar resultado consolidado de getConsolidatedResult
+            // que ya calcula el promedio de todos los evaluadores
+            const { getConsolidatedResult } = await import("@/lib/finalResultSupabase");
+            const consolidado = await getConsolidatedResult(user.dpi, activePeriodId);
+            
+            if (consolidado && consolidado.totalEvaluadores > 0) {
+              // Usar el desempeño promedio consolidado
+              // Para el radar, necesitamos calcular desde las respuestas consolidadas
+              // Obtener todas las evaluaciones de jefes para consolidar
+              const evaluacionesJefes = await Promise.all(
+                jefesAsignados.map(jefeId => 
+                  getJefeEvaluationDraft(jefeId, user.dpi, activePeriodId)
+                )
+              );
+              
+              // Consolidar todas las evaluaciones de jefes (promedio)
+              const todasLasRespuestasJefe: Record<string, number[]> = {};
+              evaluacionesJefes.forEach(jefeEval => {
+                if (jefeEval) {
+                  Object.entries(jefeEval.responses).forEach(([key, value]) => {
+                    if (!todasLasRespuestasJefe[key]) {
+                      todasLasRespuestasJefe[key] = [];
+                    }
+                    todasLasRespuestasJefe[key].push(value);
+                  });
+                }
               });
+              
+              // Calcular promedio de todas las evaluaciones de jefes
+              const respuestasJefePromedio: Record<string, number> = {};
+              Object.entries(todasLasRespuestasJefe).forEach(([key, values]) => {
+                const promedio = values.reduce((sum, val) => sum + val, 0) / values.length;
+                respuestasJefePromedio[key] = Math.round(promedio * 100) / 100; // Redondear a 2 decimales
+              });
+              
+              // Consolidar con autoevaluación
+              const instrumentId = instrument?.id || user?.nivel;
+              responsesToUse = calculateConsolidatedResponses(submitted.responses, respuestasJefePromedio, instrumentId);
+              
+              console.log('✅ [Dashboard] Usando respuestas consolidadas de todos los jefes:', { 
+                totalJefes,
+                autoCount: Object.keys(submitted.responses).length,
+                jefePromedioCount: Object.keys(respuestasJefePromedio).length,
+                consolidadasCount: Object.keys(responsesToUse).length,
+                instrumentId,
+                desempenoPromedio: consolidado.desempenoPorcentajePromedio
+              });
+            } else {
+              // Fallback: usar solo el primer jefe si no hay consolidado
+              const jefeId = jefesAsignados[0];
+              const jefeEval = await getJefeEvaluationDraft(jefeId, user.dpi, activePeriodId);
+              if (jefeEval) {
+                const instrumentId = instrument?.id || user?.nivel;
+                responsesToUse = calculateConsolidatedResponses(submitted.responses, jefeEval.responses, instrumentId);
+              }
             }
+          } else {
+            console.log(`⏳ [Dashboard] Solo ${jefesCompletados} de ${totalJefes} jefe(s) han completado. Usando solo autoevaluación.`);
           }
         }
 
@@ -512,14 +656,39 @@ const Dashboard = () => {
 
         console.log('📊 [Dashboard] RadarData final con promedios:', radarDataWithPromedio);
 
+        // Si todos los jefes completaron, usar el resultado consolidado calculado
+        let performancePercentageFinal = performancePercentage;
+        if (jefeCompleto && totalJefes > 0) {
+          // Obtener resultado consolidado que ya tiene el promedio de todos los evaluadores
+          const { getConsolidatedResult } = await import("@/lib/finalResultSupabase");
+          const consolidado = await getConsolidatedResult(user.dpi, activePeriodId);
+          
+          if (consolidado && consolidado.desempenoPorcentajePromedio) {
+            performancePercentageFinal = consolidado.desempenoPorcentajePromedio;
+            console.log('✅ [Dashboard] Usando desempeño porcentaje consolidado (promedio de todos los jefes):', {
+              calculadoDesdeRespuestas: performancePercentage,
+              consolidado: consolidado.desempenoPorcentajePromedio,
+              totalEvaluadores: consolidado.totalEvaluadores
+            });
+          }
+        }
+
         setResultadoData({
-          performancePercentage,
+          performancePercentage: performancePercentageFinal,
           jefeCompleto,
           fortalezas,
           areasOportunidad,
           instrument,
           radarData: radarDataWithPromedio,
           promedioMunicipal
+        });
+        
+        console.log('✅ [Dashboard] resultadoData establecido:', {
+          performancePercentage: performancePercentageFinal,
+          jefeCompleto,
+          tieneResultado,
+          fortalezasCount: fortalezas.length,
+          areasOportunidadCount: areasOportunidad.length
         });
 
         // Cargar plan de desarrollo si existe
@@ -840,9 +1009,13 @@ const Dashboard = () => {
                       ? "Resultado consolidado de tu evaluación de desempeño"
                       : user?.nivel === 'C1'
                         ? "Resultado final de tu autoevaluación (Concejo Municipal)"
-                        : user?.nivel === 'A1'
-                          ? "Resultado final de tu autoevaluación (Alcalde Municipal)"
-                          : "Autoevaluación enviada. Esperando evaluación del jefe para resultado consolidado."}
+                        : jefesEvaluacionInfo
+                          ? user?.nivel === 'A1'
+                            ? `Autoevaluación enviada. ${jefesEvaluacionInfo.jefesCompletados} de ${jefesEvaluacionInfo.totalJefes} miembro(s) del Concejo han completado su evaluación. Esperando a que todos completen para mostrar resultado consolidado.`
+                            : `Autoevaluación enviada. ${jefesEvaluacionInfo.jefesCompletados} de ${jefesEvaluacionInfo.totalJefes} jefe(s) han completado su evaluación. Esperando a que todos completen para mostrar resultado consolidado.`
+                          : user?.nivel === 'A1'
+                            ? "Autoevaluación enviada. Esperando evaluación del Concejo Municipal para resultado consolidado."
+                            : "Autoevaluación enviada. Esperando evaluación del jefe para resultado consolidado."}
                   </p>
                 </div>
 
@@ -853,9 +1026,13 @@ const Dashboard = () => {
                     <AlertDescription className="text-blue-800 dark:text-blue-200">
                       {user?.nivel === 'C1'
                         ? "Su autoevaluación fue recibida exitosamente. Como miembro del Concejo Municipal, su resultado final está disponible inmediatamente."
-                        : user?.nivel === 'A1'
-                          ? "Su autoevaluación fue recibida exitosamente. Como Alcalde Municipal, su resultado final está disponible inmediatamente."
-                          : "Su autoevaluación fue recibida. Cuando su jefe complete la evaluación, aquí aparecerá su resultado consolidado."}
+                        : jefesEvaluacionInfo
+                          ? user?.nivel === 'A1'
+                            ? `Su autoevaluación fue recibida exitosamente. ${jefesEvaluacionInfo.jefesCompletados} de ${jefesEvaluacionInfo.totalJefes} miembro(s) del Concejo han completado su evaluación. El resultado consolidado se mostrará cuando todos los miembros del Concejo hayan completado.`
+                            : `Su autoevaluación fue recibida exitosamente. ${jefesEvaluacionInfo.jefesCompletados} de ${jefesEvaluacionInfo.totalJefes} jefe(s) han completado su evaluación. El resultado consolidado se mostrará cuando todos los jefes asignados hayan completado.`
+                          : user?.nivel === 'A1'
+                            ? "Su autoevaluación fue recibida. Cuando el Concejo Municipal complete la evaluación, aquí aparecerá su resultado consolidado."
+                            : "Su autoevaluación fue recibida. Cuando su jefe complete la evaluación, aquí aparecerá su resultado consolidado."}
                     </AlertDescription>
                   </Alert>
                 )}
@@ -1265,7 +1442,13 @@ const Dashboard = () => {
                     Autoevaluación Enviada
                   </CardTitle>
                   <CardDescription>
-                    Su autoevaluación ha sido recibida exitosamente
+                    {jefesEvaluacionInfo
+                      ? user?.nivel === 'A1'
+                        ? `Su autoevaluación ha sido recibida exitosamente. ${jefesEvaluacionInfo.jefesCompletados} de ${jefesEvaluacionInfo.totalJefes} miembro(s) del Concejo han completado su evaluación. ${jefesEvaluacionInfo.totalJefes - jefesEvaluacionInfo.jefesCompletados > 0 ? `Faltan ${jefesEvaluacionInfo.totalJefes - jefesEvaluacionInfo.jefesCompletados} miembro(s) del Concejo por completar.` : ''} Una vez que todos completen, podrá ver su resultado consolidado aquí.`
+                        : `Su autoevaluación ha sido recibida exitosamente. ${jefesEvaluacionInfo.jefesCompletados} de ${jefesEvaluacionInfo.totalJefes} jefe(s) han completado su evaluación. ${jefesEvaluacionInfo.totalJefes - jefesEvaluacionInfo.jefesCompletados > 0 ? `Faltan ${jefesEvaluacionInfo.totalJefes - jefesEvaluacionInfo.jefesCompletados} jefe(s) por completar.` : ''} Una vez que todos completen, podrá ver su resultado consolidado aquí.`
+                      : user?.nivel === 'A1'
+                        ? "Su autoevaluación ha sido recibida exitosamente. El resultado consolidado se mostrará cuando el Concejo Municipal complete la evaluación."
+                        : "Su autoevaluación ha sido recibida exitosamente"}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -1280,8 +1463,31 @@ const Dashboard = () => {
                         </>
                       ) : (
                         <>
-                          <strong>Su autoevaluación fue enviada correctamente.</strong> Cuando su jefe complete la evaluación, 
-                          aquí aparecerá su resultado consolidado con el gráfico radar, fortalezas y áreas de mejora.
+                          <strong>Su autoevaluación fue enviada correctamente.</strong>{" "}
+                          {jefesEvaluacionInfo ? (
+                            <>
+                              {user?.nivel === 'A1' ? (
+                                <>
+                                  {jefesEvaluacionInfo.jefesCompletados} de {jefesEvaluacionInfo.totalJefes} miembro(s) del Concejo han completado su evaluación.
+                                  {jefesEvaluacionInfo.totalJefes - jefesEvaluacionInfo.jefesCompletados > 0 && (
+                                    <> Faltan {jefesEvaluacionInfo.totalJefes - jefesEvaluacionInfo.jefesCompletados} miembro(s) del Concejo por completar.</>
+                                  )}
+                                </>
+                              ) : (
+                                <>
+                                  {jefesEvaluacionInfo.jefesCompletados} de {jefesEvaluacionInfo.totalJefes} jefe(s) han completado su evaluación.
+                                  {jefesEvaluacionInfo.totalJefes - jefesEvaluacionInfo.jefesCompletados > 0 && (
+                                    <> Faltan {jefesEvaluacionInfo.totalJefes - jefesEvaluacionInfo.jefesCompletados} jefe(s) por completar.</>
+                                  )}
+                                </>
+                              )}
+                              {" "}Una vez que todos completen, aquí aparecerá su resultado consolidado con el gráfico radar, fortalezas y áreas de mejora.
+                            </>
+                          ) : (
+                            user?.nivel === 'A1'
+                              ? "Cuando el Concejo Municipal complete la evaluación, aquí aparecerá su resultado consolidado con el gráfico radar, fortalezas y áreas de mejora."
+                              : "Cuando su jefe complete la evaluación, aquí aparecerá su resultado consolidado con el gráfico radar, fortalezas y áreas de mejora."
+                          )}
                         </>
                       )}
                     </AlertDescription>

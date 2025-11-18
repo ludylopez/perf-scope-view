@@ -26,7 +26,7 @@ export const MobileLikertScale = ({
   disabled = false,
 }: MobileLikertScaleProps) => {
   return (
-    <div className="space-y-4 rounded-lg border-2 bg-card p-4 sm:p-6">
+    <div id={`likert-${itemId}`} className="space-y-4 rounded-lg border-2 bg-card p-4 sm:p-6 transition-all">
       <p className="text-base font-medium leading-relaxed text-foreground">
         {itemText}
       </p>

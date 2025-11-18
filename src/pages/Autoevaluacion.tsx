@@ -222,10 +222,49 @@ const Autoevaluacion = () => {
 
         // Load draft
         const draft = await getEvaluationDraft(user.dpi, periodoIdFinal);
+        let npsLoadedFromDraft = false;
+        let openQuestionsLoadedFromSupabase = false;
+        
         if (draft) {
           console.log("📄 Draft cargado con periodo UUID:", draft.periodoId);
           setResponses(draft.responses);
           setComments(draft.comments);
+          
+          // Cargar NPS desde el draft (si está en Supabase)
+          if (draft.npsScore !== undefined) {
+            setNpsScore(draft.npsScore);
+            npsLoadedFromDraft = true;
+            console.log("📊 NPS cargado desde draft:", draft.npsScore);
+          }
+          
+          // Cargar preguntas abiertas desde Supabase si hay evaluationId
+          const { supabase } = await import("@/integrations/supabase/client");
+          const { data: evalData } = await supabase
+            .from("evaluations")
+            .select("id")
+            .eq("usuario_id", user.dpi)
+            .eq("periodo_id", periodoIdFinal)
+            .eq("tipo", "auto")
+            .maybeSingle();
+          
+          if (evalData?.id) {
+            // Cargar respuestas a preguntas abiertas desde Supabase
+            const { data: openResponsesData } = await supabase
+              .from("open_question_responses")
+              .select("pregunta_id, respuesta")
+              .eq("evaluacion_id", evalData.id);
+            
+            if (openResponsesData && openResponsesData.length > 0) {
+              const responsesMap: Record<string, string> = {};
+              openResponsesData.forEach((item) => {
+                responsesMap[item.pregunta_id] = item.respuesta;
+              });
+              setOpenQuestionResponses(responsesMap);
+              openQuestionsLoadedFromSupabase = true;
+              console.log("📝 Preguntas abiertas cargadas desde Supabase:", responsesMap);
+            }
+          }
+          
           toast.info("Se ha cargado su borrador guardado");
         }
 
@@ -233,24 +272,29 @@ const Autoevaluacion = () => {
         const questions = await getOpenQuestions();
         setOpenQuestions(questions);
 
-        // Cargar respuestas a preguntas abiertas
-        const openQuestionsKey = `open_questions_${user.dpi}_${periodoIdFinal}`;
-        const savedOpenQuestions = localStorage.getItem(openQuestionsKey);
-        if (savedOpenQuestions) {
-          try {
-            const parsed = JSON.parse(savedOpenQuestions);
-            setOpenQuestionResponses(parsed);
-          } catch {
-            // ignore parsing errors
+        // Cargar respuestas a preguntas abiertas desde localStorage (fallback si no hay en Supabase)
+        if (!openQuestionsLoadedFromSupabase) {
+          const openQuestionsKey = `open_questions_${user.dpi}_${periodoIdFinal}`;
+          const savedOpenQuestions = localStorage.getItem(openQuestionsKey);
+          if (savedOpenQuestions) {
+            try {
+              const parsed = JSON.parse(savedOpenQuestions);
+              setOpenQuestionResponses(parsed);
+              console.log("📝 Preguntas abiertas cargadas desde localStorage:", parsed);
+            } catch {
+              // ignore parsing errors
+            }
           }
         }
 
-        // Cargar NPS
-        const npsKey = `nps_${user.dpi}_${periodoIdFinal}`;
-        const savedNps = localStorage.getItem(npsKey);
-        if (savedNps) {
-          setNpsScore(parseInt(savedNps));
-          console.log("📊 NPS cargado:", savedNps);
+        // Cargar NPS desde localStorage (fallback si no hay en Supabase)
+        if (!npsLoadedFromDraft) {
+          const npsKey = `nps_${user.dpi}_${periodoIdFinal}`;
+          const savedNps = localStorage.getItem(npsKey);
+          if (savedNps) {
+            setNpsScore(parseInt(savedNps));
+            console.log("📊 NPS cargado desde localStorage:", savedNps);
+          }
         }
       } catch (error) {
         console.error("Error loading data:", error);
@@ -290,14 +334,24 @@ const Autoevaluacion = () => {
       npsScore: npsScore,
     };
 
-    await saveEvaluationDraft(draft);
+    const evaluationId = await saveEvaluationDraft(draft);
     
-    // Guardar también respuestas a preguntas abiertas y NPS
-    if (Object.keys(openQuestionResponses).length > 0) {
+    // Guardar también respuestas a preguntas abiertas en Supabase si hay evaluationId
+    if (Object.keys(openQuestionResponses).length > 0 && evaluationId) {
+      // Guardar en Supabase
+      await saveOpenQuestionResponses(evaluationId, openQuestionResponses);
+      console.log("📝 Preguntas abiertas guardadas en Supabase");
+      
+      // También guardar en localStorage como respaldo
+      const openQuestionsKey = `open_questions_${user.dpi}_${periodoId}`;
+      localStorage.setItem(openQuestionsKey, JSON.stringify(openQuestionResponses));
+    } else if (Object.keys(openQuestionResponses).length > 0) {
+      // Si no hay evaluationId, solo guardar en localStorage
       const openQuestionsKey = `open_questions_${user.dpi}_${periodoId}`;
       localStorage.setItem(openQuestionsKey, JSON.stringify(openQuestionResponses));
     }
     
+    // Guardar NPS en localStorage como respaldo (ya se guarda en Supabase con el draft)
     if (npsScore !== undefined) {
       const npsKey = `nps_${user.dpi}_${periodoId}`;
       localStorage.setItem(npsKey, npsScore.toString());

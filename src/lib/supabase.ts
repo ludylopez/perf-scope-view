@@ -342,7 +342,7 @@ export const saveEvaluationToSupabase = async (draft: EvaluationDraft): Promise<
     }
     
     // Buscar si ya existe
-    // Para evaluaciones de tipo 'jefe', también necesitamos filtrar por evaluador_id
+    // Para evaluaciones de tipo 'jefe', también necesitamos filtrar por evaluador_id y colaborador_id
     let query = supabase
       .from('evaluations')
       .select('id')
@@ -352,6 +352,9 @@ export const saveEvaluationToSupabase = async (draft: EvaluationDraft): Promise<
     
     if (draft.tipo === 'jefe' && draft.evaluadorId) {
       query = query.eq('evaluador_id', draft.evaluadorId);
+      if (draft.colaboradorId) {
+        query = query.eq('colaborador_id', draft.colaboradorId);
+      }
     }
     
     const { data: existing, error: existingError } = await query.maybeSingle();
@@ -366,31 +369,46 @@ export const saveEvaluationToSupabase = async (draft: EvaluationDraft): Promise<
           usuario_id: draft.usuarioId,
           periodo_id: draft.periodoId,
           tipo: draft.tipo,
+          evaluador_id: draft.evaluadorId,
+          colaborador_id: draft.colaboradorId,
         },
       });
       return null;
     }
     
     if (existing) {
-      const { data, error } = await supabase
+      // Validar constraint de la base de datos: si estado es 'enviado', fecha_envio debe estar presente
+      if (evaluationData.estado === 'enviado' && !evaluationData.fecha_envio) {
+        console.error('[Supabase] ❌ Error: estado "enviado" requiere fecha_envio según constraint de BD', {
+          evaluationId: existing.id,
+          payload: evaluationData,
+        });
+        return null;
+      }
+      
+      // Hacer el update sin select para evitar problemas
+      // Si no hay error, asumimos que el update fue exitoso
+      // El ID ya lo tenemos en existing.id, no necesitamos leerlo de vuelta
+      const { error: updateError } = await supabase
         .from('evaluations')
         .update(evaluationData)
-        .eq('id', existing.id)
-        .select('id')
-        .single();
+        .eq('id', existing.id);
       
-      if (error) {
+      if (updateError) {
         console.error('[Supabase] ❌ Error actualizando evaluación', {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code,
+          message: updateError.message,
+          details: updateError.details,
+          hint: updateError.hint,
+          code: updateError.code,
           payload: evaluationData,
           evaluationId: existing.id,
         });
         return null;
       }
-      return data.id;
+      
+      // Si no hubo error, el update fue exitoso
+      // Retornamos el ID que ya tenemos (no necesitamos leerlo de vuelta)
+      return existing.id;
     } else {
       const { data, error } = await supabase
         .from('evaluations')
@@ -463,6 +481,8 @@ export const getEvaluationFromSupabase = async (
         responses: data.evaluacion_potencial.responses || {},
         comments: data.evaluacion_potencial.comments || {},
       } : undefined,
+      // Incluir NPS si está presente
+      npsScore: data.nps_score !== null && data.nps_score !== undefined ? data.nps_score : undefined,
     };
   } catch {
     return null;

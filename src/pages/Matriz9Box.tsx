@@ -89,6 +89,7 @@ const Matriz9Box = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [loadingStep, setLoadingStep] = useState<string>("");
   const [teamMembers, setTeamMembers] = useState<TeamMember9Box[]>([]);
   const [showLegend, setShowLegend] = useState(false);
   const [activePeriodName, setActivePeriodName] = useState<string>("");
@@ -122,6 +123,7 @@ const Matriz9Box = () => {
   const loadTeamNineBox = async () => {
     try {
       setLoading(true);
+      setLoadingStep("Cargando período de evaluación...");
 
       const activePeriod = await getActivePeriod();
       if (!activePeriod) {
@@ -138,6 +140,7 @@ const Matriz9Box = () => {
       // solo tienen autoevaluación de desempeño (sin evaluación de potencial),
       // y la matriz 9-Box requiere ambas dimensiones.
       if (isRRHH) {
+        setLoadingStep("Cargando resultados consolidados...");
         console.log("🔍 RRHH cargando matriz 9-box para periodo:", periodoId);
 
         // Obtener todos los resultados finales consolidados del período activo
@@ -182,6 +185,7 @@ const Matriz9Box = () => {
           return;
         }
 
+        setLoadingStep("Cargando información de jefes...");
         // Obtener información de jefes para cada colaborador
         const { data: assignments, error: assignmentsError } = await supabase
           .from("user_assignments")
@@ -255,6 +259,7 @@ const Matriz9Box = () => {
       // solo tienen autoevaluación de desempeño (sin evaluación de potencial),
       // y la matriz 9-Box requiere ambas dimensiones.
       else {
+        setLoadingStep("Cargando colaboradores asignados...");
         const { data: assignments, error: assignmentsError } = await supabase
           .from("user_assignments")
           .select(`
@@ -273,78 +278,166 @@ const Matriz9Box = () => {
 
         if (assignmentsError) throw assignmentsError;
 
-        for (const assignment of assignments || []) {
-          const colaborador = Array.isArray(assignment.users) ? assignment.users[0] : assignment.users;
-          if (!colaborador) continue;
+        if (!assignments || assignments.length === 0) {
+          setTeamMembers([]);
+          setNineBoxData({
+            "alto-alto": [], "alto-medio": [], "alto-bajo": [],
+            "medio-alto": [], "medio-medio": [], "medio-bajo": [],
+            "bajo-alto": [], "bajo-medio": [], "bajo-bajo": [],
+          });
+          return;
+        }
 
-          // Excluir miembros del Concejo (C1) de la matriz 9-Box ya que no tienen evaluación de potencial
-          if (colaborador.nivel === 'C1') {
-            console.log("ℹ️ Excluyendo miembro del Concejo (C1) de matriz 9-Box:", colaborador.nombre, colaborador.apellidos);
-            continue;
-          }
+        // OPTIMIZACIÓN: Filtrar colaboradores válidos primero (excluir C1)
+        const colaboradoresValidos = assignments
+          .map(a => {
+            const colaborador = Array.isArray(a.users) ? a.users[0] : a.users;
+            return colaborador && colaborador.nivel !== 'C1' ? colaborador : null;
+          })
+          .filter((c): c is NonNullable<typeof c> => c !== null);
 
+        if (colaboradoresValidos.length === 0) {
+          setTeamMembers([]);
+          setNineBoxData({
+            "alto-alto": [], "alto-medio": [], "alto-bajo": [],
+            "medio-alto": [], "medio-medio": [], "medio-bajo": [],
+            "bajo-alto": [], "bajo-medio": [], "bajo-bajo": [],
+          });
+          return;
+        }
+
+        const colaboradoresIds = colaboradoresValidos.map(c => c.dpi);
+
+        setLoadingStep(`Cargando evaluaciones de ${colaboradoresValidos.length} colaboradores...`);
+        // OPTIMIZACIÓN CRÍTICA: Obtener TODAS las evaluaciones del jefe en batch
+        // en lugar de hacer queries individuales por cada colaborador
+        const { data: evaluacionesJefe, error: evaluacionesError } = await supabase
+          .from("evaluations")
+          .select("colaborador_id, estado, responses, comments, evaluacion_potencial")
+          .eq("evaluador_id", user.dpi)
+          .eq("periodo_id", periodoId)
+          .eq("tipo", "jefe")
+          .eq("estado", "enviado")
+          .in("colaborador_id", colaboradoresIds);
+
+        if (evaluacionesError) {
+          console.error("Error cargando evaluaciones del jefe:", evaluacionesError);
+        }
+
+        // Crear mapa de evaluaciones del jefe
+        const evaluacionesJefeMap = new Map<string, any>();
+        evaluacionesJefe?.forEach((evaluacion: any) => {
+          evaluacionesJefeMap.set(evaluacion.colaborador_id, evaluacion);
+        });
+
+        // OPTIMIZACIÓN: Obtener TODAS las autoevaluaciones en batch
+        const { data: autoevaluaciones, error: autoevaluacionesError } = await supabase
+          .from("evaluations")
+          .select("usuario_id, responses, comments")
+          .eq("periodo_id", periodoId)
+          .eq("tipo", "auto")
+          .eq("estado", "enviado")
+          .in("usuario_id", colaboradoresIds);
+
+        if (autoevaluacionesError) {
+          console.error("Error cargando autoevaluaciones:", autoevaluacionesError);
+        }
+
+        // Crear mapa de autoevaluaciones
+        const autoevaluacionesMap = new Map<string, any>();
+        autoevaluaciones?.forEach((auto: any) => {
+          autoevaluacionesMap.set(auto.usuario_id, auto);
+        });
+
+        // OPTIMIZACIÓN: Obtener TODOS los resultados finales en batch
+        const { data: resultadosFinales, error: resultadosError } = await supabase
+          .from("final_evaluation_results")
+          .select("colaborador_id, resultado_final, posicion_9box")
+          .eq("periodo_id", periodoId)
+          .in("colaborador_id", colaboradoresIds);
+
+        if (resultadosError) {
+          console.error("Error cargando resultados finales:", resultadosError);
+        }
+
+        // Crear mapa de resultados finales
+        const resultadosFinalesMap = new Map<string, any>();
+        resultadosFinales?.forEach((result: any) => {
+          resultadosFinalesMap.set(result.colaborador_id, result);
+        });
+
+        setLoadingStep("Procesando resultados...");
+        // OPTIMIZACIÓN: Obtener TODOS los instrumentos necesarios en batch
+        const nivelesUnicos = [...new Set(colaboradoresValidos.map(c => c.nivel))];
+        const instrumentosMap = new Map<string, any>();
+        
+        await Promise.all(
+          nivelesUnicos.map(async (nivel) => {
+            const instrument = await getInstrumentForUser(nivel);
+            if (instrument) {
+              instrumentosMap.set(nivel, instrument);
+            }
+          })
+        );
+
+        // Procesar colaboradores con datos ya cargados en batch
+        for (const colaborador of colaboradoresValidos) {
           const colaboradorDpi = colaborador.dpi;
-          const jefeEvaluado = await hasJefeEvaluation(user.dpi, colaboradorDpi, periodoId);
-
-          if (!jefeEvaluado) continue;
-
-          // Intentar cargar resultado consolidado primero
-          const { getConsolidatedResult } = await import("@/lib/finalResultSupabase");
-          let resultadoConsolidado = await getConsolidatedResult(colaboradorDpi, periodoId);
           
-          let resultadoFinal: any = null;
-          if (resultadoConsolidado && Object.keys(resultadoConsolidado).length > 0) {
-            resultadoFinal = {
-              desempenoFinal: resultadoConsolidado.desempenoFinalPromedio || 0,
-              potencial: resultadoConsolidado.potencialPromedio,
-              posicion9Box: resultadoConsolidado.posicion9BoxModa,
+          // Verificar si el jefe evaluó a este colaborador
+          const evaluacionJefe = evaluacionesJefeMap.get(colaboradorDpi);
+          if (!evaluacionJefe) continue;
+
+          // Intentar obtener resultado final primero (más rápido)
+          const resultadoFinal = resultadosFinalesMap.get(colaboradorDpi);
+          
+          let resultadoFinalData: any = null;
+          
+          if (resultadoFinal && resultadoFinal.resultado_final) {
+            // Usar resultado final existente
+            const resultado = resultadoFinal.resultado_final;
+            resultadoFinalData = {
+              desempenoFinal: resultado.desempenoFinal || 0,
+              potencial: resultado.potencial,
+              posicion9Box: resultadoFinal.posicion_9box || resultado.posicion9Box,
             };
-            console.log("✅ [Matriz9Box] Resultado consolidado cargado:", {
-              colaborador: `${colaborador.nombre} ${colaborador.apellidos}`,
-              desempenoFinal: resultadoFinal.desempenoFinal,
-              potencial: resultadoFinal.potencial,
-              posicion9Box: resultadoFinal.posicion9Box
-            });
           } else {
-            // Fallback: usar getFinalResultFromSupabase
-            resultadoFinal = await getFinalResultFromSupabase(colaboradorDpi, periodoId);
-            console.log("✅ [Matriz9Box] Resultado desde final_evaluation_results:", {
-              colaborador: `${colaborador.nombre} ${colaborador.apellidos}`,
-              resultadoFinal: resultadoFinal
-            });
-          }
+            // Calcular resultado final desde evaluaciones
+            const autoevaluacion = autoevaluacionesMap.get(colaboradorDpi);
+            if (!autoevaluacion) continue;
 
-          if (!resultadoFinal) {
-            const evaluacionJefe = await getJefeEvaluationDraft(user.dpi, colaboradorDpi, periodoId);
-            const autoevaluacion = await getSubmittedEvaluation(colaboradorDpi, periodoId);
-
-            if (!evaluacionJefe || evaluacionJefe.estado !== "enviado" || !autoevaluacion) continue;
-
-            const instrument = await getInstrumentForUser(colaborador.nivel);
+            const instrument = instrumentosMap.get(colaborador.nivel);
             if (!instrument) continue;
 
-            const autoevaluacionId = await getEvaluationIdFromSupabase(colaboradorDpi, periodoId, "auto");
-            const evaluacionJefeId = await getEvaluationIdFromSupabase(colaboradorDpi, periodoId, "jefe", user.dpi, colaboradorDpi);
-            const instrumentConfig = await getInstrumentConfigForUser(colaboradorDpi);
+            try {
+              // Convertir evaluaciones a formato esperado
+              const evaluacionJefeFormatted = {
+                responses: evaluacionJefe.responses || {},
+                comments: evaluacionJefe.comments || {},
+                evaluacionPotencial: evaluacionJefe.evaluacion_potencial || {},
+                estado: evaluacionJefe.estado,
+              };
 
-            if (autoevaluacionId && evaluacionJefeId && instrumentConfig) {
-              try {
-                resultadoFinal = await calculateCompleteFinalScore(
-                  autoevaluacion, evaluacionJefe, instrument.dimensionesDesempeno, instrument.dimensionesPotencial, true, autoevaluacionId, evaluacionJefeId, instrumentConfig
-                );
-              } catch (error) {
-                resultadoFinal = await calculateCompleteFinalScore(
-                  autoevaluacion, evaluacionJefe, instrument.dimensionesDesempeno, instrument.dimensionesPotencial, false
-                );
-              }
-            } else {
-              resultadoFinal = await calculateCompleteFinalScore(
-                autoevaluacion, evaluacionJefe, instrument.dimensionesDesempeno, instrument.dimensionesPotencial, false
+              const autoevaluacionFormatted = {
+                responses: autoevaluacion.responses || {},
+                comments: autoevaluacion.comments || {},
+              };
+
+              // Calcular resultado final
+              resultadoFinalData = await calculateCompleteFinalScore(
+                autoevaluacionFormatted,
+                evaluacionJefeFormatted,
+                instrument.dimensionesDesempeno,
+                instrument.dimensionesPotencial,
+                false
               );
+            } catch (error) {
+              console.error(`Error calculando resultado para ${colaborador.nombre}:`, error);
+              continue;
             }
-
-            if (!resultadoFinal.posicion9Box) continue;
           }
+
+          if (!resultadoFinalData || !resultadoFinalData.posicion9Box) continue;
 
           members.push({
             dpi: colaboradorDpi,
@@ -352,11 +445,11 @@ const Matriz9Box = () => {
             cargo: colaborador.cargo,
             area: colaborador.area,
             nivel: colaborador.nivel,
-            desempenoFinal: resultadoFinal.desempenoFinal,
-            potencial: resultadoFinal.potencial,
-            posicion9Box: resultadoFinal.posicion9Box || "medio-medio",
-            desempenoPorcentaje: scoreToPercentage(resultadoFinal.desempenoFinal),
-            potencialPorcentaje: resultadoFinal.potencial ? scoreToPercentage(resultadoFinal.potencial) : undefined,
+            desempenoFinal: resultadoFinalData.desempenoFinal,
+            potencial: resultadoFinalData.potencial,
+            posicion9Box: resultadoFinalData.posicion9Box || "medio-medio",
+            desempenoPorcentaje: scoreToPercentage(resultadoFinalData.desempenoFinal),
+            potencialPorcentaje: resultadoFinalData.potencial ? scoreToPercentage(resultadoFinalData.potencial) : undefined,
           });
         }
       }
@@ -609,7 +702,12 @@ const Matriz9Box = () => {
         {loading ? (
           <Card>
             <CardContent className="py-12 text-center">
-              <p className="text-muted-foreground">Cargando matriz 9-box...</p>
+              <div className="space-y-2">
+                <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+                <p className="text-muted-foreground">
+                  {loadingStep || "Cargando matriz 9-box..."}
+                </p>
+              </div>
             </CardContent>
           </Card>
         ) : totalEvaluados === 0 ? (
