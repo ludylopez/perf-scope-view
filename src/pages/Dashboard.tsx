@@ -701,8 +701,9 @@ const Dashboard = () => {
           </p>
         </div>
 
-        {/* Colaborador Dashboard - Mostrar para colaboradores, C1 (Concejo) y A1 (Alcalde) */}
-        {(isColaborador || user?.nivel === 'C1' || user?.nivel === 'A1') && (
+        {/* Colaborador Dashboard - Mostrar para colaboradores, C1 (Concejo) y A1 (Alcalde) 
+            PERO solo si NO tienen colaboradores asignados (para evitar duplicación) */}
+        {(isColaborador || user?.nivel === 'C1' || user?.nivel === 'A1') && !jerarquiaInfo?.tieneColaboradores && (
           <div className="space-y-6">
             {/* Mostrar resultados si están disponibles Y el jefe completó (o es C1/A1 que solo tienen autoevaluación) */}
             {evaluationStatus === "submitted" && resultadoData && (resultadoData.jefeCompleto || user?.nivel === 'C1' || user?.nivel === 'A1') && (
