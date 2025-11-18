@@ -203,10 +203,10 @@ const Dashboard = () => {
         setProgress(100);
         
         // Cargar datos de resultados si está enviada
-        // IMPORTANTE: Para C1 (Concejo Municipal), cargar resultados inmediatamente ya que solo tienen autoevaluación
+        // IMPORTANTE: Para C1 (Concejo Municipal) y A1 (Alcalde), cargar resultados inmediatamente ya que solo tienen autoevaluación
         // Para otros niveles, solo cargar resultados si el jefe completó su evaluación
-        if (user.nivel === 'C1') {
-          // C1 solo tiene autoevaluación, cargar resultados inmediatamente
+        if (user.nivel === 'C1' || user.nivel === 'A1') {
+          // C1 y A1 solo tienen autoevaluación, cargar resultados inmediatamente
           await loadResultadosData();
         } else if (isColaborador) {
           const jefeId = await getColaboradorJefe(user.dpi);
@@ -692,11 +692,11 @@ const Dashboard = () => {
           </p>
         </div>
 
-        {/* Colaborador Dashboard */}
-        {(isColaborador || user?.nivel === 'C1') && (
+        {/* Colaborador Dashboard - Mostrar para colaboradores, C1 (Concejo) y A1 (Alcalde) */}
+        {(isColaborador || user?.nivel === 'C1' || user?.nivel === 'A1') && (
           <div className="space-y-6">
-            {/* Mostrar resultados si están disponibles Y el jefe completó */}
-            {evaluationStatus === "submitted" && resultadoData && (resultadoData.jefeCompleto || user?.nivel === 'C1') && (
+            {/* Mostrar resultados si están disponibles Y el jefe completó (o es C1/A1 que solo tienen autoevaluación) */}
+            {evaluationStatus === "submitted" && resultadoData && (resultadoData.jefeCompleto || user?.nivel === 'C1' || user?.nivel === 'A1') && (
               <div id="resultados-evaluacion-container">
                 {/* Título y Badge */}
                 <div className="mb-6">
@@ -714,7 +714,9 @@ const Dashboard = () => {
                       ? "Resultado consolidado de tu evaluación de desempeño"
                       : user?.nivel === 'C1'
                         ? "Resultado final de tu autoevaluación (Concejo Municipal)"
-                        : "Autoevaluación enviada. Esperando evaluación del jefe para resultado consolidado."}
+                        : user?.nivel === 'A1'
+                          ? "Resultado final de tu autoevaluación (Alcalde Municipal)"
+                          : "Autoevaluación enviada. Esperando evaluación del jefe para resultado consolidado."}
                   </p>
                 </div>
 
@@ -725,7 +727,9 @@ const Dashboard = () => {
                     <AlertDescription className="text-blue-800 dark:text-blue-200">
                       {user?.nivel === 'C1'
                         ? "Su autoevaluación fue recibida exitosamente. Como miembro del Concejo Municipal, su resultado final está disponible inmediatamente."
-                        : "Su autoevaluación fue recibida. Cuando su jefe complete la evaluación, aquí aparecerá su resultado consolidado."}
+                        : user?.nivel === 'A1'
+                          ? "Su autoevaluación fue recibida exitosamente. Como Alcalde Municipal, su resultado final está disponible inmediatamente."
+                          : "Su autoevaluación fue recibida. Cuando su jefe complete la evaluación, aquí aparecerá su resultado consolidado."}
                     </AlertDescription>
                   </Alert>
                 )}

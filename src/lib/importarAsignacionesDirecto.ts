@@ -261,26 +261,27 @@ export async function importarAsignacionesDirecto() {
       }
     }
 
-    // 4. Actualizar roles de supervisores
-    console.log('\n🔄 Actualizando roles de supervisores...');
+    // 4. Actualizar roles de jefes
+    console.log('\n🔄 Actualizando roles de jefes...');
     const jefesUnicos = [...new Set(asignacionesValidas.map(a => a.jefe_id))];
     
-    let supervisoresActualizados = 0;
+    let jefesActualizados = 0;
     for (const jefeDpi of jefesUnicos) {
       const usuario = usuariosMap.get(jefeDpi);
-      if (usuario && usuario.rol !== 'admin') {
+      // Solo actualizar si no es admin (mantener admin_rrhh y admin_general)
+      if (usuario && usuario.rol !== 'admin_rrhh' && usuario.rol !== 'admin_general') {
         const { error } = await supabase
           .from('users')
-          .update({ rol: 'supervisor' })
+          .update({ rol: 'jefe' })
           .eq('dpi', jefeDpi);
 
         if (!error) {
-          supervisoresActualizados++;
+          jefesActualizados++;
         }
       }
     }
     
-    console.log(`✅ ${supervisoresActualizados} supervisores actualizados de ${jefesUnicos.length} jefes únicos`);
+    console.log(`✅ ${jefesActualizados} jefes actualizados de ${jefesUnicos.length} jefes únicos`);
 
     // 5. Resumen
     console.log('\n📊 ═══════════════════════════════════════');

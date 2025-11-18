@@ -19,6 +19,7 @@ export const Header = () => {
       jefe: "Jefe Evaluador",
       admin_rrhh: "Admin RR.HH.",
       admin_general: "Administrador General",
+      supervisor: "Supervisor", // Mantener por compatibilidad (debería migrarse a "jefe")
     };
     return roles[rol] || rol;
   };
