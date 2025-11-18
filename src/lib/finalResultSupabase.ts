@@ -111,11 +111,20 @@ export const getFinalResultFromSupabase = async (
     }
 
     // Si no, construir desde los campos individuales
+    // Convertir strings a números si es necesario
+    const desempenoFinal = typeof data.desempeno_final === 'string' 
+      ? parseFloat(data.desempeno_final) 
+      : (data.desempeno_final || data.resultado_final?.desempenoFinal || 0);
+    
+    const potencial = typeof data.potencial === 'string'
+      ? parseFloat(data.potencial)
+      : (data.potencial || data.resultado_final?.potencial || null);
+    
     return {
       desempenoAuto: data.resultado_final?.desempenoAuto,
       desempenoJefe: data.resultado_final?.desempenoJefe,
-      desempenoFinal: data.desempeno_final || data.resultado_final?.desempenoFinal,
-      potencial: data.potencial || data.resultado_final?.potencial,
+      desempenoFinal: desempenoFinal,
+      potencial: potencial,
       posicion9Box: data.posicion_9box || data.resultado_final?.posicion9Box,
     };
   } catch (error) {

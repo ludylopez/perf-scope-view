@@ -299,9 +299,19 @@ const Matriz9Box = () => {
               potencial: resultadoConsolidado.potencialPromedio,
               posicion9Box: resultadoConsolidado.posicion9BoxModa,
             };
+            console.log("✅ [Matriz9Box] Resultado consolidado cargado:", {
+              colaborador: `${colaborador.nombre} ${colaborador.apellidos}`,
+              desempenoFinal: resultadoFinal.desempenoFinal,
+              potencial: resultadoFinal.potencial,
+              posicion9Box: resultadoFinal.posicion9Box
+            });
           } else {
             // Fallback: usar getFinalResultFromSupabase
             resultadoFinal = await getFinalResultFromSupabase(colaboradorDpi, periodoId);
+            console.log("✅ [Matriz9Box] Resultado desde final_evaluation_results:", {
+              colaborador: `${colaborador.nombre} ${colaborador.apellidos}`,
+              resultadoFinal: resultadoFinal
+            });
           }
 
           if (!resultadoFinal) {
