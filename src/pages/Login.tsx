@@ -109,16 +109,6 @@ const Login = () => {
               )}
             </Button>
           </form>
-
-          <div className="mt-6 rounded-lg bg-muted p-4 text-sm">
-            <p className="font-medium text-foreground">Usuarios de prueba:</p>
-            <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
-              <li>• Colaborador: 1234567890101 / 15081990</li>
-              <li>• Jefe: 2345678901012 / 22031985</li>
-              <li>• Admin RR.HH.: 3456789012103 / 10121988</li>
-              <li>• Admin General: 9999999999999 / 01011980</li>
-            </ul>
-          </div>
         </CardContent>
       </Card>
     </div>

@@ -35,7 +35,33 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Plus, Edit, X, UserPlus, Users, Search, ChevronLeft, ChevronRight, Upload, FileSpreadsheet, Layers, Lock, RotateCcw } from "lucide-react";
+import {
+  ArrowLeft,
+  Plus,
+  Edit,
+  X,
+  UserPlus,
+  Users,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  Upload,
+  FileSpreadsheet,
+  Layers,
+  Lock,
+  RotateCcw,
+  ChevronsUpDown,
+  Check,
+} from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@/types/auth";
@@ -207,7 +233,7 @@ const AdminUsuarios = () => {
   const [filtroArea, setFiltroArea] = useState<string>("");
   const [filtroDireccion, setFiltroDireccion] = useState<string>("");
   const [filtroDepartamento, setFiltroDepartamento] = useState<string>("");
-  const [newUser, setNewUser] = useState({
+const [newUser, setNewUser] = useState({
     dpi: "",
     nombre: "",
     apellidos: "",
@@ -229,6 +255,18 @@ const AdminUsuarios = () => {
     estado: "activo" as "activo" | "inactivo",
     instrumentoId: "",
   });
+const [allJefesOptions, setAllJefesOptions] = useState<Array<{ dpi: string; nombre: string; apellidos: string; cargo: string; nivel: string; area: string }>>([]);
+const [openJefePicker, setOpenJefePicker] = useState(false);
+const [openJefePickerEdit, setOpenJefePickerEdit] = useState(false);
+
+const selectedJefe = useMemo(() => {
+  return allJefesOptions.find((option) => option.dpi === newUser.jefeInmediato) || null;
+}, [allJefesOptions, newUser.jefeInmediato]);
+
+const selectedJefeEdit = useMemo(() => {
+  if (!editingUser || !editingUser.jefeInmediato) return null;
+  return allJefesOptions.find((option) => option.dpi === editingUser.jefeInmediato) || null;
+}, [allJefesOptions, editingUser]);
 
   // Debounce para el término de búsqueda
   useEffect(() => {
@@ -246,6 +284,7 @@ const AdminUsuarios = () => {
     }
     loadJobLevels();
     loadUsuarios();
+  loadAllJefesOptions();
   }, [user, navigate]);
 
   const loadJobLevels = async () => {
@@ -382,6 +421,29 @@ const AdminUsuarios = () => {
       toast.error("Error al cargar usuarios");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadAllJefesOptions = async () => {
+    try {
+      console.log("🔍 [AdminUsuarios] Cargando opciones de jefes...");
+      const { data, error } = await supabase
+        .from("users")
+        .select("dpi, nombre, apellidos, cargo, nivel, area")
+        .eq("estado", "activo")
+        .order("nombre", { ascending: true });
+
+      if (error) {
+        console.error("❌ [AdminUsuarios] Error al cargar jefes:", error);
+        toast.error("Error al cargar lista de jefes");
+        throw error;
+      }
+      
+      console.log(`✅ [AdminUsuarios] ${data?.length || 0} jefes cargados:`, data?.slice(0, 5));
+      setAllJefesOptions(data || []);
+    } catch (error: any) {
+      console.error("❌ [AdminUsuarios] Error loading jefe options:", error);
+      toast.error("Error al cargar opciones de jefes");
     }
   };
 
@@ -986,11 +1048,69 @@ const AdminUsuarios = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Jefe Inmediato (DPI)</Label>
+                    <Label>Jefe Inmediato</Label>
+                    <Popover open={openJefePicker} onOpenChange={setOpenJefePicker}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={openJefePicker}
+                          className="w-full justify-between"
+                        >
+                          {selectedJefe ? (
+                            <span className="truncate">
+                              {selectedJefe.nombre} {selectedJefe.apellidos} • {selectedJefe.cargo}
+                            </span>
+                          ) : newUser.jefeInmediato ? (
+                            `DPI: ${newUser.jefeInmediato}`
+                          ) : (
+                            "Buscar jefe por nombre, DPI o cargo..."
+                          )}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[420px] p-0">
+                        <Command>
+                          <CommandInput placeholder="Buscar por nombre, DPI o cargo..." />
+                          <CommandList>
+                            <CommandEmpty>No se encontraron coincidencias.</CommandEmpty>
+                            <CommandGroup>
+                              {allJefesOptions.map((usuario) => (
+                                <CommandItem
+                                  key={usuario.dpi}
+                                  value={`${usuario.nombre} ${usuario.apellidos} ${usuario.dpi} ${usuario.cargo}`}
+                                  onSelect={() => {
+                                    setNewUser({ ...newUser, jefeInmediato: usuario.dpi });
+                                    setOpenJefePicker(false);
+                                  }}
+                                >
+                                  <Check
+                                    className={`mr-2 h-4 w-4 ${
+                                      newUser.jefeInmediato === usuario.dpi ? "opacity-100" : "opacity-0"
+                                    }`}
+                                  />
+                                  <div className="flex flex-col">
+                                    <span className="font-medium">
+                                      {usuario.nombre} {usuario.apellidos}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">
+                                      {usuario.cargo} • {usuario.nivel} • DPI: {usuario.dpi}
+                                    </span>
+                                  </div>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                    <p className="text-xs text-muted-foreground">
+                      Puedes buscar al jefe por nombre o ingresar el DPI manualmente si no aparece en la lista.
+                    </p>
                     <Input
                       value={newUser.jefeInmediato}
                       onChange={(e) => setNewUser({ ...newUser, jefeInmediato: e.target.value })}
-                      placeholder="Opcional"
+                      placeholder="DPI del jefe inmediato (opcional)"
                     />
                   </div>
                   <div className="space-y-2">
@@ -1402,11 +1522,67 @@ const AdminUsuarios = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Jefe Inmediato (DPI)</Label>
-                    <Input
-                      value={editingUser.jefeInmediato || ""}
-                      onChange={(e) => setEditingUser({ ...editingUser, jefeInmediato: e.target.value })}
-                    />
+                    <Label>Jefe Inmediato</Label>
+                    <Popover open={openJefePickerEdit} onOpenChange={setOpenJefePickerEdit}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={openJefePickerEdit}
+                          className="w-full justify-between"
+                        >
+                          {selectedJefeEdit ? (
+                            <span className="truncate">
+                              {selectedJefeEdit.nombre} {selectedJefeEdit.apellidos} • {selectedJefeEdit.cargo}
+                            </span>
+                          ) : editingUser?.jefeInmediato ? (
+                            `DPI: ${editingUser.jefeInmediato}`
+                          ) : (
+                            "Buscar jefe por nombre, DPI o cargo..."
+                          )}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[420px] p-0">
+                        <Command>
+                          <CommandInput placeholder="Buscar por nombre, DPI o cargo..." />
+                          <CommandList>
+                            <CommandEmpty>No se encontraron coincidencias.</CommandEmpty>
+                            <CommandGroup>
+                              {allJefesOptions.map((usuario) => (
+                                <CommandItem
+                                  key={usuario.dpi}
+                                  value={`${usuario.nombre} ${usuario.apellidos} ${usuario.dpi} ${usuario.cargo}`}
+                                  onSelect={() => {
+                                    if (editingUser) {
+                                      setEditingUser({ ...editingUser, jefeInmediato: usuario.dpi });
+                                      setOpenJefePickerEdit(false);
+                                    }
+                                  }}
+                                >
+                                  <Check
+                                    className={`mr-2 h-4 w-4 ${
+                                      editingUser?.jefeInmediato === usuario.dpi ? "opacity-100" : "opacity-0"
+                                    }`}
+                                  />
+                                  <div className="flex flex-col">
+                                    <span className="font-medium">
+                                      {usuario.nombre} {usuario.apellidos}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">
+                                      {usuario.cargo} • {usuario.nivel} • DPI: {usuario.dpi}
+                                    </span>
+                                  </div>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                    <p className="text-xs text-muted-foreground">
+                      Busque por nombre, DPI o cargo. Opcional.
+                    </p>
                   </div>
                   <div className="space-y-2">
                     <Label>Rol</Label>
