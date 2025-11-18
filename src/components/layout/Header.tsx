@@ -1,6 +1,7 @@
 import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { LogOut, User } from "lucide-react";
+import { LogOut, User, Lock } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,6 +13,7 @@ import {
 
 export const Header = () => {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
 
   const getRoleName = (rol: string) => {
     const roles: Record<string, string> = {
@@ -64,6 +66,11 @@ export const Header = () => {
                 <span className="font-medium">Nivel:</span> {user?.nivel}
               </p>
             </div>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => navigate("/cambio-contrasena")}>
+              <Lock className="mr-2 h-4 w-4" />
+              Cambiar Contraseña
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={logout} className="text-destructive">
               <LogOut className="mr-2 h-4 w-4" />

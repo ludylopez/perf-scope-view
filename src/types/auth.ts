@@ -25,6 +25,7 @@ export interface AuthContextType {
   user: User | null;
   login: (dpi: string, password: string) => Promise<void>;
   logout: () => void;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   isAuthenticated: boolean;
   isLoading?: boolean;
 }

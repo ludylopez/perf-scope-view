@@ -33,6 +33,7 @@ import NotFound from "./pages/NotFound";
 import ConfiguracionSistema from "./pages/ConfiguracionSistema";
 import PopulateExplanations from "./pages/PopulateExplanations";
 import DashboardPersonal from "./pages/DashboardPersonal";
+import CambioContrasena from "./pages/CambioContrasena";
 
 const queryClient = new QueryClient();
 
@@ -262,6 +263,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <DashboardPersonal />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/cambio-contrasena"
+              element={
+                <ProtectedRoute>
+                  <CambioContrasena />
                 </ProtectedRoute>
               }
             />

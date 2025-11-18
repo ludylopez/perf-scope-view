@@ -19,13 +19,23 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Plus, Edit, X, UserPlus, Users, Search, ChevronLeft, ChevronRight, Upload, FileSpreadsheet, Layers } from "lucide-react";
+import { ArrowLeft, Plus, Edit, X, UserPlus, Users, Search, ChevronLeft, ChevronRight, Upload, FileSpreadsheet, Layers, Lock, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@/types/auth";
@@ -186,6 +196,8 @@ const AdminUsuarios = () => {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [currentPage, setCurrentPage] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
+  const [resettingPasswordFor, setResettingPasswordFor] = useState<User | null>(null);
+  const [passwordStatus, setPasswordStatus] = useState<Record<string, boolean>>({});
 
   // Estados para filtros
   const [filtroNivel, setFiltroNivel] = useState<string>("");
@@ -351,6 +363,19 @@ const AdminUsuarios = () => {
         });
 
         setEvaluadoresPorUsuario(evaluadoresMap);
+
+        // Cargar estado de contraseñas (si tienen password_hash personalizado)
+        const { data: passwordData } = await supabase
+          .from("users")
+          .select("dpi, password_hash")
+          .in("dpi", dpis);
+
+        const passwordStatusMap: Record<string, boolean> = {};
+        passwordData?.forEach((item: any) => {
+          passwordStatusMap[item.dpi] = item.password_hash !== null;
+        });
+
+        setPasswordStatus(passwordStatusMap);
       }
     } catch (error: any) {
       console.error("Error loading usuarios:", error);
@@ -501,6 +526,31 @@ const AdminUsuarios = () => {
 
   const handleEditClick = (usuario: any) => {
     setEditingUser(usuario);
+  };
+
+  const handleResetPassword = async () => {
+    if (!resettingPasswordFor) return;
+
+    try {
+      const { error } = await supabase
+        .from("users")
+        .update({ password_hash: null })
+        .eq("dpi", resettingPasswordFor.dpi);
+
+      if (error) throw error;
+
+      toast.success(`Contraseña restablecida para ${resettingPasswordFor.nombre} ${resettingPasswordFor.apellidos}. Ahora puede usar su fecha de nacimiento (${resettingPasswordFor.fechaNacimiento}) como contraseña.`);
+      setResettingPasswordFor(null);
+      
+      // Actualizar estado local
+      setPasswordStatus(prev => ({
+        ...prev,
+        [resettingPasswordFor.dpi]: false
+      }));
+    } catch (error: any) {
+      console.error("Error resetting password:", error);
+      toast.error(error.message || "Error al restablecer la contraseña");
+    }
   };
 
   const handleImportComplete = () => {
@@ -1109,13 +1159,27 @@ const AdminUsuarios = () => {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEditClick(usuario)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditClick(usuario)}
+                            title="Editar usuario"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setResettingPasswordFor(usuario)}
+                            title="Restablecer contraseña a fecha de nacimiento"
+                          >
+                            <RotateCcw className="h-4 w-4" />
+                          </Button>
+                          {passwordStatus[usuario.dpi] && (
+                            <Lock className="h-3 w-3 text-green-600" title="Tiene contraseña personalizada" />
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -1406,6 +1470,35 @@ const AdminUsuarios = () => {
             </DialogContent>
           </Dialog>
         )}
+
+        {/* Dialog de confirmación para resetear contraseña */}
+        <AlertDialog open={!!resettingPasswordFor} onOpenChange={(open) => !open && setResettingPasswordFor(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Restablecer Contraseña</AlertDialogTitle>
+              <AlertDialogDescription>
+                ¿Está seguro de que desea restablecer la contraseña de{" "}
+                <strong>
+                  {resettingPasswordFor?.nombre} {resettingPasswordFor?.apellidos}
+                </strong>{" "}
+                (DPI: {resettingPasswordFor?.dpi})?
+                <br />
+                <br />
+                La contraseña se restablecerá a su fecha de nacimiento:{" "}
+                <strong>{resettingPasswordFor?.fechaNacimiento}</strong>
+                <br />
+                <br />
+                El usuario podrá cambiar su contraseña nuevamente desde su perfil.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={handleResetPassword} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                Restablecer Contraseña
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </main>
     </div>
   );
