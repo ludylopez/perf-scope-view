@@ -83,9 +83,16 @@ const EvaluacionEquipo = () => {
     try {
       setLoading(true);
       
+      console.log("🔍 [EvaluacionEquipo] Cargando colaboradores para jefe:", {
+        jefe_dpi: user!.dpi,
+        jefe_nombre: `${user!.nombre} ${user!.apellidos}`,
+        jefe_nivel: user!.nivel
+      });
+      
       // Cargar colaboradores asignados desde Supabase
       // NOTA: Las asignaciones son permanentes, no están vinculadas a períodos específicos
-      const { data: assignments, error: assignmentsError } = await supabase
+      // Intentar primero con la relación de foreign key
+      let { data: assignments, error: assignmentsError } = await supabase
         .from("user_assignments")
         .select(`
           colaborador_id,
@@ -101,19 +108,87 @@ const EvaluacionEquipo = () => {
         .eq("jefe_id", user!.dpi)
         .eq("activo", true);
 
-      if (assignmentsError) throw assignmentsError;
+      // Si falla la relación o no hay datos, intentar con consulta manual
+      if (assignmentsError || !assignments || assignments.length === 0) {
+        console.warn("⚠️ [EvaluacionEquipo] Relación FK falló o sin datos, intentando consulta manual...", assignmentsError);
+        
+        // Consulta alternativa: obtener IDs primero, luego usuarios
+        const { data: assignmentIds, error: idsError } = await supabase
+          .from("user_assignments")
+          .select("colaborador_id")
+          .eq("jefe_id", user!.dpi)
+          .eq("activo", true);
+
+        if (idsError) {
+          console.error("❌ [EvaluacionEquipo] Error al obtener IDs de asignaciones:", idsError);
+          throw idsError;
+        }
+
+        if (assignmentIds && assignmentIds.length > 0) {
+          const colaboradoresIds = assignmentIds.map(a => a.colaborador_id);
+          
+          const { data: usuarios, error: usuariosError } = await supabase
+            .from("users")
+            .select("dpi, nombre, apellidos, cargo, nivel, area")
+            .in("dpi", colaboradoresIds)
+            .eq("estado", "activo");
+
+          if (usuariosError) {
+            console.error("❌ [EvaluacionEquipo] Error al obtener usuarios:", usuariosError);
+            throw usuariosError;
+          }
+
+          // Formatear como si viniera de la relación
+          assignments = assignmentIds.map(assignment => ({
+            colaborador_id: assignment.colaborador_id,
+            users: usuarios?.find(u => u.dpi === assignment.colaborador_id) || null
+          })).filter(a => a.users !== null);
+
+          assignmentsError = null;
+          console.log("✅ [EvaluacionEquipo] Consulta manual exitosa:", {
+            total: assignments.length,
+            asignaciones: assignments
+          });
+        } else {
+          console.warn("⚠️ [EvaluacionEquipo] No se encontraron asignaciones activas para este jefe");
+        }
+      }
+
+      if (assignmentsError && !assignments) {
+        console.error("❌ [EvaluacionEquipo] Error al cargar asignaciones:", assignmentsError);
+        throw assignmentsError;
+      }
+
+      console.log("✅ [EvaluacionEquipo] Asignaciones encontradas:", {
+        total: assignments?.length || 0,
+        asignaciones: assignments
+      });
 
       // Formatear datos de colaboradores
-      const members = (assignments || []).map((assignment: any) => {
-        const colaborador = assignment.users;
-        return {
-          id: colaborador.dpi,
-          dpi: colaborador.dpi,
-          nombre: `${colaborador.nombre} ${colaborador.apellidos}`,
-          cargo: colaborador.cargo,
-          nivel: colaborador.nivel,
-          area: colaborador.area,
-        };
+      const members = (assignments || [])
+        .filter((assignment: any) => {
+          // Filtrar asignaciones donde el colaborador existe
+          if (!assignment.users) {
+            console.warn("⚠️ [EvaluacionEquipo] Asignación sin usuario:", assignment);
+            return false;
+          }
+          return true;
+        })
+        .map((assignment: any) => {
+          const colaborador = assignment.users;
+          return {
+            id: colaborador.dpi,
+            dpi: colaborador.dpi,
+            nombre: `${colaborador.nombre} ${colaborador.apellidos}`,
+            cargo: colaborador.cargo,
+            nivel: colaborador.nivel,
+            area: colaborador.area,
+          };
+        });
+
+      console.log("✅ [EvaluacionEquipo] Colaboradores formateados:", {
+        total: members.length,
+        miembros: members
       });
 
       setTeamMembers(members);
