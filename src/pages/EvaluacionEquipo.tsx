@@ -165,19 +165,19 @@ const EvaluacionEquipo = () => {
       // OPTIMIZACIÓN: Cargar todos los estados de evaluaciones de una vez usando query batch
       if (members.length === 0) {
         setTeamStatus({});
+        setLoading(false);
         return;
       }
 
-      const colaboradoresIds = members.map(m => m.dpi);
-      
       // Obtener todas las evaluaciones del jefe para estos colaboradores en una sola query
+      const colaboradoresDpis = members.map(m => m.dpi);
       const { data: evaluacionesData, error: evaluacionesError } = await supabase
         .from("evaluations")
         .select("colaborador_id, estado, progreso")
         .eq("evaluador_id", user!.dpi)
         .eq("periodo_id", periodoIdParam)
         .eq("tipo", "jefe")
-        .in("colaborador_id", colaboradoresIds);
+        .in("colaborador_id", colaboradoresDpis);
 
       if (evaluacionesError) {
         console.error("Error loading evaluations:", evaluacionesError);
