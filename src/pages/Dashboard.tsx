@@ -605,9 +605,18 @@ const Dashboard = () => {
     const loadJerarquia = async () => {
       try {
         const info = await getJerarquiaInfo(user.dpi);
+        console.log("✅ [Dashboard] Información de jerarquía cargada:", {
+          usuario: `${user.nombre} ${user.apellidos}`,
+          nivel: user.nivel,
+          rol: user.rol,
+          tieneColaboradores: info.tieneColaboradores,
+          totalColaboradores: info.totalColaboradores,
+          tieneJefeSuperior: info.tieneJefeSuperior,
+          tieneJefesSubordinados: info.tieneJefesSubordinados
+        });
         setJerarquiaInfo(info);
       } catch (error) {
-        console.error("Error loading hierarchy info:", error);
+        console.error("❌ [Dashboard] Error loading hierarchy info:", error);
       }
     };
 
@@ -1210,8 +1219,8 @@ const Dashboard = () => {
           </div>
         )}
 
-        {/* Jefe Dashboard */}
-        {isJefe && (
+        {/* Jefe Dashboard - Mostrar para jefes que tienen colaboradores asignados */}
+        {(isJefe || jerarquiaInfo?.tieneColaboradores) && (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {/* Autoevaluación del jefe */}
             {(jerarquiaInfo?.tieneJefeSuperior || true) && (
