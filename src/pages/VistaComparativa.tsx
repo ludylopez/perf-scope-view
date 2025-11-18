@@ -21,6 +21,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { getActivePeriod, getEvaluationIdFromSupabase } from "@/lib/supabase";
 import { getFinalResultFromSupabase, getConsolidatedResult, getResultsByEvaluator } from "@/lib/finalResultSupabase";
 import { getInstrumentConfigForUser } from "@/lib/backendCalculations";
+import { getInstrumentCalculationConfig } from "@/lib/instrumentCalculations";
 import { GenerarPlanDesarrollo } from "@/components/development/GenerarPlanDesarrollo";
 import { GenerarGuiaRetroalimentacion } from "@/components/development/GuiaRetroalimentacion";
 import { GenerarFeedbackGrupal } from "@/components/development/GenerarFeedbackGrupal";
@@ -507,12 +508,33 @@ const VistaComparativa = () => {
     };
   });
 
-  // Helper para calcular respuestas consolidadas (70% jefe + 30% auto) - IGUAL QUE DASHBOARD
+  // Helper para calcular respuestas consolidadas con pesos dinámicos según el nivel
+  // A1 (Alcalde): 55% jefe + 45% auto
+  // C1 (Concejo): 100% auto (no tiene jefe)
+  // Otros: 70% jefe + 30% auto
   const calculateConsolidatedResponses = (
     autoResponses: Record<string, number>,
-    jefeResponses: Record<string, number>
+    jefeResponses: Record<string, number>,
+    instrumentId?: string
   ): Record<string, number> => {
     const consolidated: Record<string, number> = {};
+    
+    // Obtener pesos del instrumento (por defecto 70/30)
+    let pesoJefe = 0.7;
+    let pesoAuto = 0.3;
+    
+    if (instrumentId) {
+      try {
+        const instrumentConfig = getInstrumentCalculationConfig(instrumentId);
+        if (instrumentConfig?.pesoJefe !== undefined && instrumentConfig?.pesoAuto !== undefined) {
+          pesoJefe = instrumentConfig.pesoJefe;
+          pesoAuto = instrumentConfig.pesoAuto;
+          console.log(`📊 [VistaComparativa] Usando pesos del instrumento ${instrumentId}:`, { pesoJefe, pesoAuto });
+        }
+      } catch (error) {
+        console.warn(`⚠️ [VistaComparativa] No se pudo obtener configuración del instrumento ${instrumentId}, usando pesos por defecto 70/30`);
+      }
+    }
     
     const allItemIds = new Set([
       ...Object.keys(autoResponses),
@@ -524,7 +546,8 @@ const VistaComparativa = () => {
       const jefeValue = jefeResponses[itemId] || 0;
       
       if (autoResponses[itemId] !== undefined && jefeResponses[itemId] !== undefined) {
-        consolidated[itemId] = Math.round((jefeValue * 0.7 + autoValue * 0.3) * 100) / 100;
+        // Aplicar pesos dinámicos
+        consolidated[itemId] = Math.round((jefeValue * pesoJefe + autoValue * pesoAuto) * 100) / 100;
       } else if (autoResponses[itemId] !== undefined) {
         consolidated[itemId] = autoValue;
       } else if (jefeResponses[itemId] !== undefined) {
@@ -538,9 +561,12 @@ const VistaComparativa = () => {
   // Preparar datos para PDF del colaborador (usando EXACTAMENTE el mismo método que Dashboard)
   const prepararDatosParaPDF = async () => {
     // Consolidar respuestas a nivel de ítem (igual que Dashboard)
+    // Pasar el ID del instrumento para obtener los pesos correctos (A1=45/55, otros=70/30)
+    const instrumentId = instrument?.id || colaborador?.nivel;
     const responsesToUse = calculateConsolidatedResponses(
       autoevaluacion.responses,
-      evaluacionJefe.responses
+      evaluacionJefe.responses,
+      instrumentId
     );
     
     // Calcular performance score y percentage (igual que Dashboard)
@@ -618,7 +644,9 @@ const VistaComparativa = () => {
             finalResults.forEach((resultado) => {
               const autoResponses = autoEvalMap.get(resultado.autoevaluacion_id) || {};
               const jefeResponses = jefeEvalMap.get(resultado.evaluacion_jefe_id) || {};
-              const consolidadas = calculateConsolidatedResponses(autoResponses, jefeResponses);
+              // Usar el mismo instrumentId del colaborador para calcular promedio municipal
+              const instrumentId = instrument?.id || colaborador?.nivel;
+              const consolidadas = calculateConsolidatedResponses(autoResponses, jefeResponses, instrumentId);
               const porcentaje = calculateDimensionPercentage(consolidadas, dim);
               if (porcentaje > 0) {
                 sumaPorcentajes += porcentaje;

@@ -22,7 +22,7 @@ import {
   Database,
   Grid3x3
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { getEvaluationDraft, hasSubmittedEvaluation, submitEvaluation, EvaluationDraft, getSubmittedEvaluation, hasJefeEvaluation, getJefeEvaluationDraft } from "@/lib/storage";
 import { getInstrumentForUser } from "@/lib/instruments";
 import { toast } from "@/hooks/use-toast";
@@ -34,13 +34,35 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PerformanceRadarAnalysis } from "@/components/evaluation/PerformanceRadarAnalysis";
 import { supabase } from "@/integrations/supabase/client";
 import { exportEvaluacionCompletaPDF, exportEvaluacionCompletaPDFFromElement, exportEvaluacionCompletaPDFReact } from "@/lib/exports";
+import { getInstrumentCalculationConfig } from "@/lib/instrumentCalculations";
 
-// Helper para calcular respuestas consolidadas (70% jefe + 30% auto)
+// Helper para calcular respuestas consolidadas con pesos dinámicos según el nivel
+// A1 (Alcalde): 55% jefe + 45% auto
+// C1 (Concejo): 100% auto (no tiene jefe)
+// Otros: 70% jefe + 30% auto
 const calculateConsolidatedResponses = (
   autoResponses: Record<string, number>,
-  jefeResponses: Record<string, number>
+  jefeResponses: Record<string, number>,
+  instrumentId?: string
 ): Record<string, number> => {
   const consolidated: Record<string, number> = {};
+  
+  // Obtener pesos del instrumento (por defecto 70/30)
+  let pesoJefe = 0.7;
+  let pesoAuto = 0.3;
+  
+  if (instrumentId) {
+    try {
+      const instrumentConfig = getInstrumentCalculationConfig(instrumentId);
+      if (instrumentConfig?.pesoJefe !== undefined && instrumentConfig?.pesoAuto !== undefined) {
+        pesoJefe = instrumentConfig.pesoJefe;
+        pesoAuto = instrumentConfig.pesoAuto;
+        console.log(`📊 [Dashboard] Usando pesos del instrumento ${instrumentId}:`, { pesoJefe, pesoAuto });
+      }
+    } catch (error) {
+      console.warn(`⚠️ [Dashboard] No se pudo obtener configuración del instrumento ${instrumentId}, usando pesos por defecto 70/30`);
+    }
+  }
   
   const allItemIds = new Set([
     ...Object.keys(autoResponses),
@@ -52,7 +74,8 @@ const calculateConsolidatedResponses = (
     const jefeValue = jefeResponses[itemId] || 0;
     
     if (autoResponses[itemId] !== undefined && jefeResponses[itemId] !== undefined) {
-      consolidated[itemId] = Math.round((jefeValue * 0.7 + autoValue * 0.3) * 100) / 100;
+      // Aplicar pesos dinámicos
+      consolidated[itemId] = Math.round((jefeValue * pesoJefe + autoValue * pesoAuto) * 100) / 100;
     } else if (autoResponses[itemId] !== undefined) {
       consolidated[itemId] = autoValue;
     } else if (jefeResponses[itemId] !== undefined) {
@@ -146,8 +169,12 @@ const getDimensionFriendlyDescription = (dimension: any, percentage: number): st
 const Dashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const { activePeriodId, activePeriod } = usePeriod();
 
+  const [isStatusLoading, setIsStatusLoading] = useState(true);
+  const [isResultadosLoading, setIsResultadosLoading] = useState(false);
+  const [pendingResultadosScroll, setPendingResultadosScroll] = useState(false);
   const [evaluationStatus, setEvaluationStatus] = useState<"not_started" | "in_progress" | "submitted">("not_started");
   const [progress, setProgress] = useState(0);
   const [jerarquiaInfo, setJerarquiaInfo] = useState<any>(null);
@@ -163,10 +190,39 @@ const Dashboard = () => {
   const [planDesarrollo, setPlanDesarrollo] = useState<any>(null);
   const [dashboardStats, setDashboardStats] = useState<any>(null);
 
+  const focusResultadosSection = () => {
+    const element = document.getElementById("resultados-evaluacion-container");
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth", block: "start" });
+      setPendingResultadosScroll(false);
+    } else {
+      setPendingResultadosScroll(true);
+    }
+  };
+
   const isColaborador = user?.rol === "colaborador";
   const isJefe = user?.rol === "jefe";
   const isAdminRRHH = user?.rol === "admin_rrhh";
   const isAdminGeneral = user?.rol === "admin_general";
+
+  useEffect(() => {
+    if (location.state?.focusResultados) {
+      setPendingResultadosScroll(true);
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location, navigate]);
+
+  useEffect(() => {
+    if (!pendingResultadosScroll) return;
+    const timer = setTimeout(() => {
+      const element = document.getElementById("resultados-evaluacion-container");
+      if (element) {
+        element.scrollIntoView({ behavior: "smooth", block: "start" });
+        setPendingResultadosScroll(false);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [pendingResultadosScroll, resultadoData, evaluationStatus, isResultadosLoading]);
 
   // Cargar estadísticas del dashboard para RRHH
   useEffect(() => {
@@ -195,47 +251,54 @@ const Dashboard = () => {
   useEffect(() => {
     if (!user || !activePeriodId) return;
 
+    setIsStatusLoading(true);
+
     const checkStatus = async () => {
-      // Check evaluation status con período activo real
-      const isSubmitted = await hasSubmittedEvaluation(user.dpi, activePeriodId);
-      if (isSubmitted) {
-        setEvaluationStatus("submitted");
-        setProgress(100);
-        
-        // Cargar datos de resultados si está enviada
-        // IMPORTANTE: Para C1 (Concejo Municipal) y A1 (Alcalde), cargar resultados inmediatamente ya que solo tienen autoevaluación
-        // Para otros niveles, solo cargar resultados si el jefe completó su evaluación
-        if (user.nivel === 'C1' || user.nivel === 'A1') {
-          // C1 y A1 solo tienen autoevaluación, cargar resultados inmediatamente
-          await loadResultadosData();
-        } else if (isColaborador) {
-          const jefeId = await getColaboradorJefe(user.dpi);
-          if (jefeId) {
-            const jefeCompleto = await hasJefeEvaluation(jefeId, user.dpi, activePeriodId);
-            if (jefeCompleto) {
-              await loadResultadosData();
-            } else {
-              console.log('⏳ [Dashboard] Autoevaluación enviada, pero jefe aún no ha completado. No se mostrarán resultados.');
-              setResultadoData(null);
-            }
-          } else {
-            // Si no tiene jefe, cargar resultados de autoevaluación
+      try {
+        // Check evaluation status con período activo real
+        const isSubmitted = await hasSubmittedEvaluation(user.dpi, activePeriodId);
+        if (isSubmitted) {
+          setEvaluationStatus("submitted");
+          setProgress(100);
+          
+          // Cargar datos de resultados si está enviada
+          // IMPORTANTE: Para C1 (Concejo Municipal) y A1 (Alcalde), cargar resultados inmediatamente ya que solo tienen autoevaluación
+          // Para otros niveles, solo cargar resultados si el jefe completó su evaluación
+          if (user.nivel === 'C1' || user.nivel === 'A1') {
+            // C1 y A1 solo tienen autoevaluación, cargar resultados inmediatamente
             await loadResultadosData();
+          } else if (isColaborador) {
+            const jefeId = await getColaboradorJefe(user.dpi);
+            if (jefeId) {
+              const jefeCompleto = await hasJefeEvaluation(jefeId, user.dpi, activePeriodId);
+              if (jefeCompleto) {
+                await loadResultadosData();
+              } else {
+                console.log('⏳ [Dashboard] Autoevaluación enviada, pero jefe aún no ha completado. No se mostrarán resultados.');
+                setResultadoData(null);
+              }
+            } else {
+              // Si no tiene jefe, cargar resultados de autoevaluación
+              await loadResultadosData();
+            }
+          }
+        } else {
+          const draft = await getEvaluationDraft(user.dpi, activePeriodId);
+          if (draft && Object.keys(draft.responses).length > 0) {
+            setEvaluationStatus("in_progress");
+            setProgress(draft.progreso);
+          } else {
+            setEvaluationStatus("not_started");
+            setProgress(0);
           }
         }
-      } else {
-        const draft = await getEvaluationDraft(user.dpi, activePeriodId);
-        if (draft && Object.keys(draft.responses).length > 0) {
-          setEvaluationStatus("in_progress");
-          setProgress(draft.progreso);
-        } else {
-          setEvaluationStatus("not_started");
-          setProgress(0);
-        }
+      } finally {
+        setIsStatusLoading(false);
       }
     };
 
     const loadResultadosData = async () => {
+      setIsResultadosLoading(true);
       try {
         console.log('🔍 [Dashboard] Iniciando carga de resultados para:', { dpi: user.dpi, nivel: user.nivel, periodo: activePeriodId });
         
@@ -271,11 +334,14 @@ const Dashboard = () => {
           if (jefeCompleto) {
             const jefeEval = await getJefeEvaluationDraft(jefeId, user.dpi, activePeriodId);
             if (jefeEval) {
-              responsesToUse = calculateConsolidatedResponses(submitted.responses, jefeEval.responses);
+              // Pasar el ID del instrumento para obtener los pesos correctos (A1=45/55, otros=70/30)
+              const instrumentId = instrument?.id || user?.nivel;
+              responsesToUse = calculateConsolidatedResponses(submitted.responses, jefeEval.responses, instrumentId);
               console.log('✅ [Dashboard] Usando respuestas consolidadas:', { 
                 autoCount: Object.keys(submitted.responses).length,
                 jefeCount: Object.keys(jefeEval.responses).length,
-                consolidadasCount: Object.keys(responsesToUse).length
+                consolidadasCount: Object.keys(responsesToUse).length,
+                instrumentId
               });
             }
           }
@@ -592,6 +658,8 @@ const Dashboard = () => {
         }
       } catch (error) {
         console.error('Error cargando resultados:', error);
+      } finally {
+        setIsResultadosLoading(false);
       }
     };
 
@@ -624,6 +692,9 @@ const Dashboard = () => {
   }, [user]);
 
   const getStatusBadge = () => {
+    if (isStatusLoading) {
+      return <div className="h-6 w-24 rounded-full bg-muted animate-pulse" />;
+    }
     switch (evaluationStatus) {
       case "submitted":
         return (
@@ -651,6 +722,9 @@ const Dashboard = () => {
 
 
   const getActionButton = () => {
+    if (isStatusLoading) {
+      return <div className="h-12 w-full rounded-md bg-muted animate-pulse" />;
+    }
     switch (evaluationStatus) {
       case "submitted":
         return (
@@ -658,7 +732,16 @@ const Dashboard = () => {
             className="w-full" 
             size="lg"
             variant="outline"
-            onClick={() => navigate("/mi-autoevaluacion")}
+            disabled={isResultadosLoading && !resultadoData}
+            onClick={() => {
+              if (!resultadoData && !isResultadosLoading) {
+                toast({
+                  title: "Resultados en proceso",
+                  description: "Mostraremos tus resultados finales cuando se consoliden con la evaluación de tu jefe.",
+                });
+              }
+              focusResultadosSection();
+            }}
           >
             Ver Mis Resultados
           </Button>
@@ -686,6 +769,38 @@ const Dashboard = () => {
     }
   };
 
+  const ResultadosSkeleton = () => (
+    <Card className="border-primary/20">
+      <CardContent className="pt-6 space-y-4 animate-pulse">
+        <div className="h-6 w-48 rounded bg-muted" />
+        <div className="h-4 w-64 rounded bg-muted" />
+        <div className="flex flex-col gap-4 lg:flex-row">
+          <div className="h-64 flex-1 rounded bg-muted" />
+          <div className="flex-1 space-y-3">
+            <div className="h-16 rounded bg-muted" />
+            <div className="h-16 rounded bg-muted" />
+          </div>
+        </div>
+        <div className="h-48 rounded bg-muted" />
+      </CardContent>
+    </Card>
+  );
+
+  const AutoevaluacionSkeleton = () => (
+    <Card className="md:col-span-2">
+      <CardContent className="pt-6 space-y-4 animate-pulse">
+        <div className="h-6 w-40 rounded bg-muted" />
+        <div className="h-4 w-32 rounded bg-muted" />
+        <div className="h-2 w-full rounded bg-muted" />
+        <div className="h-12 w-full rounded bg-muted" />
+      </CardContent>
+    </Card>
+  );
+
+  const shouldShowCollaboratorDashboard = (isColaborador || user?.nivel === 'C1' || user?.nivel === 'A1') && !jerarquiaInfo?.tieneColaboradores;
+  const canDisplayResultados = evaluationStatus === "submitted" && resultadoData && (resultadoData.jefeCompleto || user?.nivel === 'C1' || user?.nivel === 'A1');
+  const shouldShowResultadosSkeleton = evaluationStatus === "submitted" && isResultadosLoading;
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -703,10 +818,11 @@ const Dashboard = () => {
 
         {/* Colaborador Dashboard - Mostrar para colaboradores, C1 (Concejo) y A1 (Alcalde) 
             PERO solo si NO tienen colaboradores asignados (para evitar duplicación) */}
-        {(isColaborador || user?.nivel === 'C1' || user?.nivel === 'A1') && !jerarquiaInfo?.tieneColaboradores && (
+        {shouldShowCollaboratorDashboard && (
           <div className="space-y-6">
+            {shouldShowResultadosSkeleton && <ResultadosSkeleton />}
             {/* Mostrar resultados si están disponibles Y el jefe completó (o es C1/A1 que solo tienen autoevaluación) */}
-            {evaluationStatus === "submitted" && resultadoData && (resultadoData.jefeCompleto || user?.nivel === 'C1' || user?.nivel === 'A1') && (
+            {canDisplayResultados && (
               <div id="resultados-evaluacion-container">
                 {/* Título y Badge */}
                 <div className="mb-6">
@@ -1141,7 +1257,7 @@ const Dashboard = () => {
             )}
 
             {/* Mostrar mensaje si autoevaluación enviada pero jefe no completó (excepto C1 que ya tiene resultados) */}
-            {evaluationStatus === "submitted" && (!resultadoData || (!resultadoData.jefeCompleto && user?.nivel !== 'C1')) && (
+            {!isStatusLoading && evaluationStatus === "submitted" && (!resultadoData || (!resultadoData.jefeCompleto && user?.nivel !== 'C1')) && (
               <Card className="md:col-span-2 border-blue-200 bg-blue-50 dark:bg-blue-950/20">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -1181,7 +1297,7 @@ const Dashboard = () => {
             )}
 
             {/* Mostrar formulario o mensaje si no está completada */}
-            {evaluationStatus !== "submitted" && (
+            {!isStatusLoading && evaluationStatus !== "submitted" && (
               <Card className="md:col-span-2">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -1217,6 +1333,7 @@ const Dashboard = () => {
                 </CardContent>
               </Card>
             )}
+            {isStatusLoading && <AutoevaluacionSkeleton />}
           </div>
         )}
 

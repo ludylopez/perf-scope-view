@@ -39,7 +39,7 @@ const MisRespuestasDetalle = () => {
       const userInstrument = await getInstrumentForUser(user.nivel, user.instrumentoId, user.cargo);
       if (!userInstrument) {
         toast.error("No se encontró un instrumento de evaluación para su nivel");
-        navigate("/mi-autoevaluacion");
+        navigate("/dashboard", { state: { focusResultados: true } });
         return;
       }
       setInstrument(userInstrument);
@@ -49,7 +49,7 @@ const MisRespuestasDetalle = () => {
 
       if (!savedEval) {
         toast.error("No se encontró una autoevaluación enviada");
-        navigate("/mi-autoevaluacion");
+        navigate("/dashboard", { state: { focusResultados: true } });
         return;
       }
 
@@ -85,7 +85,7 @@ const MisRespuestasDetalle = () => {
 
       <main className="container mx-auto px-4 py-8">
         <div className="mb-6 flex items-center justify-between">
-          <Button variant="ghost" onClick={() => navigate("/mi-autoevaluacion")}>
+          <Button variant="ghost" onClick={() => navigate("/dashboard", { state: { focusResultados: true } })}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             Volver a Resultados
           </Button>

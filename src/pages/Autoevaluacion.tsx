@@ -216,7 +216,7 @@ const Autoevaluacion = () => {
         // Check if already submitted
         const alreadySubmitted = await hasSubmittedEvaluation(user.dpi, periodoIdFinal);
         if (alreadySubmitted) {
-          navigate("/mi-autoevaluacion");
+          navigate("/dashboard", { state: { focusResultados: true } });
           return;
         }
 
