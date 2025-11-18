@@ -386,7 +386,7 @@ const EvaluacionEquipo = () => {
                           {colaborador.cargo} • {colaborador.area} • Nivel {colaborador.nivel}
                           {multipleEvaluatorsInfo[colaborador.dpi]?.totalEvaluadores > 1 && (
                             <span className="ml-2 text-xs text-muted-foreground">
-                              (Evaluado por múltiples jefes)
+                              (Múltiples evaluadores)
                             </span>
                           )}
                         </CardDescription>
