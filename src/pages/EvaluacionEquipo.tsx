@@ -91,100 +91,69 @@ const EvaluacionEquipo = () => {
       
       // Cargar colaboradores asignados desde Supabase
       // NOTA: Las asignaciones son permanentes, no están vinculadas a períodos específicos
-      // Intentar primero con la relación de foreign key
-      let { data: assignments, error: assignmentsError } = await supabase
+      // Usar consulta manual directa (más confiable que la relación FK)
+      
+      // Paso 1: Obtener IDs de colaboradores asignados
+      const { data: assignmentIds, error: idsError } = await supabase
         .from("user_assignments")
-        .select(`
-          colaborador_id,
-          users!user_assignments_colaborador_id_fkey (
-            dpi,
-            nombre,
-            apellidos,
-            cargo,
-            nivel,
-            area
-          )
-        `)
+        .select("colaborador_id")
         .eq("jefe_id", user!.dpi)
         .eq("activo", true);
 
-      // Si falla la relación o no hay datos, intentar con consulta manual
-      if (assignmentsError || !assignments || assignments.length === 0) {
-        console.warn("⚠️ [EvaluacionEquipo] Relación FK falló o sin datos, intentando consulta manual...", assignmentsError);
-        
-        // Consulta alternativa: obtener IDs primero, luego usuarios
-        const { data: assignmentIds, error: idsError } = await supabase
-          .from("user_assignments")
-          .select("colaborador_id")
-          .eq("jefe_id", user!.dpi)
-          .eq("activo", true);
-
-        if (idsError) {
-          console.error("❌ [EvaluacionEquipo] Error al obtener IDs de asignaciones:", idsError);
-          throw idsError;
-        }
-
-        if (assignmentIds && assignmentIds.length > 0) {
-          const colaboradoresIds = assignmentIds.map(a => a.colaborador_id);
-          
-          const { data: usuarios, error: usuariosError } = await supabase
-            .from("users")
-            .select("dpi, nombre, apellidos, cargo, nivel, area")
-            .in("dpi", colaboradoresIds)
-            .eq("estado", "activo");
-
-          if (usuariosError) {
-            console.error("❌ [EvaluacionEquipo] Error al obtener usuarios:", usuariosError);
-            throw usuariosError;
-          }
-
-          // Formatear como si viniera de la relación
-          assignments = assignmentIds.map(assignment => ({
-            colaborador_id: assignment.colaborador_id,
-            users: usuarios?.find(u => u.dpi === assignment.colaborador_id) || null
-          })).filter(a => a.users !== null);
-
-          assignmentsError = null;
-          console.log("✅ [EvaluacionEquipo] Consulta manual exitosa:", {
-            total: assignments.length,
-            asignaciones: assignments
-          });
-        } else {
-          console.warn("⚠️ [EvaluacionEquipo] No se encontraron asignaciones activas para este jefe");
-        }
+      if (idsError) {
+        console.error("❌ [EvaluacionEquipo] Error al obtener IDs de asignaciones:", idsError);
+        throw idsError;
       }
 
-      if (assignmentsError && !assignments) {
-        console.error("❌ [EvaluacionEquipo] Error al cargar asignaciones:", assignmentsError);
-        throw assignmentsError;
+      if (!assignmentIds || assignmentIds.length === 0) {
+        console.warn("⚠️ [EvaluacionEquipo] No se encontraron asignaciones activas para este jefe");
+        setTeamMembers([]);
+        setTeamStatus({});
+        setLoading(false);
+        return;
       }
 
       console.log("✅ [EvaluacionEquipo] Asignaciones encontradas:", {
-        total: assignments?.length || 0,
-        asignaciones: assignments
+        total: assignmentIds.length,
+        colaboradores_ids: assignmentIds.map(a => a.colaborador_id)
       });
 
-      // Formatear datos de colaboradores
-      const members = (assignments || [])
-        .filter((assignment: any) => {
-          // Filtrar asignaciones donde el colaborador existe
-          if (!assignment.users) {
-            console.warn("⚠️ [EvaluacionEquipo] Asignación sin usuario:", assignment);
-            return false;
-          }
-          return true;
-        })
-        .map((assignment: any) => {
-          const colaborador = assignment.users;
-          return {
-            id: colaborador.dpi,
-            dpi: colaborador.dpi,
-            nombre: `${colaborador.nombre} ${colaborador.apellidos}`,
-            cargo: colaborador.cargo,
-            nivel: colaborador.nivel,
-            area: colaborador.area,
-          };
-        });
+      // Paso 2: Obtener información de los usuarios colaboradores
+      const colaboradoresIds = assignmentIds.map(a => a.colaborador_id);
+      
+      const { data: usuarios, error: usuariosError } = await supabase
+        .from("users")
+        .select("dpi, nombre, apellidos, cargo, nivel, area")
+        .in("dpi", colaboradoresIds)
+        .eq("estado", "activo");
+
+      if (usuariosError) {
+        console.error("❌ [EvaluacionEquipo] Error al obtener usuarios:", usuariosError);
+        throw usuariosError;
+      }
+
+      if (!usuarios || usuarios.length === 0) {
+        console.warn("⚠️ [EvaluacionEquipo] No se encontraron usuarios activos para las asignaciones");
+        setTeamMembers([]);
+        setTeamStatus({});
+        setLoading(false);
+        return;
+      }
+
+      console.log("✅ [EvaluacionEquipo] Usuarios encontrados:", {
+        total: usuarios.length,
+        usuarios: usuarios.map(u => ({ dpi: u.dpi, nombre: `${u.nombre} ${u.apellidos}` }))
+      });
+
+      // Paso 3: Formatear datos de colaboradores
+      const members = usuarios.map((colaborador: any) => ({
+        id: colaborador.dpi,
+        dpi: colaborador.dpi,
+        nombre: `${colaborador.nombre} ${colaborador.apellidos}`,
+        cargo: colaborador.cargo,
+        nivel: colaborador.nivel,
+        area: colaborador.area,
+      }));
 
       console.log("✅ [EvaluacionEquipo] Colaboradores formateados:", {
         total: members.length,
