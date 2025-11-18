@@ -120,7 +120,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
                 .from("users")
                 .select("estado")
                 .eq("dpi", userObj.dpi)
-                .single();
+                .maybeSingle();
               
               if (!error && data && data.estado === "activo") {
                 setUser(userObj);
@@ -164,7 +164,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         .from("users")
         .select("*")
         .eq("dpi", dpi)
-        .single();
+        .maybeSingle();
       
       if (!error && data) {
         foundUser = {

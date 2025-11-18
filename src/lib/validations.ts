@@ -26,7 +26,7 @@ export const validateConcejoEvaluation = async (
       .from("users")
       .select("nivel, estado")
       .eq("dpi", concejoId)
-      .single();
+      .maybeSingle();
 
     if (evaluadorError || !evaluador) {
       return {
@@ -54,7 +54,7 @@ export const validateConcejoEvaluation = async (
       .from("users")
       .select("nivel, estado, nombre, apellidos")
       .eq("dpi", colaboradorId)
-      .single();
+      .maybeSingle();
 
     if (colaboradorError || !colaborador) {
       return {
@@ -119,7 +119,7 @@ export const validateAlcaldeEvaluation = async (
       .from("users")
       .select("nivel, estado")
       .eq("dpi", alcaldeId)
-      .single();
+      .maybeSingle();
 
     if (evaluadorError || !evaluador) {
       return {
@@ -147,7 +147,7 @@ export const validateAlcaldeEvaluation = async (
       .from("users")
       .select("nivel, estado, nombre, apellidos")
       .eq("dpi", colaboradorId)
-      .single();
+      .maybeSingle();
 
     if (colaboradorError || !colaborador) {
       return {
@@ -198,8 +198,103 @@ export const validateAlcaldeEvaluation = async (
 };
 
 /**
+ * Valida si se puede crear una asignación entre un evaluador y un colaborador
+ * Esta función NO requiere que la asignación ya exista (a diferencia de validateEvaluationPermission)
+ * Se usa específicamente para crear nuevas asignaciones
+ */
+export const validateAssignmentCreation = async (
+  evaluadorId: string,
+  colaboradorId: string
+): Promise<ValidationResult> => {
+  try {
+    // Obtener datos del evaluador
+    const { data: evaluador, error: evaluadorError } = await supabase
+      .from("users")
+      .select("nivel, estado, rol, nombre, apellidos")
+      .eq("dpi", evaluadorId)
+      .maybeSingle();
+
+    if (evaluadorError || !evaluador) {
+      return {
+        valid: false,
+        error: "El evaluador no existe o no está activo",
+      };
+    }
+
+    if (evaluador.estado !== "activo") {
+      return {
+        valid: false,
+        error: "El evaluador no está activo",
+      };
+    }
+
+    // Obtener datos del colaborador
+    const { data: colaborador, error: colaboradorError } = await supabase
+      .from("users")
+      .select("nivel, estado, nombre, apellidos")
+      .eq("dpi", colaboradorId)
+      .maybeSingle();
+
+    if (colaboradorError || !colaborador) {
+      return {
+        valid: false,
+        error: "El colaborador no existe o no está activo",
+      };
+    }
+
+    if (colaborador.estado !== "activo") {
+      return {
+        valid: false,
+        error: "El colaborador no está activo",
+      };
+    }
+
+    // Validar que no se esté asignando a sí mismo
+    if (evaluadorId === colaboradorId) {
+      return {
+        valid: false,
+        error: "Un usuario no puede ser evaluador de sí mismo",
+      };
+    }
+
+    // Reglas específicas sobre QUIÉN puede evaluar a C1 y A1 (no sobre a QUIÉN pueden evaluar)
+    // C1 (Concejo) solo puede ser evaluado por A1 (Alcalde)
+    if (colaborador.nivel === "C1" && evaluador.nivel !== "A1") {
+      return {
+        valid: false,
+        error: "El Concejo Municipal (C1) solo puede ser evaluado por el Alcalde Municipal (A1)",
+      };
+    }
+
+    // A1 (Alcalde) solo puede ser evaluado por C1 (Concejo)
+    if (colaborador.nivel === "A1" && evaluador.nivel !== "C1") {
+      return {
+        valid: false,
+        error: "El Alcalde Municipal (A1) solo puede ser evaluado por miembros del Concejo Municipal (C1)",
+      };
+    }
+
+    // Para todas las demás asignaciones, no hay restricciones de nivel
+    // Las asignaciones reflejan la estructura organizacional real
+    // Si se crea una asignación, entonces se puede evaluar, independientemente del nivel
+    return {
+      valid: true,
+      message: "Asignación válida: ambos usuarios están activos y cumplen las reglas de jerarquía",
+    };
+  } catch (error) {
+    console.error("Error in validateAssignmentCreation:", error);
+    return {
+      valid: false,
+      error: "Error al validar la creación de asignación",
+    };
+  }
+};
+
+/**
  * Función genérica que valida permisos de evaluación según las reglas de negocio
  * Aplica validaciones específicas para C1 (Concejo) y A1 (Alcalde)
+ * NOTA: Esta función valida cuando YA EXISTE una asignación (para evaluaciones)
+ * Para crear asignaciones, usar validateAssignmentCreation en su lugar
  */
 export const validateEvaluationPermission = async (
   evaluadorId: string,
@@ -211,7 +306,7 @@ export const validateEvaluationPermission = async (
       .from("users")
       .select("nivel, estado")
       .eq("dpi", evaluadorId)
-      .single();
+      .maybeSingle();
 
     if (evaluadorError || !evaluador) {
       return {

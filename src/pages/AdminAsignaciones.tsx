@@ -36,7 +36,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { AssignmentWithUsers } from "@/types/assignment";
-import { validateEvaluationPermission } from "@/lib/validations";
+import { validateAssignmentCreation } from "@/lib/validations";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ImportAssignmentsDialog } from "@/components/ImportAssignmentsDialog";
 
@@ -150,14 +150,14 @@ const AdminAsignaciones = () => {
       return;
     }
 
-    // Validar permisos de evaluación usando la función de validación async
-    const validationResult = await validateEvaluationPermission(
+    // Validar que se puede crear la asignación (usar función específica para creación)
+    const validationResult = await validateAssignmentCreation(
       jefe.dpi,
       colaborador.dpi
     );
 
     if (!validationResult.valid) {
-      toast.error(validationResult.error || validationResult.message || "No tiene permisos para crear esta asignación");
+      toast.error(validationResult.error || validationResult.message || "No se puede crear esta asignación");
       return;
     }
 
@@ -175,18 +175,8 @@ const AdminAsignaciones = () => {
       return;
     }
 
-    // Validaciones específicas para C1 y A1
-    // C1 solo puede ser evaluado por A1 (Alcalde)
-    if (colaborador.nivel === 'C1' && jefe.nivel !== 'A1') {
-      toast.error("El Concejo Municipal (C1) solo puede ser evaluado por el Alcalde Municipal (A1).");
-      return;
-    }
-
-    // A1 solo puede ser evaluado por C1 (Concejo)
-    if (colaborador.nivel === 'A1' && jefe.nivel !== 'C1') {
-      toast.error("El Alcalde Municipal (A1) solo puede ser evaluado por miembros del Concejo Municipal (C1).");
-      return;
-    }
+    // Las validaciones de nivel (C1 solo evaluado por A1, A1 solo evaluado por C1)
+    // ya están incluidas en validateAssignmentCreation
 
     try {
       const { error } = await supabase

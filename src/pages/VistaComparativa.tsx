@@ -168,13 +168,20 @@ const VistaComparativa = () => {
           }
           colaboradorFormatted = mockColaborador;
         } else {
+          // Incluir TODOS los campos necesarios para el PDF (igual que Dashboard)
           colaboradorFormatted = {
             id: colaboradorData.dpi,
             dpi: colaboradorData.dpi,
-            nombre: `${colaboradorData.nombre} ${colaboradorData.apellidos}`,
-            cargo: colaboradorData.cargo,
-            nivel: colaboradorData.nivel,
-            area: colaboradorData.area,
+            nombre: colaboradorData.nombre || '',
+            apellidos: colaboradorData.apellidos || '',
+            cargo: colaboradorData.cargo || '',
+            nivel: colaboradorData.nivel || '',
+            area: colaboradorData.area || '',
+            direccionUnidad: colaboradorData.direccion_unidad || colaboradorData.direccionUnidad || '',
+            departamentoDependencia: colaboradorData.departamento_dependencia || colaboradorData.departamentoDependencia || '',
+            profesion: colaboradorData.profesion || '',
+            correo: colaboradorData.correo || '',
+            telefono: colaboradorData.telefono || '',
           };
         }
 
@@ -720,7 +727,7 @@ const VistaComparativa = () => {
               Volver al Equipo
             </Button>
             <h1 className="text-3xl font-bold text-foreground mt-4">
-              Vista Comparativa - {colaborador.nombre}
+              Vista Comparativa - {colaborador.apellidos ? `${colaborador.nombre} ${colaborador.apellidos}` : colaborador.nombre}
             </h1>
             <p className="text-muted-foreground mt-2">
               Comparación entre autoevaluación y evaluación del jefe

@@ -17,11 +17,16 @@ export interface JerarquiaInfo {
 export const getJerarquiaInfo = async (usuarioDpi: string): Promise<JerarquiaInfo> => {
   try {
     // Verificar si tiene jefe superior
-    const { data: usuario } = await supabase
+    // Usar maybeSingle() en lugar de single() para evitar errores 406 cuando el usuario no existe
+    const { data: usuario, error: usuarioError } = await supabase
       .from("users")
       .select("jefe_inmediato_id")
       .eq("dpi", usuarioDpi)
-      .single();
+      .maybeSingle();
+
+    if (usuarioError) {
+      console.warn("⚠️ [jerarquias] Error al consultar usuario:", usuarioError);
+    }
 
     const tieneJefeSuperior = usuario?.jefe_inmediato_id != null;
 

@@ -797,7 +797,7 @@ const Dashboard = () => {
     </Card>
   );
 
-  const shouldShowCollaboratorDashboard = (isColaborador || user?.nivel === 'C1' || user?.nivel === 'A1') && !jerarquiaInfo?.tieneColaboradores;
+  const shouldShowCollaboratorDashboard = (isColaborador || user?.nivel === 'C1' || user?.nivel === 'A1') && !jerarquiaInfo?.tieneColaboradores && !isAdminRRHH && !isAdminGeneral;
   const canDisplayResultados = evaluationStatus === "submitted" && resultadoData && (resultadoData.jefeCompleto || user?.nivel === 'C1' || user?.nivel === 'A1');
   const shouldShowResultadosSkeleton = evaluationStatus === "submitted" && isResultadosLoading;
 
@@ -1540,6 +1540,14 @@ const Dashboard = () => {
                   >
                     <Users className="mr-2 h-4 w-4" />
                     Análisis de Personal
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="justify-start"
+                    onClick={() => navigate("/admin/usuarios")}
+                  >
+                    <Users className="mr-2 h-4 w-4" />
+                    Gestión de Usuarios
                   </Button>
                   <Button
                     variant="outline"
