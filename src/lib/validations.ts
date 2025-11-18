@@ -107,7 +107,8 @@ export const validateConcejoEvaluation = async (
 
 /**
  * Valida que el Alcalde Municipal (A1) puede evaluar a un colaborador específico
- * El Alcalde solo puede evaluar a Directores (D1)
+ * El Alcalde puede evaluar a cualquier colaborador que tenga una asignación activa
+ * (las asignaciones reflejan la estructura organizacional real, no restringimos por nivel)
  */
 export const validateAlcaldeEvaluation = async (
   alcaldeId: string,
@@ -163,15 +164,9 @@ export const validateAlcaldeEvaluation = async (
       };
     }
 
-    // El Alcalde puede evaluar a Directores (D1) y miembros del Concejo (C1)
-    if (colaborador.nivel !== "D1" && colaborador.nivel !== "C1") {
-      return {
-        valid: false,
-        error: `El Alcalde solo puede evaluar a Directores (D1) o miembros del Concejo (C1), pero el colaborador es nivel ${colaborador.nivel}`,
-      };
-    }
-
     // Verificar que existe asignación activa
+    // Si existe una asignación activa, el Alcalde puede evaluar al colaborador
+    // independientemente del nivel (ya que las asignaciones reflejan la estructura real)
     const { data: asignacion, error: asignacionError } = await supabase
       .from("user_assignments")
       .select("id")
@@ -187,9 +182,12 @@ export const validateAlcaldeEvaluation = async (
       };
     }
 
+    // Si existe asignación activa, el Alcalde puede evaluar al colaborador
+    // (no restringimos por nivel ya que las asignaciones reflejan la estructura organizacional real)
+
     return {
       valid: true,
-      message: `Validación exitosa: Alcalde puede evaluar a ${colaborador.nombre} ${colaborador.apellidos} (${colaborador.nivel === "D1" ? "Director" : "Concejo"})`,
+      message: `Validación exitosa: Alcalde puede evaluar a ${colaborador.nombre} ${colaborador.apellidos} (nivel ${colaborador.nivel})`,
     };
   } catch (error) {
     console.error("Error in validateAlcaldeEvaluation:", error);
