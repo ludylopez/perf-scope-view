@@ -20,7 +20,8 @@ import {
   PlayCircle,
   Sparkles,
   Database,
-  Grid3x3
+  Grid3x3,
+  Eye
 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { getEvaluationDraft, hasSubmittedEvaluation, submitEvaluation, EvaluationDraft, getSubmittedEvaluation, hasJefeEvaluation, getJefeEvaluationDraft } from "@/lib/storage";
@@ -897,23 +898,34 @@ const Dashboard = () => {
     switch (evaluationStatus) {
       case "submitted":
         return (
-          <Button 
-            className="w-full" 
-            size="lg"
-            variant="outline"
-            disabled={isResultadosLoading && !resultadoData}
-            onClick={() => {
-              if (!resultadoData && !isResultadosLoading) {
-                toast({
-                  title: "Resultados en proceso",
-                  description: "Mostraremos tus resultados finales cuando se consoliden con la evaluación de tu jefe.",
-                });
-              }
-              focusResultadosSection();
-            }}
-          >
-            Ver Mis Resultados
-          </Button>
+          <div className="space-y-3">
+            <Button 
+              className="w-full" 
+              size="lg"
+              variant="outline"
+              disabled={isResultadosLoading && !resultadoData}
+              onClick={() => {
+                if (!resultadoData && !isResultadosLoading) {
+                  toast({
+                    title: "Resultados en proceso",
+                    description: "Mostraremos tus resultados finales cuando se consoliden con la evaluación de tu jefe.",
+                  });
+                }
+                focusResultadosSection();
+              }}
+            >
+              Ver Mis Resultados
+            </Button>
+            <Button 
+              className="w-full" 
+              size="lg"
+              variant="secondary"
+              onClick={() => navigate("/mis-respuestas-detalle")}
+            >
+              <Eye className="mr-2 h-4 w-4" />
+              Ver Mis Respuestas
+            </Button>
+          </div>
         );
       case "in_progress":
         return (
