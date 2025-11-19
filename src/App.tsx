@@ -2,10 +2,11 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { PeriodProvider } from "@/contexts/PeriodContext";
 import { importarAsignacionesDirecto } from "./lib/importarAsignacionesDirecto";
+import { WhatsAppButton } from "@/components/layout/WhatsAppButton";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Autoevaluacion from "./pages/Autoevaluacion";
@@ -56,6 +57,22 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" />;
 };
 
+// Componente wrapper para mostrar el botón de WhatsApp solo cuando el usuario esté autenticado
+const WhatsAppButtonWrapper = () => {
+  const { isAuthenticated } = useAuth();
+  const location = useLocation();
+  
+  // No mostrar en la página de login
+  if (location.pathname === "/login" || !isAuthenticated) {
+    return null;
+  }
+  
+  // Número de WhatsApp - Cambiar este número según sea necesario
+  const whatsappNumber = "50247035917"; // Formato: código de país + número sin espacios ni guiones
+  
+  return <WhatsAppButton phoneNumber={whatsappNumber} />;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
@@ -64,6 +81,7 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
+          <WhatsAppButtonWrapper />
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/" element={<Navigate to="/dashboard" />} />
