@@ -1862,22 +1862,26 @@ const Dashboard = () => {
                     <BarChart3 className="mr-2 h-4 w-4" />
                     Monitoreo
                   </Button>
-                  <Button
-                    variant="outline"
-                    className="justify-start"
-                    onClick={() => navigate("/admin/supabase-utils")}
-                  >
-                    <Database className="mr-2 h-4 w-4" />
-                    Estado Base de Datos
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="justify-start"
-                    onClick={() => navigate("/admin/configuracion")}
-                  >
-                    <Settings className="mr-2 h-4 w-4" />
-                    Configuración Sistema
-                  </Button>
+                  {isAdminGeneral && (
+                    <>
+                      <Button
+                        variant="outline"
+                        className="justify-start"
+                        onClick={() => navigate("/admin/supabase-utils")}
+                      >
+                        <Database className="mr-2 h-4 w-4" />
+                        Estado Base de Datos
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="justify-start"
+                        onClick={() => navigate("/admin/configuracion")}
+                      >
+                        <Settings className="mr-2 h-4 w-4" />
+                        Configuración Sistema
+                      </Button>
+                    </>
+                  )}
                   <Button
                     variant="outline"
                     className="justify-start"

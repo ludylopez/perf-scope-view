@@ -47,14 +47,14 @@ const VistaDetalleJefe = () => {
 
   useEffect(() => {
     if (!id) {
-      navigate("/dashboard-rrhh");
+      navigate("/admin/dashboard");
       return;
     }
 
     // Verificar que el usuario tenga permisos (admin o rrhh)
     if (user?.rol !== "admin_general" && user?.rol !== "admin_rrhh") {
       toast.error("No tienes permisos para ver esta información");
-      navigate("/dashboard-rrhh");
+      navigate("/admin/dashboard");
       return;
     }
 
@@ -215,7 +215,7 @@ const VistaDetalleJefe = () => {
         <main className="container mx-auto p-6">
           <div className="text-center py-12">
             <p className="text-muted-foreground">Jefe no encontrado</p>
-            <Button onClick={() => navigate("/dashboard-rrhh")} className="mt-4">
+            <Button onClick={() => navigate("/admin/dashboard")} className="mt-4">
               Volver al Dashboard
             </Button>
           </div>
@@ -235,7 +235,7 @@ const VistaDetalleJefe = () => {
         <div className="mb-6">
           <Button
             variant="ghost"
-            onClick={() => navigate("/dashboard-rrhh")}
+            onClick={() => navigate("/admin/dashboard")}
             className="mb-4"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
