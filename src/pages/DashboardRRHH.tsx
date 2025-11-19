@@ -22,7 +22,7 @@ import {
   RefreshCw,
   Zap
 } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, CartesianGrid } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -114,6 +114,15 @@ const DashboardRRHH = () => {
       // Tendencia semanal REAL desde la base de datos
       const tendenciaSemanal = (statsData.tendenciaSemanal || []) as Array<{ semana: string; completadas: number }>;
 
+      // Debug: Verificar datos de NPS
+      console.log("📊 NPS Data from SQL:", {
+        npsPromedio: statsData.npsPromedio,
+        npsPromoters: statsData.npsPromoters,
+        npsPassives: statsData.npsPassives,
+        npsDetractors: statsData.npsDetractors,
+        allKeys: Object.keys(statsData)
+      });
+
       // Cargar métricas avanzadas
       const { data: advancedStatsData, error: advancedError } = await supabase
         .rpc("get_advanced_dashboard_stats", { periodo_id_param: currentPeriodId });
@@ -167,7 +176,19 @@ const DashboardRRHH = () => {
       const { data: seguimientoData, error: seguimientoError } = await supabase
         .rpc("get_seguimiento_evaluaciones", { periodo_id_param: currentPeriodId });
 
-      if (!seguimientoError && seguimientoData) {
+      if (seguimientoError) {
+        console.error("❌ Error cargando seguimiento de evaluaciones:", seguimientoError);
+        console.error("Período usado:", currentPeriodId);
+        toast.error("Error al cargar seguimiento de evaluaciones", {
+          description: seguimientoError.message
+        });
+        setSeguimientoData([]);
+      } else {
+        console.log("✅ Seguimiento de evaluaciones cargado:", {
+          periodo: currentPeriodId,
+          cantidadJefes: seguimientoData?.length || 0,
+          datos: seguimientoData
+        });
         setSeguimientoData(seguimientoData || []);
       }
 
@@ -731,17 +752,18 @@ const DashboardRRHH = () => {
           )}
         </div>
 
-        {/* Tarjeta de Uso de API de IA */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Zap className="h-5 w-5 text-info" />
-              Uso de API de OpenAI
-            </CardTitle>
-            <CardDescription>
-              Consumo de créditos de IA para generación de planes de desarrollo
-            </CardDescription>
-          </CardHeader>
+        {/* Tarjeta de Uso de API de IA - Solo para Admin General */}
+        {user?.rol === "admin_general" && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Zap className="h-5 w-5 text-info" />
+                Uso de API de OpenAI
+              </CardTitle>
+              <CardDescription>
+                Consumo de créditos de IA para generación de planes de desarrollo
+              </CardDescription>
+            </CardHeader>
           <CardContent>
             <div className="grid gap-4 md:grid-cols-4">
               <div className="p-4 rounded-lg border">
@@ -800,6 +822,7 @@ const DashboardRRHH = () => {
             )}
           </CardContent>
         </Card>
+        )}
 
         {/* Gráficos Detallados */}
         <Tabs defaultValue="general" className="mb-6">
@@ -880,28 +903,6 @@ const DashboardRRHH = () => {
           </TabsContent>
 
           <TabsContent value="antiguedad" className="space-y-6">
-            {/* Debug info - remover en producción */}
-            {process.env.NODE_ENV === 'development' && (
-              <Card className="bg-yellow-50 border-yellow-200">
-                <CardHeader>
-                  <CardTitle className="text-sm">Debug Info</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <pre className="text-xs overflow-auto">
-                    {JSON.stringify({
-                      hasAdvancedStats: !!advancedStats,
-                      hasElegibilidad: !!advancedStats?.elegibilidad,
-                      hasAntiguedadDistribution: !!advancedStats?.antiguedadDistribution,
-                      hasAntiguedadCompleta: !!advancedStats?.antiguedadCompleta,
-                      keys: advancedStats ? Object.keys(advancedStats) : [],
-                      elegibilidad: advancedStats?.elegibilidad,
-                      antiguedadDistribution: advancedStats?.antiguedadDistribution
-                    }, null, 2)}
-                  </pre>
-                </CardContent>
-              </Card>
-            )}
-
             {/* Mensaje si no hay datos */}
             {!advancedStats && (
               <Card className="bg-muted/50">
@@ -1883,112 +1884,108 @@ const DashboardRRHH = () => {
                 <p className="text-sm mt-2">Todas las evaluaciones están completadas</p>
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Jefe Evaluador</TableHead>
-                    <TableHead>Área</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead>Completadas</TableHead>
-                    <TableHead>En Progreso</TableHead>
-                    <TableHead>Pendientes</TableHead>
-                    <TableHead>Última Actividad</TableHead>
-                    <TableHead>Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {seguimientoData.map((jefe: any) => (
-                    <TableRow key={jefe.jefeId}>
-                      <TableCell className="font-medium">
-                        <div>
-                          <p>{jefe.jefeNombre}</p>
-                          <p className="text-xs text-muted-foreground">{jefe.jefeCargo}</p>
-                        </div>
-                      </TableCell>
-                      <TableCell>{jefe.jefeArea}</TableCell>
-                      <TableCell>
-                        <Badge 
-                          variant={
-                            jefe.estadoGeneral === 'completado' ? 'default' :
-                            jefe.estadoGeneral === 'en_progreso' ? 'secondary' :
-                            jefe.diasSinActividad > 7 ? 'destructive' : 'outline'
-                          }
-                        >
-                          {jefe.estadoGeneral === 'completado' && <CheckCircle2 className="mr-1 h-3 w-3" />}
-                          {jefe.estadoGeneral === 'en_progreso' && <Clock className="mr-1 h-3 w-3" />}
-                          {jefe.estadoGeneral === 'pendiente' && <AlertCircle className="mr-1 h-3 w-3" />}
-                          {jefe.estadoGeneral === 'completado' ? 'Completado' :
-                           jefe.estadoGeneral === 'en_progreso' ? 'En Progreso' :
-                           jefe.diasSinActividad > 7 ? 'Con Retraso' : 'Pendiente'}
-                        </Badge>
-                        {jefe.diasSinActividad > 0 && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {jefe.diasSinActividad} días sin actividad
-                          </p>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-success">{jefe.evaluacionesCompletadas}</span>
-                          <span className="text-xs text-muted-foreground">
-                            ({Math.round(jefe.porcentajeCompletitud)}%)
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <span className="font-semibold text-info">{jefe.evaluacionesEnProgreso}</span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="font-semibold text-warning">{jefe.evaluacionesPendientes}</span>
-                      </TableCell>
-                      <TableCell>
-                        {jefe.ultimaActividad ? (
-                          <div>
-                            <p className="text-sm">
-                              {format(new Date(jefe.ultimaActividad), "dd/MM/yyyy", { locale: es })}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {format(new Date(jefe.ultimaActividad), "HH:mm", { locale: es })}
-                            </p>
-                          </div>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">Sin actividad</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              // Navegar a vista de detalles del jefe
-                              const periodo = activePeriodId || periodoId;
-                              navigate(`/admin/evaluaciones/jefe/${jefe.jefeId}?periodo=${periodo}`);
-                            }}
-                          >
-                            <FileText className="h-4 w-4 mr-1" />
-                            Ver Detalles
-                          </Button>
-                          {jefe.jefeCorreo && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                // Enviar recordatorio por correo
-                                window.location.href = `mailto:${jefe.jefeCorreo}?subject=Recordatorio: Evaluaciones Pendientes&body=Estimado/a ${jefe.jefeNombre},%0D%0A%0D%0ATiene ${jefe.evaluacionesPendientes} evaluaciones pendientes y ${jefe.evaluacionesEnProgreso} en progreso.%0D%0A%0D%0APor favor complete las evaluaciones pendientes.`;
-                                toast.info("Abriendo cliente de correo para enviar recordatorio");
-                              }}
-                            >
-                              <AlertCircle className="h-4 w-4 mr-1" />
-                              Recordatorio
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <>
+                {/* Gráfica de Barras */}
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold mb-4">Resumen por Jefe</h3>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={seguimientoData.map(jefe => ({
+                      nombre: jefe.jefeNombre.split(' ')[0], // Solo primer nombre
+                      pendientes: jefe.evaluacionesPendientes,
+                      completadas: jefe.evaluacionesCompletadas
+                    }))}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="nombre" />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Bar dataKey="pendientes" fill="#f59e0b" name="Pendientes" />
+                      <Bar dataKey="completadas" fill="#10b981" name="Completadas" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Tabla Simplificada */}
+                <div className="mt-6">
+                  <h3 className="text-lg font-semibold mb-4">Detalle por Jefe</h3>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Jefe Evaluador</TableHead>
+                        <TableHead className="text-center">Pendientes</TableHead>
+                        <TableHead className="text-center">Completadas</TableHead>
+                        <TableHead className="text-center">Total</TableHead>
+                        <TableHead className="text-center">% Completitud</TableHead>
+                        <TableHead>Acciones</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {seguimientoData.map((jefe: any) => {
+                        const total = jefe.totalColaboradores || (jefe.evaluacionesPendientes + jefe.evaluacionesEnProgreso + jefe.evaluacionesCompletadas);
+                        const porcentaje = total > 0 ? Math.round((jefe.evaluacionesCompletadas / total) * 100) : 0;
+                        
+                        return (
+                          <TableRow key={jefe.jefeId}>
+                            <TableCell className="font-medium">
+                              <div>
+                                <p>{jefe.jefeNombre}</p>
+                                <p className="text-xs text-muted-foreground">{jefe.jefeCargo} • {jefe.jefeArea}</p>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <span className="font-semibold text-warning text-lg">
+                                {jefe.evaluacionesPendientes}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <span className="font-semibold text-success text-lg">
+                                {jefe.evaluacionesCompletadas}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <span className="font-semibold text-primary">
+                                {total}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Badge variant={porcentaje === 100 ? "default" : porcentaje >= 50 ? "secondary" : "destructive"}>
+                                {porcentaje}%
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    navigate(`/evaluacion-jefe/${jefe.jefeId}`);
+                                  }}
+                                >
+                                  <FileText className="h-4 w-4 mr-1" />
+                                  Ver Detalles
+                                </Button>
+                                {jefe.jefeCorreo && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      window.location.href = `mailto:${jefe.jefeCorreo}?subject=Recordatorio: Evaluaciones Pendientes&body=Estimado/a ${jefe.jefeNombre},%0D%0A%0D%0ATiene ${jefe.evaluacionesPendientes} evaluaciones pendientes y ${jefe.evaluacionesEnProgreso} en progreso.%0D%0A%0D%0APor favor complete las evaluaciones pendientes.`;
+                                      toast.info("Abriendo cliente de correo para enviar recordatorio");
+                                    }}
+                                  >
+                                    <AlertCircle className="h-4 w-4 mr-1" />
+                                    Recordatorio
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>

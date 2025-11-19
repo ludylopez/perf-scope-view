@@ -194,6 +194,10 @@ const Dashboard = () => {
     totalJefes: number;
     jefesCompletados: number;
   } | null>(null);
+  const [equipoEvaluaciones, setEquipoEvaluaciones] = useState<{
+    pendientes: number;
+    completadas: number;
+  }>({ pendientes: 0, completadas: 0 });
 
   const focusResultadosSection = () => {
     const element = document.getElementById("resultados-evaluacion-container");
@@ -860,6 +864,65 @@ const Dashboard = () => {
 
     loadJerarquia();
   }, [user]);
+
+  // Cargar evaluaciones del equipo (pendientes y completadas)
+  useEffect(() => {
+    if (!user || !activePeriodId || !jerarquiaInfo?.tieneColaboradores) return;
+
+    const loadEquipoEvaluaciones = async () => {
+      try {
+        const { supabase } = await import("@/integrations/supabase/client");
+        
+        // Obtener colaboradores del jefe
+        const { data: asignaciones } = await supabase
+          .from("user_assignments")
+          .select("colaborador_id")
+          .eq("jefe_id", user.dpi)
+          .eq("activo", true);
+        
+        const colaboradoresIds = asignaciones?.map(a => a.colaborador_id) || [];
+        
+        if (colaboradoresIds.length === 0) {
+          setEquipoEvaluaciones({ pendientes: 0, completadas: 0 });
+          return;
+        }
+
+        // Contar evaluaciones completadas (enviadas)
+        const { count: completadas } = await supabase
+          .from("evaluations")
+          .select("*", { count: "exact", head: true })
+          .eq("evaluador_id", user.dpi)
+          .eq("periodo_id", activePeriodId)
+          .eq("tipo", "jefe")
+          .eq("estado", "enviado")
+          .in("colaborador_id", colaboradoresIds);
+
+        // Contar evaluaciones en progreso (borrador)
+        const { count: enProgreso } = await supabase
+          .from("evaluations")
+          .select("*", { count: "exact", head: true })
+          .eq("evaluador_id", user.dpi)
+          .eq("periodo_id", activePeriodId)
+          .eq("tipo", "jefe")
+          .eq("estado", "borrador")
+          .in("colaborador_id", colaboradoresIds);
+
+        const totalEsperadas = colaboradoresIds.length;
+        const completadasCount = completadas || 0;
+        const enProgresoCount = enProgreso || 0;
+        const pendientes = totalEsperadas - completadasCount - enProgresoCount;
+
+        setEquipoEvaluaciones({
+          pendientes: Math.max(0, pendientes),
+          completadas: completadasCount
+        });
+      } catch (error) {
+        console.error("Error cargando evaluaciones del equipo:", error);
+      }
+    };
+
+    loadEquipoEvaluaciones();
+  }, [user, activePeriodId, jerarquiaInfo?.tieneColaboradores]);
 
   const getStatusBadge = () => {
     if (isStatusLoading) {
@@ -1608,11 +1671,11 @@ const Dashboard = () => {
                       <p className="text-sm text-muted-foreground">Total Colaboradores</p>
                     </div>
                     <div className="rounded-lg border bg-card p-4 text-center">
-                      <p className="text-3xl font-bold text-warning">-</p>
+                      <p className="text-3xl font-bold text-warning">{equipoEvaluaciones.pendientes}</p>
                       <p className="text-sm text-muted-foreground">Pendientes</p>
                     </div>
                     <div className="rounded-lg border bg-card p-4 text-center">
-                      <p className="text-3xl font-bold text-success">-</p>
+                      <p className="text-3xl font-bold text-success">{equipoEvaluaciones.completadas}</p>
                       <p className="text-sm text-muted-foreground">Completadas</p>
                     </div>
                   </div>
