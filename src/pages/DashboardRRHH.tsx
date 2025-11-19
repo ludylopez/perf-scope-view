@@ -1958,7 +1958,8 @@ const DashboardRRHH = () => {
                                   variant="outline"
                                   size="sm"
                                   onClick={() => {
-                                    navigate(`/evaluacion-jefe/${jefe.jefeId}`);
+                                    const periodo = activePeriodId || periodoId;
+                                    navigate(`/admin/evaluaciones/jefe/${jefe.jefeId}?periodo=${periodo}`);
                                   }}
                                 >
                                   <FileText className="h-4 w-4 mr-1" />

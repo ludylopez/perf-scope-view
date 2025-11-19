@@ -28,6 +28,7 @@ import AdminInstrumentos from "./pages/AdminInstrumentos";
 import Matriz9Box from "./pages/Matriz9Box";
 import EvaluacionJefes from "./pages/EvaluacionJefes";
 import EvaluacionJefeIndividual from "./pages/EvaluacionJefeIndividual";
+import VistaDetalleJefe from "./pages/VistaDetalleJefe";
 import DashboardConsolidado from "./pages/DashboardConsolidado";
 import NotFound from "./pages/NotFound";
 import ConfiguracionSistema from "./pages/ConfiguracionSistema";
@@ -247,6 +248,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <EvaluacionJefeIndividual />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/evaluaciones/jefe/:id"
+              element={
+                <ProtectedRoute>
+                  <VistaDetalleJefe />
                 </ProtectedRoute>
               }
             />
