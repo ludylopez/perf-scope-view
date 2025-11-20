@@ -96,28 +96,78 @@ const VistaResultadosFinales = () => {
         .from("evaluations")
         .select("*")
         .eq("usuario_id", user?.dpi)
-        .eq("colaborador_id", user?.dpi)
         .eq("periodo_id", activePeriodId)
-        .eq("tipo", "autoevaluacion")
+        .eq("tipo", "auto")
         .eq("estado", "enviado")
         .maybeSingle();
 
       if (autoData) {
         setAutoevaluacion(autoData);
+      } else {
+        // Intentar cargar desde localStorage como fallback
+        const submitted = await getSubmittedEvaluation(user?.dpi || "", activePeriodId);
+        if (submitted) {
+          setAutoevaluacion({
+            id: null,
+            usuario_id: submitted.usuarioId,
+            periodo_id: submitted.periodoId,
+            tipo: submitted.tipo,
+            responses: submitted.responses,
+            comments: submitted.comments,
+            estado: submitted.estado,
+            progreso: submitted.progreso,
+            fecha_ultima_modificacion: submitted.fechaUltimaModificacion,
+            fecha_envio: submitted.fechaEnvio,
+          });
+        }
       }
 
-      // Cargar evaluación del jefe
-      const { data: jefeData } = await supabase
+      // Cargar evaluación del jefe (puede haber múltiples jefes, obtener todas)
+      const { data: jefesData } = await supabase
         .from("evaluations")
         .select("*")
         .eq("colaborador_id", user?.dpi)
         .eq("periodo_id", activePeriodId)
-        .eq("tipo", "evaluacion_jefe")
-        .eq("estado", "enviado")
-        .maybeSingle();
+        .eq("tipo", "jefe")
+        .eq("estado", "enviado");
 
-      if (jefeData) {
-        setEvaluacionJefe(jefeData);
+      // Si hay múltiples evaluaciones de jefes, consolidar (promedio)
+      if (jefesData && jefesData.length > 0) {
+        if (jefesData.length === 1) {
+          setEvaluacionJefe(jefesData[0]);
+        } else {
+          // Consolidar múltiples evaluaciones de jefes (promedio de respuestas)
+          const responsesByKey: Record<string, number[]> = {};
+          const consolidatedComments: Record<string, string> = {};
+          
+          // Calcular promedio de respuestas
+          jefesData.forEach((jefeEval: any) => {
+            Object.entries(jefeEval.responses || {}).forEach(([key, value]) => {
+              if (!responsesByKey[key]) {
+                responsesByKey[key] = [];
+              }
+              responsesByKey[key].push(value as number);
+            });
+          });
+          
+          // Promediar respuestas
+          const consolidatedResponses: Record<string, number> = {};
+          Object.keys(responsesByKey).forEach(key => {
+            const values = responsesByKey[key];
+            consolidatedResponses[key] = values.reduce((sum, val) => sum + val, 0) / values.length;
+          });
+          
+          // Combinar comentarios (usar el primero o concatenar)
+          if (jefesData[0].comments) {
+            Object.assign(consolidatedComments, jefesData[0].comments);
+          }
+          
+          setEvaluacionJefe({
+            ...jefesData[0],
+            responses: consolidatedResponses,
+            comments: consolidatedComments,
+          });
+        }
       }
 
       // Cargar plan de desarrollo

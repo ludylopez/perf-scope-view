@@ -7,6 +7,8 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { PeriodProvider } from "@/contexts/PeriodContext";
 import { importarAsignacionesDirecto } from "./lib/importarAsignacionesDirecto";
 import { WhatsAppButton } from "@/components/layout/WhatsAppButton";
+import "./lib/diagnosticoEvaluaciones"; // Cargar funciones de diagnóstico
+import "./lib/buscarAutoevaluacion"; // Cargar función de búsqueda de autoevaluaciones
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Autoevaluacion from "./pages/Autoevaluacion";
@@ -30,6 +32,9 @@ import Matriz9Box from "./pages/Matriz9Box";
 import EvaluacionJefes from "./pages/EvaluacionJefes";
 import EvaluacionJefeIndividual from "./pages/EvaluacionJefeIndividual";
 import VistaDetalleJefe from "./pages/VistaDetalleJefe";
+import VistaAutoevaluacionesJefes from "./pages/VistaAutoevaluacionesJefes";
+import VistaEvaluacionesCompletadas from "./pages/VistaEvaluacionesCompletadas";
+import VistaEvaluacionesEnProgreso from "./pages/VistaEvaluacionesEnProgreso";
 import DashboardConsolidado from "./pages/DashboardConsolidado";
 import NotFound from "./pages/NotFound";
 import ConfiguracionSistema from "./pages/ConfiguracionSistema";
@@ -274,6 +279,30 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <VistaDetalleJefe />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/autoevaluaciones-jefes"
+              element={
+                <ProtectedRoute>
+                  <VistaAutoevaluacionesJefes />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/evaluaciones/completadas"
+              element={
+                <ProtectedRoute>
+                  <VistaEvaluacionesCompletadas />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/evaluaciones/en-progreso"
+              element={
+                <ProtectedRoute>
+                  <VistaEvaluacionesEnProgreso />
                 </ProtectedRoute>
               }
             />

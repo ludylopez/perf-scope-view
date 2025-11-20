@@ -124,3 +124,4 @@ $$ LANGUAGE plpgsql STABLE;
 
 COMMENT ON FUNCTION get_seguimiento_evaluaciones(UUID) IS 'Obtiene el seguimiento de cumplimiento de evaluaciones por jefe, incluyendo estado, colaboradores pendientes y última actividad';
 
+

@@ -119,8 +119,37 @@ const Autoevaluacion = () => {
     return steps;
   }, [dimensions, responses, npsScore, openQuestions, openQuestionResponses]);
 
-  const currentWizardStep = wizardSteps[currentStep];
-  const isLastStep = currentStep === wizardSteps.length - 1;
+  // Validación defensiva: asegurar que currentStep esté siempre dentro del rango válido
+  const safeCurrentStep = useMemo(() => {
+    if (wizardSteps.length === 0) return 0;
+    if (currentStep >= wizardSteps.length) {
+      console.warn(`⚠️ currentStep (${currentStep}) fuera de rango. Ajustando a ${wizardSteps.length - 1}`);
+      return wizardSteps.length - 1;
+    }
+    if (currentStep < 0) {
+      console.warn(`⚠️ currentStep (${currentStep}) negativo. Ajustando a 0`);
+      return 0;
+    }
+    return currentStep;
+  }, [currentStep, wizardSteps.length]);
+
+  // Sincronizar currentStep si wizardSteps cambia de tamaño
+  useEffect(() => {
+    if (wizardSteps.length === 0) return;
+    
+    // Si currentStep está fuera de rango, ajustarlo
+    if (currentStep >= wizardSteps.length) {
+      const newStep = Math.max(0, wizardSteps.length - 1);
+      console.warn(`🔄 Ajustando currentStep: ${currentStep} -> ${newStep} (wizardSteps.length: ${wizardSteps.length})`);
+      setCurrentStep(newStep);
+    } else if (currentStep < 0) {
+      console.warn(`🔄 Ajustando currentStep: ${currentStep} -> 0`);
+      setCurrentStep(0);
+    }
+  }, [wizardSteps.length, currentStep]);
+
+  const currentWizardStep = wizardSteps[safeCurrentStep];
+  const isLastStep = safeCurrentStep === wizardSteps.length - 1;
 
   // Load existing draft and open questions on mount
   useEffect(() => {
@@ -425,15 +454,19 @@ const Autoevaluacion = () => {
       toast.error("Por favor completa todas las respuestas antes de continuar");
       return;
     }
-    if (currentStep < wizardSteps.length - 1) {
-      setCurrentStep(currentStep + 1);
+    // Usar safeCurrentStep para asegurar que estamos trabajando con el valor válido
+    const nextStep = safeCurrentStep + 1;
+    if (nextStep < wizardSteps.length) {
+      setCurrentStep(nextStep);
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
 
   const handlePrevious = () => {
-    if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
+    // Usar safeCurrentStep para asegurar que estamos trabajando con el valor válido
+    const prevStep = safeCurrentStep - 1;
+    if (prevStep >= 0) {
+      setCurrentStep(prevStep);
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
@@ -558,7 +591,7 @@ const Autoevaluacion = () => {
         {/* Wizard Header con Stepper */}
         <WizardHeader
           steps={wizardSteps}
-          currentStep={currentStep}
+          currentStep={safeCurrentStep}
           totalProgress={progressPercentage}
           answeredItems={answeredItems}
           totalItems={totalItems}
@@ -566,12 +599,27 @@ const Autoevaluacion = () => {
 
         {/* Wizard Step Content */}
         <div className="mb-6">
-          {currentWizardStep?.type === "dimension" && currentWizardStep.data && (
+          {!currentWizardStep ? (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground mb-4">
+                Error: No se pudo cargar el paso actual de la evaluación.
+              </p>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setCurrentStep(0);
+                  window.location.reload();
+                }}
+              >
+                Recargar página
+              </Button>
+            </div>
+          ) : currentWizardStep.type === "dimension" && currentWizardStep.data ? (
             <WizardStep
               title={currentWizardStep.data.nombre}
               description={currentWizardStep.data.descripcion}
               weight={currentWizardStep.data.peso}
-              currentStep={currentStep}
+              currentStep={safeCurrentStep}
               totalSteps={wizardSteps.length}
               answered={getDimensionProgress(responses, currentWizardStep.data).answered}
               total={getDimensionProgress(responses, currentWizardStep.data).total}
@@ -609,24 +657,20 @@ const Autoevaluacion = () => {
                 </div>
               </div>
             </WizardStep>
-          )}
-
-          {currentWizardStep?.type === "nps" && (
+          ) : currentWizardStep.type === "nps" ? (
             <WizardStep
               title="Recomendación Institucional"
               description="Tu opinión nos ayuda a mejorar como organización"
-              currentStep={currentStep}
+              currentStep={safeCurrentStep}
               totalSteps={wizardSteps.length}
             >
               <MobileNPSQuestion value={npsScore} onChange={handleNpsChange} />
             </WizardStep>
-          )}
-
-          {currentWizardStep?.type === "open-questions" && (
+          ) : currentWizardStep.type === "open-questions" ? (
             <WizardStep
               title="Necesidades de Desarrollo"
               description="Comparta sus necesidades para mejorar su desempeño"
-              currentStep={currentStep}
+              currentStep={safeCurrentStep}
               totalSteps={wizardSteps.length}
             >
               <MobileOpenQuestions
@@ -635,12 +679,30 @@ const Autoevaluacion = () => {
                 onChange={handleOpenQuestionChange}
               />
             </WizardStep>
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-destructive font-medium mb-2">
+                Error: Tipo de paso no reconocido
+              </p>
+              <p className="text-sm text-muted-foreground mb-4">
+                El paso actual no es válido. Por favor, recargue la página.
+              </p>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setCurrentStep(0);
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+              >
+                Volver al inicio
+              </Button>
+            </div>
           )}
         </div>
 
         {/* Wizard Footer con Navegación */}
         <WizardFooter
-          currentStep={currentStep}
+          currentStep={safeCurrentStep}
           totalSteps={wizardSteps.length}
           onPrevious={handlePrevious}
           onNext={handleNext}

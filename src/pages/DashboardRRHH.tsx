@@ -49,6 +49,10 @@ interface DashboardStats {
   evaluacionesPorArea: Array<{ area: string; completadas: number; total: number }>;
   evaluacionesPorNivel: Array<{ nivel: string; completadas: number; total: number }>;
   tendenciaSemanal: Array<{ semana: string; completadas: number }>;
+  autoevaluacionesJefesCompletadas?: number; // Autoevaluaciones de jefes completadas
+  autoevaluacionesJefesEnProgreso?: number; // Autoevaluaciones de jefes en progreso
+  autoevaluacionesJefesPendientes?: number; // Autoevaluaciones de jefes pendientes
+  totalJefesConAutoevaluacion?: number; // Total de jefes que deberían tener autoevaluación
 }
 
 const DashboardRRHH = () => {
@@ -212,6 +216,46 @@ const DashboardRRHH = () => {
         }));
       }
 
+      // Cargar autoevaluaciones de jefes completadas
+      const { data: jefesData } = await supabase
+        .from("users")
+        .select("dpi")
+        .eq("rol", "jefe")
+        .eq("estado", "activo");
+
+      const jefesIds = jefesData?.map(j => j.dpi) || [];
+      let autoevaluacionesJefesCompletadas = 0;
+      let autoevaluacionesJefesEnProgreso = 0;
+      let autoevaluacionesJefesPendientes = 0;
+      let totalJefesConAutoevaluacion = jefesIds.length;
+
+      if (jefesIds.length > 0) {
+        // Autoevaluaciones completadas
+        const { count: countCompletadas } = await supabase
+          .from("evaluations")
+          .select("*", { count: "exact", head: true })
+          .eq("periodo_id", currentPeriodId)
+          .eq("tipo", "auto")
+          .eq("estado", "enviado")
+          .in("usuario_id", jefesIds);
+
+        autoevaluacionesJefesCompletadas = countCompletadas || 0;
+
+        // Autoevaluaciones en progreso
+        const { count: countEnProgreso } = await supabase
+          .from("evaluations")
+          .select("*", { count: "exact", head: true })
+          .eq("periodo_id", currentPeriodId)
+          .eq("tipo", "auto")
+          .eq("estado", "borrador")
+          .in("usuario_id", jefesIds);
+
+        autoevaluacionesJefesEnProgreso = countEnProgreso || 0;
+
+        // Autoevaluaciones pendientes = Total jefes - Completadas - En Progreso
+        autoevaluacionesJefesPendientes = Math.max(0, totalJefesConAutoevaluacion - autoevaluacionesJefesCompletadas - autoevaluacionesJefesEnProgreso);
+      }
+
       setStats({
         totalUsuarios: statsData.totalUsuarios || 0,
         totalJefes: statsData.totalJefes || 0,
@@ -229,6 +273,10 @@ const DashboardRRHH = () => {
         evaluacionesPorArea,
         evaluacionesPorNivel,
         tendenciaSemanal,
+        autoevaluacionesJefesCompletadas,
+        autoevaluacionesJefesEnProgreso,
+        autoevaluacionesJefesPendientes,
+        totalJefesConAutoevaluacion,
       });
 
       // Cargar estadísticas de uso de OpenAI API desde Supabase
@@ -578,7 +626,13 @@ const DashboardRRHH = () => {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card 
+            className="cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => {
+              const periodo = activePeriodId || periodoId;
+              navigate(`/admin/evaluaciones/completadas?periodo=${periodo}`);
+            }}
+          >
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium">Evaluaciones Completadas</CardTitle>
             </CardHeader>
@@ -588,16 +642,28 @@ const DashboardRRHH = () => {
                 {stats.porcentajeCompletitud}% del total
               </p>
               <Progress value={stats.porcentajeCompletitud} className="mt-2 h-2" />
+              <p className="text-xs text-muted-foreground mt-2 text-center">
+                Click para ver detalles
+              </p>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card 
+            className="cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => {
+              const periodo = activePeriodId || periodoId;
+              navigate(`/admin/evaluaciones/en-progreso?periodo=${periodo}`);
+            }}
+          >
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium">En Progreso</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-3xl font-bold text-info">{stats.evaluacionesEnProgreso}</p>
               <p className="text-xs text-muted-foreground mt-1">Requieren seguimiento</p>
+              <p className="text-xs text-muted-foreground mt-2 text-center">
+                Click para ver detalles
+              </p>
             </CardContent>
           </Card>
 
@@ -610,6 +676,81 @@ const DashboardRRHH = () => {
               <p className="text-xs text-muted-foreground mt-1">Sin iniciar</p>
             </CardContent>
           </Card>
+
+          {stats.autoevaluacionesJefesCompletadas !== undefined && (
+            <Card 
+              className="cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => {
+                const periodo = activePeriodId || periodoId;
+                navigate(`/admin/autoevaluaciones-jefes?periodo=${periodo}`);
+              }}
+            >
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium">Autoevaluaciones de Jefes</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold text-primary">
+                  {stats.autoevaluacionesJefesCompletadas} / {stats.totalJefesConAutoevaluacion || 0}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {stats.totalJefesConAutoevaluacion && stats.totalJefesConAutoevaluacion > 0
+                    ? Math.round((stats.autoevaluacionesJefesCompletadas / stats.totalJefesConAutoevaluacion) * 100)
+                    : 0}% completadas
+                </p>
+                <Progress 
+                  value={stats.totalJefesConAutoevaluacion && stats.totalJefesConAutoevaluacion > 0
+                    ? (stats.autoevaluacionesJefesCompletadas / stats.totalJefesConAutoevaluacion) * 100
+                    : 0} 
+                  className="mt-2 h-2" 
+                />
+                <p className="text-xs text-muted-foreground mt-2 text-center">
+                  Click para ver detalles
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {stats.autoevaluacionesJefesEnProgreso !== undefined && stats.autoevaluacionesJefesEnProgreso > 0 && (
+            <Card 
+              className="cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => {
+                const periodo = activePeriodId || periodoId;
+                navigate(`/admin/autoevaluaciones-jefes?periodo=${periodo}&tab=en_progreso`);
+              }}
+            >
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium">Autoevaluaciones Jefes - En Progreso</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold text-info">{stats.autoevaluacionesJefesEnProgreso}</p>
+                <p className="text-xs text-muted-foreground mt-1">Requieren seguimiento</p>
+                <p className="text-xs text-muted-foreground mt-2 text-center">
+                  Click para ver detalles
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {stats.autoevaluacionesJefesPendientes !== undefined && stats.autoevaluacionesJefesPendientes > 0 && (
+            <Card 
+              className="cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => {
+                const periodo = activePeriodId || periodoId;
+                navigate(`/admin/autoevaluaciones-jefes?periodo=${periodo}&tab=pendientes`);
+              }}
+            >
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium">Autoevaluaciones Jefes - Pendientes</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold text-warning">{stats.autoevaluacionesJefesPendientes}</p>
+                <p className="text-xs text-muted-foreground mt-1">Sin iniciar</p>
+                <p className="text-xs text-muted-foreground mt-2 text-center">
+                  Click para ver detalles
+                </p>
+              </CardContent>
+            </Card>
+          )}
 
           {stats.reaperturas !== undefined && stats.reaperturas > 0 && (
             <Card>
@@ -1923,13 +2064,22 @@ const DashboardRRHH = () => {
                       {seguimientoData.map((jefe: any) => {
                         const total = jefe.totalColaboradores || (jefe.evaluacionesPendientes + jefe.evaluacionesEnProgreso + jefe.evaluacionesCompletadas);
                         const porcentaje = total > 0 ? Math.round((jefe.evaluacionesCompletadas / total) * 100) : 0;
+                        const todasCompletadas = jefe.evaluacionesCompletadas === total && total > 0;
                         
                         return (
-                          <TableRow key={jefe.jefeId}>
+                          <TableRow 
+                            key={jefe.jefeId}
+                            className={todasCompletadas ? "bg-green-50/50 dark:bg-green-950/20" : ""}
+                          >
                             <TableCell className="font-medium">
-                              <div>
-                                <p>{jefe.jefeNombre}</p>
-                                <p className="text-xs text-muted-foreground">{jefe.jefeCargo} • {jefe.jefeArea}</p>
+                              <div className="flex items-center gap-2">
+                                {todasCompletadas && (
+                                  <CheckCircle2 className="h-4 w-4 text-success" />
+                                )}
+                                <div>
+                                  <p>{jefe.jefeNombre}</p>
+                                  <p className="text-xs text-muted-foreground">{jefe.jefeCargo} • {jefe.jefeArea}</p>
+                                </div>
                               </div>
                             </TableCell>
                             <TableCell className="text-center">

@@ -328,11 +328,20 @@ const VistaDetalleJefe = () => {
                   {evaluaciones.map((evaluacion) => {
                     const colaborador = evaluacion.colaborador;
                     const progreso = evaluacion.progreso || 0;
+                    const estaCompletada = evaluacion.estado === "enviado";
                     
                     return (
-                      <TableRow key={evaluacion.id}>
+                      <TableRow 
+                        key={evaluacion.id}
+                        className={estaCompletada ? "bg-green-50/50 dark:bg-green-950/20" : ""}
+                      >
                         <TableCell className="font-medium">
-                          {colaborador?.nombre} {colaborador?.apellidos}
+                          <div className="flex items-center gap-2">
+                            {estaCompletada && (
+                              <CheckCircle2 className="h-4 w-4 text-success" />
+                            )}
+                            {colaborador?.nombre} {colaborador?.apellidos}
+                          </div>
                         </TableCell>
                         <TableCell>{colaborador?.cargo || "N/A"}</TableCell>
                         <TableCell>{colaborador?.area || "N/A"}</TableCell>
