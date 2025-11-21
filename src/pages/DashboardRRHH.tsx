@@ -53,6 +53,9 @@ interface DashboardStats {
   autoevaluacionesJefesEnProgreso?: number; // Autoevaluaciones de jefes en progreso
   autoevaluacionesJefesPendientes?: number; // Autoevaluaciones de jefes pendientes
   totalJefesConAutoevaluacion?: number; // Total de jefes que deberían tener autoevaluación
+  autoevaluacionesColaboradoresCompletadas?: number; // Autoevaluaciones de colaboradores completadas
+  autoevaluacionesColaboradoresEnProgreso?: number; // Autoevaluaciones de colaboradores en progreso
+  totalColaboradoresConAutoevaluacion?: number; // Total de colaboradores que deberían tener autoevaluación
 }
 
 const DashboardRRHH = () => {
@@ -217,44 +220,124 @@ const DashboardRRHH = () => {
       }
 
       // Cargar autoevaluaciones de jefes completadas
-      const { data: jefesData } = await supabase
-        .from("users")
-        .select("dpi")
-        .eq("rol", "jefe")
-        .eq("estado", "activo");
-
-      const jefesIds = jefesData?.map(j => j.dpi) || [];
       let autoevaluacionesJefesCompletadas = 0;
       let autoevaluacionesJefesEnProgreso = 0;
       let autoevaluacionesJefesPendientes = 0;
-      let totalJefesConAutoevaluacion = jefesIds.length;
+      let totalJefesConAutoevaluacion = 0;
 
-      if (jefesIds.length > 0) {
-        // Autoevaluaciones completadas
-        const { count: countCompletadas } = await supabase
-          .from("evaluations")
-          .select("*", { count: "exact", head: true })
-          .eq("periodo_id", currentPeriodId)
-          .eq("tipo", "auto")
-          .eq("estado", "enviado")
-          .in("usuario_id", jefesIds);
+      try {
+        const { data: jefesData, error: jefesError } = await supabase
+          .from("users")
+          .select("dpi")
+          .eq("rol", "jefe")
+          .eq("estado", "activo");
 
-        autoevaluacionesJefesCompletadas = countCompletadas || 0;
+        if (jefesError) {
+          console.error("Error cargando jefes:", jefesError);
+        } else {
+          const jefesIds = jefesData?.map(j => j.dpi) || [];
+          totalJefesConAutoevaluacion = jefesIds.length;
 
-        // Autoevaluaciones en progreso
-        const { count: countEnProgreso } = await supabase
-          .from("evaluations")
-          .select("*", { count: "exact", head: true })
-          .eq("periodo_id", currentPeriodId)
-          .eq("tipo", "auto")
-          .eq("estado", "borrador")
-          .in("usuario_id", jefesIds);
+          if (jefesIds.length > 0) {
+            // Autoevaluaciones completadas
+            const { count: countCompletadas, error: errorCompletadas } = await supabase
+              .from("evaluations")
+              .select("*", { count: "exact", head: true })
+              .eq("periodo_id", currentPeriodId)
+              .eq("tipo", "auto")
+              .eq("estado", "enviado")
+              .in("usuario_id", jefesIds);
 
-        autoevaluacionesJefesEnProgreso = countEnProgreso || 0;
+            if (errorCompletadas) {
+              console.error("Error contando autoevaluaciones completadas de jefes:", errorCompletadas);
+            } else {
+              autoevaluacionesJefesCompletadas = countCompletadas || 0;
+            }
 
-        // Autoevaluaciones pendientes = Total jefes - Completadas - En Progreso
-        autoevaluacionesJefesPendientes = Math.max(0, totalJefesConAutoevaluacion - autoevaluacionesJefesCompletadas - autoevaluacionesJefesEnProgreso);
+            // Autoevaluaciones en progreso
+            const { count: countEnProgreso, error: errorEnProgreso } = await supabase
+              .from("evaluations")
+              .select("*", { count: "exact", head: true })
+              .eq("periodo_id", currentPeriodId)
+              .eq("tipo", "auto")
+              .eq("estado", "borrador")
+              .in("usuario_id", jefesIds);
+
+            if (errorEnProgreso) {
+              console.error("Error contando autoevaluaciones en progreso de jefes:", errorEnProgreso);
+            } else {
+              autoevaluacionesJefesEnProgreso = countEnProgreso || 0;
+            }
+
+            // Autoevaluaciones pendientes = Total jefes - Completadas - En Progreso
+            autoevaluacionesJefesPendientes = Math.max(0, totalJefesConAutoevaluacion - autoevaluacionesJefesCompletadas - autoevaluacionesJefesEnProgreso);
+          }
+        }
+      } catch (error) {
+        console.error("Error en carga de autoevaluaciones de jefes:", error);
+        // Continuar con valores por defecto (0)
       }
+
+      // Cargar autoevaluaciones de colaboradores
+      let autoevaluacionesColaboradoresCompletadas = 0;
+      let autoevaluacionesColaboradoresEnProgreso = 0;
+      let totalColaboradoresConAutoevaluacion = 0;
+
+      try {
+        const { data: colaboradoresData, error: colaboradoresError } = await supabase
+          .from("users")
+          .select("dpi")
+          .eq("rol", "colaborador")
+          .eq("estado", "activo");
+
+        if (colaboradoresError) {
+          console.error("Error cargando colaboradores:", colaboradoresError);
+        } else {
+          const colaboradoresIds = colaboradoresData?.map(c => c.dpi) || [];
+          totalColaboradoresConAutoevaluacion = colaboradoresIds.length;
+
+          if (colaboradoresIds.length > 0) {
+            // Autoevaluaciones de colaboradores completadas
+            const { count: countCompletadasColab, error: errorCompletadas } = await supabase
+              .from("evaluations")
+              .select("*", { count: "exact", head: true })
+              .eq("periodo_id", currentPeriodId)
+              .eq("tipo", "auto")
+              .eq("estado", "enviado")
+              .in("usuario_id", colaboradoresIds);
+
+            if (errorCompletadas) {
+              console.error("Error contando autoevaluaciones completadas de colaboradores:", errorCompletadas);
+            } else {
+              autoevaluacionesColaboradoresCompletadas = countCompletadasColab || 0;
+            }
+
+            // Autoevaluaciones de colaboradores en progreso
+            const { count: countEnProgresoColab, error: errorEnProgreso } = await supabase
+              .from("evaluations")
+              .select("*", { count: "exact", head: true })
+              .eq("periodo_id", currentPeriodId)
+              .eq("tipo", "auto")
+              .eq("estado", "borrador")
+              .in("usuario_id", colaboradoresIds);
+
+            if (errorEnProgreso) {
+              console.error("Error contando autoevaluaciones en progreso de colaboradores:", errorEnProgreso);
+            } else {
+              autoevaluacionesColaboradoresEnProgreso = countEnProgresoColab || 0;
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error en carga de autoevaluaciones de colaboradores:", error);
+        // Continuar con valores por defecto (0)
+      }
+
+      console.log("✅ Preparando setStats con datos:", {
+        totalUsuarios: statsData.totalUsuarios || 0,
+        autoevaluacionesJefesCompletadas,
+        autoevaluacionesColaboradoresCompletadas,
+      });
 
       setStats({
         totalUsuarios: statsData.totalUsuarios || 0,
@@ -277,7 +360,12 @@ const DashboardRRHH = () => {
         autoevaluacionesJefesEnProgreso,
         autoevaluacionesJefesPendientes,
         totalJefesConAutoevaluacion,
+        autoevaluacionesColaboradoresCompletadas,
+        autoevaluacionesColaboradoresEnProgreso,
+        totalColaboradoresConAutoevaluacion,
       });
+
+      console.log("✅ setStats ejecutado correctamente");
 
       // Cargar estadísticas de uso de OpenAI API desde Supabase
       const { data: openaiStatsData, error: openaiStatsError } = await supabase
@@ -315,6 +403,30 @@ const DashboardRRHH = () => {
     } catch (error: any) {
       console.error("Error loading stats:", error);
       toast.error("Error al cargar estadísticas");
+      // Asegurar que stats tenga valores por defecto incluso si hay error
+      if (!stats) {
+        setStats({
+          totalUsuarios: 0,
+          totalJefes: 0,
+          evaluacionesCompletadas: 0,
+          evaluacionesPendientes: 0,
+          evaluacionesEnProgreso: 0,
+          porcentajeCompletitud: 0,
+          promedioDesempeno: 0,
+          promedioPotencial: 0,
+          distribucion9Box: {},
+          evaluacionesPorArea: [],
+          evaluacionesPorNivel: [],
+          tendenciaSemanal: [],
+          autoevaluacionesJefesCompletadas: 0,
+          autoevaluacionesJefesEnProgreso: 0,
+          autoevaluacionesJefesPendientes: 0,
+          totalJefesConAutoevaluacion: 0,
+          autoevaluacionesColaboradoresCompletadas: 0,
+          autoevaluacionesColaboradoresEnProgreso: 0,
+          totalColaboradoresConAutoevaluacion: 0,
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -573,6 +685,7 @@ const DashboardRRHH = () => {
     })) : [];
 
   if (loading || !stats) {
+    console.log("⏳ Estado de carga:", { loading, stats: stats ? "existe" : "null" });
     return (
       <div className="min-h-screen bg-background">
         <Header />
@@ -584,6 +697,11 @@ const DashboardRRHH = () => {
       </div>
     );
   }
+
+  console.log("✅ Renderizando dashboard con stats:", { 
+    totalUsuarios: stats.totalUsuarios,
+    evaluacionesCompletadas: stats.evaluacionesCompletadas 
+  });
 
   return (
     <div className="min-h-screen bg-background">
@@ -745,6 +863,58 @@ const DashboardRRHH = () => {
               <CardContent>
                 <p className="text-3xl font-bold text-warning">{stats.autoevaluacionesJefesPendientes}</p>
                 <p className="text-xs text-muted-foreground mt-1">Sin iniciar</p>
+                <p className="text-xs text-muted-foreground mt-2 text-center">
+                  Click para ver detalles
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {stats.autoevaluacionesColaboradoresCompletadas !== undefined && (
+            <Card 
+              className="cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => {
+                const periodo = activePeriodId || periodoId;
+                navigate(`/admin/autoevaluaciones-colaboradores?periodo=${periodo}&tab=completadas`);
+              }}
+            >
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium">Autoevaluaciones Colaboradores - Completadas</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold text-success">{stats.autoevaluacionesColaboradoresCompletadas}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {stats.totalColaboradoresConAutoevaluacion && stats.totalColaboradoresConAutoevaluacion > 0
+                    ? Math.round((stats.autoevaluacionesColaboradoresCompletadas / stats.totalColaboradoresConAutoevaluacion) * 100)
+                    : 0}% del total
+                </p>
+                <Progress 
+                  value={stats.totalColaboradoresConAutoevaluacion && stats.totalColaboradoresConAutoevaluacion > 0
+                    ? (stats.autoevaluacionesColaboradoresCompletadas / stats.totalColaboradoresConAutoevaluacion) * 100
+                    : 0} 
+                  className="mt-2 h-2" 
+                />
+                <p className="text-xs text-muted-foreground mt-2 text-center">
+                  Click para ver detalles
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {stats.autoevaluacionesColaboradoresEnProgreso !== undefined && stats.autoevaluacionesColaboradoresEnProgreso > 0 && (
+            <Card 
+              className="cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => {
+                const periodo = activePeriodId || periodoId;
+                navigate(`/admin/autoevaluaciones-colaboradores?periodo=${periodo}&tab=en_progreso`);
+              }}
+            >
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium">Autoevaluaciones Colaboradores - En Progreso</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold text-info">{stats.autoevaluacionesColaboradoresEnProgreso}</p>
+                <p className="text-xs text-muted-foreground mt-1">Requieren seguimiento</p>
                 <p className="text-xs text-muted-foreground mt-2 text-center">
                   Click para ver detalles
                 </p>

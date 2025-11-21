@@ -33,6 +33,7 @@ import EvaluacionJefes from "./pages/EvaluacionJefes";
 import EvaluacionJefeIndividual from "./pages/EvaluacionJefeIndividual";
 import VistaDetalleJefe from "./pages/VistaDetalleJefe";
 import VistaAutoevaluacionesJefes from "./pages/VistaAutoevaluacionesJefes";
+import VistaAutoevaluacionesColaboradores from "./pages/VistaAutoevaluacionesColaboradores";
 import VistaEvaluacionesCompletadas from "./pages/VistaEvaluacionesCompletadas";
 import VistaEvaluacionesEnProgreso from "./pages/VistaEvaluacionesEnProgreso";
 import DashboardConsolidado from "./pages/DashboardConsolidado";
@@ -287,6 +288,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <VistaAutoevaluacionesJefes />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/autoevaluaciones-colaboradores"
+              element={
+                <ProtectedRoute>
+                  <VistaAutoevaluacionesColaboradores />
                 </ProtectedRoute>
               }
             />
