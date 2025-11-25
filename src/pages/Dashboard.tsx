@@ -1042,7 +1042,13 @@ const Dashboard = () => {
   );
 
   const shouldShowCollaboratorDashboard = (isColaborador || user?.nivel === 'C1' || user?.nivel === 'A1') && !jerarquiaInfo?.tieneColaboradores && !isAdminRRHH && !isAdminGeneral;
-  const canDisplayResultados = evaluationStatus === "submitted" && resultadoData && (resultadoData.jefeCompleto || user?.nivel === 'C1' || user?.nivel === 'A1');
+  
+  // Verificar si se deben mostrar resultados consolidados
+  const canShowConsolidatedResults = import.meta.env.VITE_MOSTRAR_RESULTADOS_CONSOLIDADOS === "true";
+  const isRestrictedLevel = ["O1", "O2"].includes((user?.nivel || "").toUpperCase());
+  const shouldHideResults = !canShowConsolidatedResults || isRestrictedLevel;
+  
+  const canDisplayResultados = evaluationStatus === "submitted" && resultadoData && (resultadoData.jefeCompleto || user?.nivel === 'C1' || user?.nivel === 'A1') && !shouldHideResults;
   const shouldShowResultadosSkeleton = evaluationStatus === "submitted" && isResultadosLoading;
 
   return (
@@ -1508,8 +1514,8 @@ const Dashboard = () => {
               </div>
             )}
 
-            {/* Mostrar mensaje si autoevaluación enviada pero jefe no completó (excepto C1 que ya tiene resultados) */}
-            {!isStatusLoading && evaluationStatus === "submitted" && (!resultadoData || (!resultadoData.jefeCompleto && user?.nivel !== 'C1')) && (
+            {/* Mostrar mensaje si autoevaluación enviada pero jefe no completó O si los resultados están ocultos (excepto C1 que ya tiene resultados) */}
+            {!isStatusLoading && evaluationStatus === "submitted" && (!resultadoData || (!resultadoData.jefeCompleto && user?.nivel !== 'C1') || shouldHideResults) && (
               <Card className="md:col-span-2 border-blue-200 bg-blue-50 dark:bg-blue-950/20">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -1517,20 +1523,31 @@ const Dashboard = () => {
                     Autoevaluación Enviada
                   </CardTitle>
                   <CardDescription>
-                    {jefesEvaluacionInfo
-                      ? user?.nivel === 'A1'
-                        ? `Su autoevaluación ha sido recibida exitosamente. ${jefesEvaluacionInfo.jefesCompletados} de ${jefesEvaluacionInfo.totalJefes} miembro(s) del Concejo han completado su evaluación. ${jefesEvaluacionInfo.totalJefes - jefesEvaluacionInfo.jefesCompletados > 0 ? `Faltan ${jefesEvaluacionInfo.totalJefes - jefesEvaluacionInfo.jefesCompletados} miembro(s) del Concejo por completar.` : ''} Una vez que todos completen, podrá ver su resultado consolidado aquí.`
-                        : `Su autoevaluación ha sido recibida exitosamente. ${jefesEvaluacionInfo.jefesCompletados} de ${jefesEvaluacionInfo.totalJefes} jefe(s) han completado su evaluación. ${jefesEvaluacionInfo.totalJefes - jefesEvaluacionInfo.jefesCompletados > 0 ? `Faltan ${jefesEvaluacionInfo.totalJefes - jefesEvaluacionInfo.jefesCompletados} jefe(s) por completar.` : ''} Una vez que todos completen, podrá ver su resultado consolidado aquí.`
-                      : user?.nivel === 'A1'
-                        ? "Su autoevaluación ha sido recibida exitosamente. El resultado consolidado se mostrará cuando el Concejo Municipal complete la evaluación."
-                        : "Su autoevaluación ha sido recibida exitosamente"}
+                    {shouldHideResults 
+                      ? (isRestrictedLevel 
+                          ? "Su autoevaluación ha sido recibida exitosamente. Los colaboradores con nivel O1 y O2 verán su resultado consolidado más adelante."
+                          : "Su autoevaluación ha sido recibida exitosamente. Los resultados consolidados aún no están disponibles.")
+                      : jefesEvaluacionInfo
+                        ? user?.nivel === 'A1'
+                          ? `Su autoevaluación ha sido recibida exitosamente. ${jefesEvaluacionInfo.jefesCompletados} de ${jefesEvaluacionInfo.totalJefes} miembro(s) del Concejo han completado su evaluación. ${jefesEvaluacionInfo.totalJefes - jefesEvaluacionInfo.jefesCompletados > 0 ? `Faltan ${jefesEvaluacionInfo.totalJefes - jefesEvaluacionInfo.jefesCompletados} miembro(s) del Concejo por completar.` : ''} Una vez que todos completen, podrá ver su resultado consolidado aquí.`
+                          : `Su autoevaluación ha sido recibida exitosamente. ${jefesEvaluacionInfo.jefesCompletados} de ${jefesEvaluacionInfo.totalJefes} jefe(s) han completado su evaluación. ${jefesEvaluacionInfo.totalJefes - jefesEvaluacionInfo.jefesCompletados > 0 ? `Faltan ${jefesEvaluacionInfo.totalJefes - jefesEvaluacionInfo.jefesCompletados} jefe(s) por completar.` : ''} Una vez que todos completen, podrá ver su resultado consolidado aquí.`
+                        : user?.nivel === 'A1'
+                          ? "Su autoevaluación ha sido recibida exitosamente. El resultado consolidado se mostrará cuando el Concejo Municipal complete la evaluación."
+                          : "Su autoevaluación ha sido recibida exitosamente"}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950/20">
                     <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                     <AlertDescription className="text-blue-800 dark:text-blue-200">
-                      {user?.nivel === 'C1' ? (
+                      {shouldHideResults ? (
+                        <>
+                          <strong>Su autoevaluación fue enviada correctamente.</strong>{" "}
+                          {isRestrictedLevel 
+                            ? "Los colaboradores con nivel O1 y O2 verán su resultado consolidado más adelante. Le avisaremos cuando esté disponible."
+                            : "Los resultados consolidados aún no están disponibles. Le avisaremos cuando puedan consultarlos."}
+                        </>
+                      ) : user?.nivel === 'C1' ? (
                         <>
                           <strong>Su autoevaluación fue enviada correctamente.</strong> Como miembro del Concejo Municipal, 
                           su resultado final ya está disponible. Puede ver su gráfico radar, fortalezas y áreas de mejora 
