@@ -35,6 +35,7 @@ const VistaResultadosFinales = () => {
   const [instrument, setInstrument] = useState<any>(null);
 
   const isRestrictedLevel = ["O1", "O2"].includes((user?.nivel || "").toUpperCase());
+  const canShowConsolidatedResults = (import.meta.env.VITE_MOSTRAR_RESULTADOS_CONSOLIDADOS || "").toLowerCase() === "true";
 
   useEffect(() => {
     if (!user) {
@@ -214,7 +215,7 @@ const VistaResultadosFinales = () => {
     );
   }
 
-  if (isRestrictedLevel) {
+  if (isRestrictedLevel || !canShowConsolidatedResults) {
     return (
       <div className="min-h-screen bg-background">
         <Header />
@@ -226,14 +227,17 @@ const VistaResultadosFinales = () => {
                 Autoevaluación Enviada
               </CardTitle>
               <CardDescription className="text-base text-blue-900/80 dark:text-blue-100/80">
-                Su autoevaluación ha sido recibida exitosamente. Una vez que su jefe complete la evaluación, aquí podrá ver su resultado consolidado con el gráfico radar, fortalezas y áreas de mejora.
+                Su autoevaluación ha sido recibida exitosamente. Una vez que recursos humanos habilite los resultados consolidados, aquí podrá ver su gráfico radar, fortalezas y áreas de mejora.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950/30">
                 <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                 <AlertDescription className="text-blue-900 dark:text-blue-100">
-                  <strong>Su autoevaluación fue enviada correctamente.</strong> Los colaboradores con nivel O1 y O2 verán su resultado consolidado más adelante y recibirán una notificación cuando esté disponible.
+                  <strong>Su autoevaluación fue enviada correctamente.</strong>{" "}
+                  {isRestrictedLevel
+                    ? "Los colaboradores con nivel O1 y O2 verán su resultado consolidado más adelante y recibirán una notificación cuando esté disponible."
+                    : "El resultado consolidado se mostrará cuando RRHH lo habilite para toda la organización."}
                 </AlertDescription>
               </Alert>
               <div className="flex items-center justify-center p-4">
