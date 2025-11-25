@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, BarChart3, FileText, TrendingUp, Download } from "lucide-react";
+import { ArrowLeft, BarChart3, FileText, TrendingUp, Download, AlertCircle, CheckCircle2 } from "lucide-react";
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts";
 import { getSubmittedEvaluation } from "@/lib/storage";
 import { getNineBoxDescription } from "@/lib/finalScore";
@@ -32,6 +33,8 @@ const VistaResultadosFinales = () => {
   const [autoevaluacion, setAutoevaluacion] = useState<any>(null);
   const [evaluacionJefe, setEvaluacionJefe] = useState<any>(null);
   const [instrument, setInstrument] = useState<any>(null);
+
+  const isRestrictedLevel = ["O1", "O2"].includes((user?.nivel || "").toUpperCase());
 
   useEffect(() => {
     if (!user) {
@@ -206,6 +209,41 @@ const VistaResultadosFinales = () => {
         <Header />
         <main className="container mx-auto px-4 py-8">
           <p>Cargando...</p>
+        </main>
+      </div>
+    );
+  }
+
+  if (isRestrictedLevel) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container mx-auto px-4 py-8 space-y-6">
+          <Card className="border-blue-200 bg-blue-50 dark:bg-blue-950/20">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-blue-900 dark:text-blue-100">
+                <AlertCircle className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                Autoevaluación Enviada
+              </CardTitle>
+              <CardDescription className="text-base text-blue-900/80 dark:text-blue-100/80">
+                Su autoevaluación ha sido recibida exitosamente. Una vez que su jefe complete la evaluación, aquí podrá ver su resultado consolidado con el gráfico radar, fortalezas y áreas de mejora.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950/30">
+                <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                <AlertDescription className="text-blue-900 dark:text-blue-100">
+                  <strong>Su autoevaluación fue enviada correctamente.</strong> Los colaboradores con nivel O1 y O2 verán su resultado consolidado más adelante y recibirán una notificación cuando esté disponible.
+                </AlertDescription>
+              </Alert>
+              <div className="flex items-center justify-center p-4">
+                <Badge className="bg-success text-success-foreground px-4 py-2 text-base">
+                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                  Autoevaluación Completada
+                </Badge>
+              </div>
+            </CardContent>
+          </Card>
         </main>
       </div>
     );
