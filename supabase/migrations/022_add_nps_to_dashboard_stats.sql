@@ -184,3 +184,7 @@ INCLUYE: NPS (Net Promoter Score) desde autoevaluaciones, promedios de desempeñ
 distribución 9-box, y estadísticas de evaluaciones.
 Optimiza el rendimiento al calcular todo en el servidor.';
 
+
+
+
+

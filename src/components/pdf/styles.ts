@@ -11,23 +11,25 @@ export const pdfStyles = StyleSheet.create({
   
   // Header
   header: {
-    backgroundColor: '#2563eb',
-    color: '#ffffff',
+    backgroundColor: '#ffffff',
+    color: '#000000',
     padding: 10,
     marginBottom: 8,
     textAlign: 'center',
     borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
   },
   headerText: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: '#000000',
     marginBottom: 3,
   },
   headerSubtitle: {
     fontSize: 10,
-    color: '#e0e7ff',
-    opacity: 0.9,
+    color: '#374151',
+    opacity: 1,
   },
   
   // Info Card
@@ -53,18 +55,19 @@ export const pdfStyles = StyleSheet.create({
     marginBottom: 3,
   },
   infoLabel: {
-    fontSize: 8,
+    fontSize: 7,
     fontWeight: 'bold',
     color: '#666666',
-    width: '45%',
+    marginRight: 4,
+    flexShrink: 0,
   },
   infoValue: {
-    fontSize: 8,
+    fontSize: 7.5,
     color: '#000000',
-    width: '55%',
+    flex: 1,
   },
   infoEstado: {
-    fontSize: 8,
+    fontSize: 7.5,
     color: '#059669',
     fontWeight: 'bold',
   },
@@ -304,8 +307,8 @@ export const pdfStyles = StyleSheet.create({
     flexDirection: 'row',
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
-    padding: 4,
-    minHeight: 20,
+    padding: 2,
+    minHeight: 16,
   },
   tableHeader: {
     backgroundColor: '#f3f4f6',

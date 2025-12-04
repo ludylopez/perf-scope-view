@@ -9,6 +9,7 @@ import { importarAsignacionesDirecto } from "./lib/importarAsignacionesDirecto";
 import { WhatsAppButton } from "@/components/layout/WhatsAppButton";
 import "./lib/diagnosticoEvaluaciones"; // Cargar funciones de diagnóstico
 import "./lib/buscarAutoevaluacion"; // Cargar función de búsqueda de autoevaluaciones
+import "./lib/diagnosticoAutoevaluacionesColaboradores"; // Cargar funciones de diagnóstico de autoevaluaciones de colaboradores
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Autoevaluacion from "./pages/Autoevaluacion";

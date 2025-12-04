@@ -18,9 +18,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { calculatePerformanceScore, calculateDimensionAverage, calculateDimensionPercentage, scoreToPercentage } from "@/lib/calculations";
 import { getInstrumentForUser } from "@/lib/instruments";
 import { getInstrumentCalculationConfig } from "@/lib/instrumentCalculations";
-import { PDFDownloadLink } from "@react-pdf/renderer";
-import { EvaluacionPDF } from "@/components/pdf/EvaluacionPDF";
 import { getConsolidatedResult } from "@/lib/finalResultSupabase";
+import { exportEvaluacionCompletaPDFReact } from "@/lib/exports";
 
 const VistaDetalleJefe = () => {
   const { user } = useAuth();
@@ -542,137 +541,133 @@ const VistaDetalleJefe = () => {
     }
   };
 
-  // Componente para exportar PDF (igual que en VistaResultadosFinales)
+  // Componente para exportar PDF usando exportEvaluacionCompletaPDFReact (igual que VistaComparativa)
   const BotonExportarPDF = ({ colaborador, evaluacion }: { colaborador: any; evaluacion: any }) => {
-    const [datosPDF, setDatosPDF] = useState<any>(null);
-    const [cargando, setCargando] = useState(false);
+    const [exportando, setExportando] = useState(false);
 
-    useEffect(() => {
-      if (evaluacion.estado !== "enviado") return;
+    const handleExportarPDF = async () => {
+      if (evaluacion.estado !== "enviado") {
+        toast.error("La evaluación debe estar completada para exportar el PDF");
+        return;
+      }
 
-      const cargarDatosPDF = async () => {
-        setCargando(true);
-        try {
-          const periodoFinal = periodoId || (await getActivePeriodId());
-          if (!periodoFinal) {
-            setCargando(false);
-            return;
-          }
-          
-          // Cargar autoevaluación
-          const { data: autoevaluacion } = await supabase
-            .from("evaluations")
-            .select("*")
-            .eq("usuario_id", colaborador.dpi)
-            .eq("periodo_id", periodoFinal)
-            .eq("tipo", "auto")
-            .eq("estado", "enviado")
-            .single();
-
-          if (!autoevaluacion) {
-            setCargando(false);
-            return;
-          }
-
-          // Obtener datos del colaborador completo primero (para tener el nivel)
-          const { data: colaboradorCompleto } = await supabase
-            .from("users")
-            .select("*")
-            .eq("dpi", colaborador.dpi)
-            .single();
-
-          if (!colaboradorCompleto) {
-            setCargando(false);
-            return;
-          }
-
-          // Cargar instrumento usando el nivel del colaborador completo
-          const nivelColaborador = colaboradorCompleto.nivel || colaborador.nivel || "";
-          if (!nivelColaborador) {
-            setCargando(false);
-            return;
-          }
-
-          const instrument = await getInstrumentForUser(nivelColaborador);
-          if (!instrument) {
-            setCargando(false);
-            return;
-          }
-
-          // Cargar resultado final
-          const resultadoFinal = await getConsolidatedResult(colaborador.dpi, periodoFinal) || 
-            await (async () => {
-              const { data } = await supabase
-                .from("final_evaluation_results")
-                .select("resultado_final")
-                .eq("colaborador_id", colaborador.dpi)
-                .eq("periodo_id", periodoFinal)
-                .single();
-              return data?.resultado_final || null;
-            })();
-
-          if (!resultadoFinal) {
-            setCargando(false);
-            return;
-          }
-
-          // Cargar plan de desarrollo
-          const planDesarrollo = planesDesarrollo.get(colaborador.dpi);
-          let planParaPDF = null;
-          if (planDesarrollo) {
-            const competencias = planDesarrollo.competencias_desarrollar || {};
-            planParaPDF = {
-              planEstructurado: planDesarrollo.planEstructurado || (typeof competencias === 'object' && competencias.acciones ? competencias : null),
-              recomendaciones: planDesarrollo.recomendaciones || (typeof competencias === 'object' && competencias.recomendaciones ? competencias.recomendaciones : [])
-            };
-          }
-
-          // Obtener nombre del período
-          const { data: periodoData } = await supabase
-            .from("evaluation_periods")
-            .select("nombre")
-            .eq("id", periodoFinal)
-            .single();
-
-          // Obtener nombre del jefe
-          const { data: assignment } = await supabase
-            .from("user_assignments")
-            .select("jefe_id")
-            .eq("colaborador_id", colaborador.dpi)
-            .eq("activo", true)
-            .single();
-
-          let nombreJefe = "N/A";
-          if (assignment?.jefe_id) {
-            const { data: jefeData } = await supabase
-              .from("users")
-              .select("nombre, apellidos")
-              .eq("dpi", assignment.jefe_id)
-              .single();
-            if (jefeData) {
-              nombreJefe = `${jefeData.nombre} ${jefeData.apellidos}`;
-            }
-          }
-
-          setDatosPDF({
-            colaborador: colaboradorCompleto,
-            autoevaluacion,
-            evaluacionJefe: evaluacion,
-            instrument,
-            resultadoFinal,
-            planDesarrollo: planParaPDF,
-            periodoNombre: periodoData?.nombre || periodoFinal,
-            nombreJefe
-          });
-        } catch (error) {
-          console.error("Error cargando datos para PDF:", error);
-        } finally {
-          setCargando(false);
+      setExportando(true);
+      try {
+        const periodoFinal = periodoId || (await getActivePeriodId());
+        if (!periodoFinal) {
+          toast.error("No hay período activo");
+          setExportando(false);
+          return;
         }
-      };
 
-      cargarDatosPDF();
-    }, [colaborador.dpi, evaluacion.estado, periodoId]);
+        // Obtener datos del colaborador completo
+        const { data: colaboradorCompleto } = await supabase
+          .from("users")
+          .select("*")
+          .eq("dpi", colaborador.dpi)
+          .single();
+
+        if (!colaboradorCompleto) {
+          toast.error("No se encontraron datos del colaborador");
+          setExportando(false);
+          return;
+        }
+
+        // Cargar autoevaluación
+        const { data: autoevaluacion } = await supabase
+          .from("evaluations")
+          .select("*")
+          .eq("usuario_id", colaborador.dpi)
+          .eq("periodo_id", periodoFinal)
+          .eq("tipo", "auto")
+          .eq("estado", "enviado")
+          .single();
+
+        if (!autoevaluacion) {
+          toast.error("La autoevaluación debe estar completada");
+          setExportando(false);
+          return;
+        }
+
+        // Usar prepararDatosParaPDF para obtener datos correctos con cálculos consolidados
+        const datosPreparados = await prepararDatosParaPDF(colaboradorCompleto, evaluacion);
+
+        // Obtener nombre del período
+        const { data: periodoData } = await supabase
+          .from("evaluation_periods")
+          .select("nombre")
+          .eq("id", periodoFinal)
+          .single();
+
+        // Obtener nombre del jefe
+        const { data: assignment } = await supabase
+          .from("user_assignments")
+          .select("jefe_id")
+          .eq("colaborador_id", colaborador.dpi)
+          .eq("activo", true)
+          .single();
+
+        let nombreJefe = "N/A";
+        if (assignment?.jefe_id) {
+          const { data: jefeData } = await supabase
+            .from("users")
+            .select("nombre, apellidos")
+            .eq("dpi", assignment.jefe_id)
+            .single();
+          if (jefeData) {
+            nombreJefe = `${jefeData.nombre} ${jefeData.apellidos}`;
+          }
+        }
+
+        // Cargar plan de desarrollo
+        const planDesarrollo = planesDesarrollo.get(colaborador.dpi);
+        let planParaPDF = null;
+        if (planDesarrollo) {
+          const competencias = planDesarrollo.competencias_desarrollar || {};
+          planParaPDF = {
+            planEstructurado: planDesarrollo.planEstructurado || (typeof competencias === 'object' && competencias.acciones ? competencias : null),
+            recomendaciones: planDesarrollo.recomendaciones || (typeof competencias === 'object' && competencias.recomendaciones ? competencias.recomendaciones : [])
+          };
+        }
+
+        // Exportar usando la función estándar del sistema
+        await exportEvaluacionCompletaPDFReact(
+          {
+            nombre: colaboradorCompleto.nombre || colaborador.nombre || "",
+            apellidos: colaboradorCompleto.apellidos || colaborador.apellidos || "",
+            dpi: colaboradorCompleto.dpi || colaborador.dpi || "",
+            cargo: colaboradorCompleto.cargo || colaborador.cargo || "",
+            area: colaboradorCompleto.area || colaborador.area || "",
+            nivel: colaboradorCompleto.nivel || colaborador.nivel || "",
+            direccionUnidad: colaboradorCompleto.direccionUnidad || "",
+            departamentoDependencia: colaboradorCompleto.departamentoDependencia || "",
+            profesion: colaboradorCompleto.profesion || "",
+            correo: colaboradorCompleto.correo || "",
+            telefono: colaboradorCompleto.telefono || "",
+            jefeNombre: nombreJefe,
+            directoraRRHHNombre: "Brenda Carolina Lopez Perez",
+          },
+          periodoData?.nombre || periodoFinal,
+          new Date(),
+          {
+            performancePercentage: datosPreparados.performancePercentage,
+            jefeCompleto: datosPreparados.jefeCompleto,
+            fortalezas: datosPreparados.fortalezas,
+            areasOportunidad: datosPreparados.areasOportunidad,
+            radarData: datosPreparados.radarDataPDF,
+            resultadoConsolidado: undefined,
+          },
+          planParaPDF
+        );
+
+        toast.success("PDF generado. Listo para imprimir y firmar.");
+      } catch (error: any) {
+        console.error("Error al generar PDF:", error);
+        toast.error(`Error al generar PDF: ${error?.message || "Error desconocido"}`);
+      } finally {
+        setExportando(false);
+      }
+    };
 
     if (evaluacion.estado !== "enviado") {
       return (
@@ -683,100 +678,24 @@ const VistaDetalleJefe = () => {
       );
     }
 
-    if (cargando || !datosPDF) {
-      return (
-        <Button variant="outline" size="sm" disabled>
-          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-          Cargando...
-        </Button>
-      );
-    }
-
-    const { colaborador: colCompleto, autoevaluacion, evaluacionJefe, instrument, resultadoFinal, planDesarrollo, periodoNombre, nombreJefe } = datosPDF;
-
     return (
-      <Button variant="outline" size="sm" asChild>
-        <PDFDownloadLink
-          document={
-            <EvaluacionPDF
-              empleado={{
-                nombre: colCompleto.nombre || colaborador.nombre || "",
-                apellidos: colCompleto.apellidos || colaborador.apellidos || "",
-                dpi: colCompleto.dpi || colaborador.dpi || "",
-                cargo: colCompleto.cargo || colaborador.cargo || "",
-                area: colCompleto.area || colaborador.area || "",
-                nivel: colCompleto.nivel || colaborador.nivel || "",
-                direccionUnidad: colCompleto.direccionUnidad || "",
-                departamentoDependencia: colCompleto.departamentoDependencia || "",
-                profesion: colCompleto.profesion || "",
-                correo: colCompleto.correo || "",
-                telefono: colCompleto.telefono || "",
-                jefeNombre: nombreJefe,
-                directoraRRHHNombre: "Brenda Carolina Lopez Perez",
-              }}
-              periodo={periodoNombre}
-              fechaGeneracion={new Date()}
-              resultadoData={{
-                performancePercentage: resultadoFinal.desempenoFinal ? scoreToPercentage(resultadoFinal.desempenoFinal) : 0,
-                jefeCompleto: !!evaluacionJefe,
-                fortalezas: instrument.dimensionesDesempeno
-                  .map((dim: any) => {
-                    const autoItems = dim.items.map((item: any) => autoevaluacion.responses[item.id]).filter((v: any) => v !== undefined);
-                    const jefeItems = dim.items.map((item: any) => evaluacionJefe.responses[item.id]).filter((v: any) => v !== undefined);
-                    
-                    const autoAvg = autoItems.length > 0 ? autoItems.reduce((sum: number, val: number) => sum + val, 0) / autoItems.length : 0;
-                    const jefeAvg = jefeItems.length > 0 ? jefeItems.reduce((sum: number, val: number) => sum + val, 0) / jefeItems.length : 0;
-                    
-                    return {
-                      dimension: dim.nombre,
-                      nombreCompleto: dim.nombre,
-                      tuEvaluacion: jefeAvg,
-                      promedioMunicipal: autoAvg,
-                    };
-                  })
-                  .sort((a: any, b: any) => b.tuEvaluacion - a.tuEvaluacion)
-                  .slice(0, 3),
-                areasOportunidad: instrument.dimensionesDesempeno
-                  .map((dim: any) => {
-                    const autoItems = dim.items.map((item: any) => autoevaluacion.responses[item.id]).filter((v: any) => v !== undefined);
-                    const jefeItems = dim.items.map((item: any) => evaluacionJefe.responses[item.id]).filter((v: any) => v !== undefined);
-                    
-                    const autoAvg = autoItems.length > 0 ? autoItems.reduce((sum: number, val: number) => sum + val, 0) / autoItems.length : 0;
-                    const jefeAvg = jefeItems.length > 0 ? jefeItems.reduce((sum: number, val: number) => sum + val, 0) / jefeItems.length : 0;
-                    
-                    return {
-                      dimension: dim.nombre,
-                      nombreCompleto: dim.nombre,
-                      tuEvaluacion: jefeAvg,
-                      promedioMunicipal: autoAvg,
-                    };
-                  })
-                  .sort((a: any, b: any) => a.tuEvaluacion - b.tuEvaluacion)
-                  .slice(0, 3),
-                radarData: instrument.dimensionesDesempeno.map((dim: any) => {
-                  const autoItems = dim.items.map((item: any) => autoevaluacion.responses[item.id]).filter((v: any) => v !== undefined);
-                  const jefeItems = dim.items.map((item: any) => evaluacionJefe.responses[item.id]).filter((v: any) => v !== undefined);
-                  
-                  const autoAvg = autoItems.length > 0 ? autoItems.reduce((sum: number, val: number) => sum + val, 0) / autoItems.length : 0;
-                  const jefeAvg = jefeItems.length > 0 ? jefeItems.reduce((sum: number, val: number) => sum + val, 0) / jefeItems.length : 0;
-                  
-                  return {
-                    dimension: dim.nombre.substring(0, 20),
-                    tuEvaluacion: jefeAvg,
-                    promedioMunicipal: autoAvg,
-                  };
-                }),
-                resultadoConsolidado: undefined,
-              }}
-              planDesarrollo={planDesarrollo}
-            />
-          }
-          fileName={`evaluacion_${(colCompleto?.nombre || colaborador?.nombre || 'evaluacion').replace(/\s+/g, '_')}_${periodoNombre.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`}
-          style={{ textDecoration: 'none' }}
-        >
-          <Download className="h-3 w-3 mr-1" />
-          Exportar PDF
-        </PDFDownloadLink>
+      <Button 
+        variant="outline" 
+        size="sm" 
+        onClick={handleExportarPDF}
+        disabled={exportando}
+      >
+        {exportando ? (
+          <>
+            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+            Generando...
+          </>
+        ) : (
+          <>
+            <Download className="h-3 w-3 mr-1" />
+            Exportar PDF
+          </>
+        )}
       </Button>
     );
   };

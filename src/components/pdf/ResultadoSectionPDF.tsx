@@ -32,7 +32,7 @@ export const ResultadoSectionPDF = ({ performancePercentage }: ResultadoSectionP
         <Text style={pdfStyles.percentage}>{percentage.toFixed(0)}</Text>
         <Text style={pdfStyles.percentageLabel}>%</Text>
       </View>
-      <View style={pdfStyles.resultadoCenter}>
+      <View style={[pdfStyles.resultadoCenter, { marginLeft: 12 }]}>
         <Text style={[pdfStyles.interpretation, interpretation.color]}>
           RESULTADO GENERAL: Tu desempeño es {interpretation.label || 'Regular'}
         </Text>
