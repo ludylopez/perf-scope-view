@@ -441,22 +441,34 @@ export const pdfStyles = StyleSheet.create({
   },
   // Firmas
   firmasSection: {
-    flexDirection: 'row',
-    marginTop: 12,
-    justifyContent: 'space-around',
+    flexDirection: 'row', // Firmas en una sola línea horizontal
+    marginTop: 20, // Aumentar espacio superior
+    marginBottom: 10,
+    justifyContent: 'space-around', // Distribuir uniformemente
   },
   firmaBox: {
-    flex: 1,
+    flex: 1, // Cada firma ocupa espacio igual
     textAlign: 'center',
+    alignItems: 'center',
+    marginHorizontal: 5, // Espacio entre firmas
   },
   firmaLinea: {
     borderTopWidth: 1,
     borderTopColor: '#000000',
-    marginBottom: 4,
+    width: '90%', // Línea individual para cada firma
+    marginBottom: 8,
+    marginTop: 0,
   },
   firmaLabel: {
     fontSize: 7.5,
     color: '#666666',
+    marginBottom: 4,
+    fontWeight: 'bold',
+  },
+  firmaNombre: {
+    fontSize: 7.5,
+    color: '#000000',
+    marginTop: 2,
   },
 });
 

@@ -16,25 +16,28 @@ export const FirmasPDF = ({ nombreEmpleado, nombreJefe, nombreDirectoraRRHH, esC
   
   return (
     <View style={pdfStyles.firmasSection}>
+      {/* Firma del Evaluado */}
       <View style={pdfStyles.firmaBox}>
         <View style={pdfStyles.firmaLinea} />
         <Text style={pdfStyles.firmaLabel}>Firma del Evaluado</Text>
-        <Text style={pdfStyles.firmaLabel}>{nombreEmpleadoValido}</Text>
+        <Text style={pdfStyles.firmaNombre}>{nombreEmpleadoValido}</Text>
       </View>
+
       {/* Para C1 (Concejo Municipal), no mostrar firma del evaluador ya que solo se autoevalúan */}
       {/* Para otros niveles, mostrar firma del evaluador (jefe) */}
       {!esC1 && (
         <View style={pdfStyles.firmaBox}>
           <View style={pdfStyles.firmaLinea} />
           <Text style={pdfStyles.firmaLabel}>Firma del Evaluador</Text>
-          <Text style={pdfStyles.firmaLabel}>{nombreJefeValido}</Text>
+          <Text style={pdfStyles.firmaNombre}>{nombreJefeValido}</Text>
         </View>
       )}
+      
       {/* Firma de RRHH siempre se muestra (tanto para C1 como para otros niveles) */}
       <View style={pdfStyles.firmaBox}>
         <View style={pdfStyles.firmaLinea} />
         <Text style={pdfStyles.firmaLabel}>Firma de la Directora de RRHH</Text>
-        <Text style={pdfStyles.firmaLabel}>{nombreDirectoraValido}</Text>
+        <Text style={pdfStyles.firmaNombre}>{nombreDirectoraValido}</Text>
       </View>
     </View>
   );

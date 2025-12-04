@@ -285,7 +285,7 @@ export const EvaluacionPDF = ({
 
                   {/* Recomendaciones */}
           {recomendaciones.length > 0 && (
-            <View style={{ marginBottom: 10 }}>
+            <View style={{ marginBottom: 20 }}>
               <Text style={pdfStyles.sectionTitle}>RECOMENDACIONES GENERALES</Text>
               <View style={pdfStyles.recomendacionesList}>
                 {recomendaciones
@@ -298,6 +298,9 @@ export const EvaluacionPDF = ({
               </View>
             </View>
           )}
+
+          {/* Espacio adicional antes de las firmas */}
+          <View style={{ marginTop: 10, marginBottom: 10 }} />
 
           {/* Firmas */}
           <FirmasPDF 
