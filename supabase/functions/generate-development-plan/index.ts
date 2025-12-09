@@ -1,10 +1,33 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { getSystemPromptForDevelopmentPlan } from "../shared/prompt-templates.ts";
 
-// Inicializar cliente de Supabase
-const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+/**
+ * Obtiene el prompt del sistema desde la base de datos
+ * Si no se encuentra en BD, usa un fallback básico
+ */
+async function getSystemPromptFromDB(supabase: any): Promise<string> {
+  try {
+    const { data: promptData, error } = await supabase
+      .from("ai_prompts")
+      .select("prompt_text")
+      .eq("function_name", "generate-development-plan")
+      .eq("activo", true)
+      .order("version", { ascending: false })
+      .limit(1)
+      .single();
+
+    if (error || !promptData) {
+      console.warn("No se encontró prompt en BD, usando fallback:", error?.message);
+      // Fallback básico (mínimo necesario)
+      return `Eres un experto en Recursos Humanos. Genera un Plan de Desarrollo Individual en formato JSON con: objetivos, acciones, dimensionesDebiles, recomendaciones, y topicosCapacitacion. Responde ÚNICAMENTE con JSON.`;
+    }
+
+    return promptData.prompt_text;
+  } catch (error: any) {
+    console.error("Error obteniendo prompt desde BD:", error);
+    // Fallback en caso de error
+    return `Eres un experto en Recursos Humanos. Genera un Plan de Desarrollo Individual en formato JSON con: objetivos, acciones, dimensionesDebiles, recomendaciones, y topicosCapacitacion. Responde ÚNICAMENTE con JSON.`;
+  }
+}
 
 /**
  * Convierte un score de escala 0-5 a porcentaje 0-100
@@ -26,6 +49,83 @@ interface DevelopmentPlanResponse {
   planId?: string;
   plan?: any;
   error?: string;
+}
+
+/**
+ * Guarda tópicos de capacitación en la base de datos
+ */
+async function saveTrainingTopics(
+  topicos: any[],
+  colaborador: any,
+  periodo_id: string,
+  development_plan_id: string,
+  acciones: any[],
+  supabase: any
+): Promise<void> {
+  if (!topicos || topicos.length === 0) {
+    console.log("No hay tópicos de capacitación para guardar");
+    return;
+  }
+
+  // Primero eliminar tópicos existentes para este plan (si se regenera)
+  const { error: deleteError } = await supabase
+    .from("training_topics")
+    .delete()
+    .eq("development_plan_id", development_plan_id);
+
+  if (deleteError) {
+    console.error("Error eliminando tópicos existentes:", deleteError);
+    // Continuar de todas formas
+  }
+
+  // Preparar registros para insertar
+  const topicosToInsert = topicos.map((topico: any, index: number) => {
+    // Si el tópico viene del plan, buscar la acción relacionada y su dimensión
+    let dimensionRelacionada = topico.dimension_relacionada || null;
+    let accionRelacionadaId: string | null = null;
+
+    if (topico.fuente === "plan" && acciones && acciones.length > 0) {
+      // Buscar la acción que mejor coincida con el tópico
+      // Por ahora usamos el índice como referencia, pero podríamos mejorar esto
+      // Si el tópico tiene dimension_relacionada, buscar acción con esa dimensión
+      if (dimensionRelacionada) {
+        const accionRelacionada = acciones.find(
+          (acc: any) => acc.dimension === dimensionRelacionada
+        );
+        if (accionRelacionada) {
+          accionRelacionadaId = acciones.indexOf(accionRelacionada).toString();
+        }
+      }
+    }
+
+    return {
+      colaborador_id: colaborador.dpi,
+      periodo_id: periodo_id,
+      development_plan_id: development_plan_id,
+      topico: topico.topico || "",
+      area: colaborador.area || "No especificada",
+      nivel: colaborador.nivel || "A1",
+      fuente: topico.fuente || "plan",
+      dimension_relacionada: dimensionRelacionada,
+      accion_relacionada_id: accionRelacionadaId,
+      prioridad: topico.prioridad || "media",
+      categoria: topico.categoria || "Técnica",
+      descripcion: topico.descripcion || null,
+      fecha_deteccion: new Date().toISOString(),
+    };
+  });
+
+  // Insertar todos los tópicos
+  const { error: insertError } = await supabase
+    .from("training_topics")
+    .insert(topicosToInsert);
+
+  if (insertError) {
+    console.error("Error guardando tópicos de capacitación:", insertError);
+    // No lanzar error, solo loguear, para no fallar la generación del plan
+  } else {
+    console.log(`Guardados ${topicosToInsert.length} tópicos de capacitación`);
+  }
 }
 
 /**
@@ -219,6 +319,19 @@ Deno.serve(async (req: Request): Promise<Response> => {
       },
     });
   }
+
+  // Inicializar cliente de Supabase dentro del handler
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  
+  if (!supabaseUrl || !supabaseServiceKey) {
+    return new Response(
+      JSON.stringify({ success: false, error: "Configuración de Supabase faltante" }),
+      { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
+    );
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
     const { colaborador_id, periodo_id }: GenerateDevelopmentPlanRequest = await req.json();
@@ -468,7 +581,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
     };
 
     // Construir prompts separados (system y user)
-    const systemPrompt = getSystemPromptForDevelopmentPlan();
+    // Obtener prompt desde la base de datos (permite actualizaciones sin redeploy)
+    const systemPrompt = await getSystemPromptFromDB(supabase);
     let userPrompt: string;
     try {
       userPrompt = buildUserPrompt({
@@ -639,13 +753,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
     // Guardar plan en base de datos
     // Guardamos toda la estructura del plan en competencias_desarrollar como JSONB
     // Esto incluye: objetivos, acciones (con tipoAprendizaje, responsable, fecha, indicador, prioridad),
-    // dimensionesDebiles, y recomendaciones
+    // dimensionesDebiles, recomendaciones, y topicosCapacitacion
     // NOTA: NO guardamos feedback_individual ni feedback_grupal aquí (se generan por separado)
     const planCompleto = {
       objetivos: planData.objetivos || [],
       acciones: planData.acciones || [],
       dimensionesDebiles: planData.dimensionesDebiles || [],
       recomendaciones: planData.recomendaciones || [],
+      topicosCapacitacion: planData.topicosCapacitacion || [],
     };
 
     // Primero verificar si ya existe un plan para este colaborador y período
@@ -733,6 +848,24 @@ Deno.serve(async (req: Request): Promise<Response> => {
       }
 
       planInserted = newPlan;
+    }
+
+    // Guardar tópicos de capacitación si existen
+    const topicosCapacitacion = planData.topicosCapacitacion || [];
+    if (topicosCapacitacion.length > 0) {
+      try {
+        await saveTrainingTopics(
+          topicosCapacitacion,
+          colaborador,
+          periodo_id,
+          planInserted.id,
+          planData.acciones || [],
+          supabase
+        );
+      } catch (topicsError: any) {
+        console.error("Error guardando tópicos de capacitación:", topicsError);
+        // No fallar la generación del plan si hay error guardando tópicos
+      }
     }
 
     return new Response(

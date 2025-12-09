@@ -1,9 +1,9 @@
-import { Document, Page, Text } from '@react-pdf/renderer';
+import { Document, Page, Text, View } from '@react-pdf/renderer';
 import { teamAnalysisStyles } from './teamAnalysisStyles';
 import { TeamAnalysisHeaderPDF } from './TeamAnalysisHeaderPDF';
 import { TeamStatsSummaryPDF } from './TeamStatsSummaryPDF';
 import { TeamNineBoxGridPDF } from './TeamNineBoxGridPDF';
-import { TeamMembersTablePDF } from './TeamMembersTablePDF';
+import { TeamMembersTablePDF, TeamMembersTableFirstPageContent, TeamMembersTableRemainingPages } from './TeamMembersTablePDF';
 import { TeamAIAnalysisPDF } from './TeamAIAnalysisPDF';
 import { TeamJefesComparisonPDF } from './TeamJefesComparisonPDF';
 import type {
@@ -62,27 +62,25 @@ export const TeamAnalysisPDF = ({
 
   return (
     <Document>
-      {/* Páginas dinámicas para cada cuadrante 9-Box (incluyendo el primero en la página 1 si cabe) */}
-      <TeamNineBoxGridPDF
-        distribucion9Box={stats.distribucion9Box}
-        totalPersonas={stats.totalPersonas}
-        colaboradores={colaboradores}
-        fechaFormateada={fechaFormateada}
-        jefe={jefe}
-        periodo={periodo}
-        tipo={tipo}
-        fechaGeneracion={fechaGeneracion}
-        stats={stats}
-      />
-
-      {/* PÁGINA 2: Lista de Colaboradores */}
+      {/* PÁGINA 1: Header + Estadísticas + Inicio del Listado de Colaboradores */}
       <Page size="A4" style={teamAnalysisStyles.page}>
-        <TeamMembersTablePDF
-          colaboradores={colaboradores}
+        <TeamAnalysisHeaderPDF
+          jefe={jefe}
+          periodo={periodo}
           tipo={tipo}
+          fechaGeneracion={fechaGeneracion}
+          totalColaboradores={stats.totalPersonas}
         />
 
-        {/* Footer */}
+        <TeamStatsSummaryPDF stats={stats} />
+
+        {/* Incluir inicio del listado de colaboradores si hay espacio */}
+        <TeamMembersTableFirstPageContent
+          colaboradores={colaboradores}
+          tipo={tipo}
+          fechaFormateada={fechaFormateada}
+        />
+
         <Text
           style={teamAnalysisStyles.footer}
           render={({ pageNumber, totalPages }) =>
@@ -92,12 +90,19 @@ export const TeamAnalysisPDF = ({
         />
       </Page>
 
-      {/* PÁGINA 3: Análisis de IA (si existe) */}
+      {/* PÁGINAS 2-N: Resto del Listado de Colaboradores */}
+      <TeamMembersTableRemainingPages
+        colaboradores={colaboradores}
+        tipo={tipo}
+        fechaFormateada={fechaFormateada}
+        empezarEnPrimeraPagina={true}
+      />
+
+      {/* PÁGINAS: Análisis de IA (si existe) - Insights y recomendaciones */}
       {hasAIAnalysis && (
         <Page size="A4" style={teamAnalysisStyles.page}>
           <TeamAIAnalysisPDF analysis={aiAnalysis} />
 
-          {/* Footer */}
           <Text
             style={teamAnalysisStyles.footer}
             render={({ pageNumber, totalPages }) =>
@@ -108,7 +113,7 @@ export const TeamAnalysisPDF = ({
         </Page>
       )}
 
-      {/* PÁGINA 4: Desglose por Jefe (solo para unidad/cascada) */}
+      {/* PÁGINAS: Desglose por Jefe (solo para unidad/cascada) */}
       {hasJefesSubordinados && (
         <Page size="A4" style={teamAnalysisStyles.page}>
           <TeamJefesComparisonPDF
@@ -116,7 +121,6 @@ export const TeamAnalysisPDF = ({
             colaboradores={colaboradores}
           />
 
-          {/* Footer */}
           <Text
             style={teamAnalysisStyles.footer}
             render={({ pageNumber, totalPages }) =>
@@ -126,6 +130,14 @@ export const TeamAnalysisPDF = ({
           />
         </Page>
       )}
+
+      {/* PÁGINAS FINALES: Distribución 9-Box (Análisis estratégico con acciones) */}
+      <TeamNineBoxGridPDF
+        distribucion9Box={stats.distribucion9Box}
+        totalPersonas={stats.totalPersonas}
+        colaboradores={colaboradores}
+        fechaFormateada={fechaFormateada}
+      />
     </Document>
   );
 };

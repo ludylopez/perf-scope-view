@@ -140,6 +140,92 @@ interface CuadranteData {
   alturaEstimada: number;
 }
 
+// Función helper para renderizar un cuadrante como View
+const renderizarCuadrante = (
+  cuadrante: CuadranteData,
+  colaboradoresPorCuadrante: Record<string, TeamMember9Box[]>,
+  esUltimo: boolean,
+  mostrarDescripcion: boolean = true
+) => {
+  return (
+    <View
+      key={cuadrante.position}
+      style={[
+        teamAnalysisStyles.quadrantCard,
+        {
+          backgroundColor: cuadrante.colors.bg,
+          borderColor: cuadrante.colors.border,
+          borderLeftWidth: 4,
+          borderLeftColor: cuadrante.colors.border,
+          marginBottom: esUltimo ? 0 : 10,
+        },
+      ]}
+    >
+      {/* Header del cuadrante */}
+      <View style={teamAnalysisStyles.quadrantHeader}>
+        <View style={teamAnalysisStyles.quadrantHeaderLeft}>
+          <Text style={[teamAnalysisStyles.quadrantTitle, { color: cuadrante.colors.text }]}>
+            {cuadrante.label}
+          </Text>
+          <Text style={[teamAnalysisStyles.quadrantCount, { color: cuadrante.colors.text }]}>
+            {cuadrante.count} {cuadrante.count === 1 ? 'colaborador' : 'colaboradores'}
+          </Text>
+        </View>
+      </View>
+
+      {/* Lista de colaboradores */}
+      <View style={teamAnalysisStyles.quadrantMembers}>
+        {cuadrante.colaboradores.map((colaborador, index) => (
+          <View key={colaborador.dpi} style={teamAnalysisStyles.quadrantMemberItem}>
+            <Text style={teamAnalysisStyles.quadrantMemberName}>
+              {index + 1}. {colaborador.nombreCompleto || colaborador.nombre}
+            </Text>
+            {colaborador.cargo && (
+              <Text style={teamAnalysisStyles.quadrantMemberCargo}>
+                {colaborador.cargo}
+              </Text>
+            )}
+            <View style={teamAnalysisStyles.quadrantMemberStats}>
+              <Text style={teamAnalysisStyles.quadrantMemberStat}>
+                D: {Math.round(colaborador.desempenoPorcentaje || 0)}%
+              </Text>
+              {colaborador.potencialPorcentaje !== undefined && (
+                <Text style={teamAnalysisStyles.quadrantMemberStat}>
+                  P: {Math.round(colaborador.potencialPorcentaje)}%
+                </Text>
+              )}
+            </View>
+          </View>
+        ))}
+      </View>
+
+      {/* Descripción y acciones */}
+      {mostrarDescripcion && (
+        <View style={teamAnalysisStyles.quadrantDescription}>
+          <Text style={[teamAnalysisStyles.quadrantDescriptionTitle, { color: cuadrante.colors.text }]}>
+            ¿Qué significa este cuadrante?
+          </Text>
+          <Text style={teamAnalysisStyles.quadrantDescriptionText}>
+            {cuadrante.description.significado}
+          </Text>
+
+          <Text style={[teamAnalysisStyles.quadrantActionsTitle, { color: cuadrante.colors.text }]}>
+            Acciones recomendadas:
+          </Text>
+          {cuadrante.description.acciones.map((accion, index) => (
+            <View key={index} style={teamAnalysisStyles.quadrantActionItem}>
+              <Text style={[teamAnalysisStyles.quadrantActionBullet, { color: cuadrante.colors.text }]}>
+                •
+              </Text>
+              <Text style={teamAnalysisStyles.quadrantActionText}>{accion}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+};
+
 export const TeamNineBoxGridPDF = ({
   distribucion9Box,
   totalPersonas,
@@ -279,50 +365,18 @@ export const TeamNineBoxGridPDF = ({
     return paginas;
   };
 
-  // Agrupar cuadrantes en páginas
-  const paginasDeCuadrantes: CuadranteData[][] = [];
-  
-  // Primera página: incluir header y stats
-  if (jefe && periodo && tipo && fechaGeneracion && stats) {
-    const cuadrantesPrimeraPagina = agruparCuadrantesEnPaginas(cuadrantesConDatos, ALTURA_DISPONIBLE_PRIMERA_PAGINA);
-    if (cuadrantesPrimeraPagina.length > 0) {
-      paginasDeCuadrantes.push(cuadrantesPrimeraPagina[0]);
-      // Resto de páginas
-      for (let i = 1; i < cuadrantesPrimeraPagina.length; i++) {
-        paginasDeCuadrantes.push(cuadrantesPrimeraPagina[i]);
-      }
-    }
-  } else {
-    // Si no hay header/stats, agrupar normalmente
-    const todasLasPaginas = agruparCuadrantesEnPaginas(cuadrantesConDatos, ALTURA_DISPONIBLE_PAGINAS_NORMALES);
-    todasLasPaginas.forEach(pagina => paginasDeCuadrantes.push(pagina));
-  }
+  // Agrupar cuadrantes en páginas (todas las páginas tienen el mismo espacio disponible)
+  const paginasDeCuadrantes = agruparCuadrantesEnPaginas(cuadrantesConDatos, ALTURA_DISPONIBLE_PAGINAS_NORMALES);
 
   // Generar páginas del PDF
   const paginasPDF: JSX.Element[] = [];
 
   paginasDeCuadrantes.forEach((cuadrantesEnPagina, paginaIndex) => {
-    const esPrimeraPagina = paginaIndex === 0 && jefe && periodo && tipo && fechaGeneracion && stats;
-
     paginasPDF.push(
       <Page key={`pagina-${paginaIndex}`} size="A4" style={teamAnalysisStyles.page}>
-        {/* En la primera página del documento, incluir header y estadísticas */}
-        {esPrimeraPagina && (
-          <>
-            <TeamAnalysisHeaderPDF
-              jefe={jefe!}
-              periodo={periodo!}
-              tipo={tipo!}
-              fechaGeneracion={fechaGeneracion!}
-              totalColaboradores={stats!.totalPersonas}
-            />
-            <TeamStatsSummaryPDF stats={stats!} />
-          </>
-        )}
-
         <View style={teamAnalysisStyles.nineBoxSection}>
-          {/* Título solo en la primera página o primera página de cada grupo */}
-          {(esPrimeraPagina || paginaIndex === 0) && (
+          {/* Título solo en la primera página */}
+          {paginaIndex === 0 && (
             <Text style={teamAnalysisStyles.nineBoxTitle}>DISTRIBUCIÓN 9-BOX</Text>
           )}
 

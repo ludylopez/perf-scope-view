@@ -449,8 +449,42 @@ const VistaDetalleJefe = () => {
       if (error) throw error;
       if (!data.success) throw new Error(data.error || 'Error desconocido');
 
-      setExiste(true);
-      toast.success(`Análisis de ${label} generado correctamente`, { id: `analisis-${tipo}` });
+      // Guardar el análisis en la base de datos
+      const { error: saveError } = await supabase
+        .from("team_analysis")
+        .upsert(
+          {
+            jefe_dpi: id,
+            periodo_id: periodoId,
+            tipo: tipo,
+            analysis: data.analysis,
+            fecha_generacion: new Date().toISOString(),
+          },
+          {
+            onConflict: "jefe_dpi,periodo_id,tipo",
+          }
+        );
+
+      if (saveError) {
+        console.error(`Error guardando análisis ${tipo}:`, saveError);
+        console.error(`Detalles del error:`, {
+          code: saveError.code,
+          message: saveError.message,
+          details: saveError.details,
+          hint: saveError.hint
+        });
+        toast.error(`Análisis generado pero no se pudo guardar en la base de datos: ${saveError.message}`, { 
+          id: `analisis-${tipo}`,
+          duration: 5000 
+        });
+      } else {
+        // Actualizar estado y verificar desde la base de datos
+        setExiste(true);
+        // Verificar nuevamente desde la BD para asegurar sincronización
+        await checkExistingAnalysis();
+        console.log(`✅ Análisis ${tipo} guardado exitosamente para jefe ${id}, período ${periodoId}`);
+        toast.success(`Análisis de ${label} generado y guardado correctamente`, { id: `analisis-${tipo}` });
+      }
 
     } catch (err: any) {
       console.error(`Error generando análisis ${tipo}:`, err);

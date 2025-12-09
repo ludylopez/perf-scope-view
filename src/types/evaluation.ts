@@ -89,10 +89,20 @@ export interface DimensionDebil {
   accionesEspecificas: string[];
 }
 
+export interface TopicoCapacitacion {
+  topico: string;
+  categoria: "Técnica" | "Soft Skills" | "Liderazgo" | "Herramientas" | "Normativa";
+  prioridad: "alta" | "media" | "baja";
+  fuente: "plan" | "comentario_jefe" | "comentario_colaborador" | "necesidad_expresada";
+  dimension_relacionada?: string;
+  descripcion?: string;
+}
+
 export interface PlanEstructurado {
   objetivos: string[];
   acciones: AccionDesarrollo[];
   dimensionesDebiles: DimensionDebil[];
+  topicosCapacitacion?: TopicoCapacitacion[];
 }
 
 export interface DevelopmentPlan {
