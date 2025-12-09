@@ -65,7 +65,13 @@ export function TeamMemberRow({ node, onClick, showJefe = true }: TeamMemberRowP
       <TableCell>
         {node.tieneEvaluacion && node.desempenoPorcentaje !== undefined ? (
           <div className="flex items-center gap-2">
-            <span className="font-medium text-sm w-10">
+            <span className={`font-medium text-sm w-10 ${
+              node.desempenoPorcentaje >= 85 
+                ? "text-green-600 dark:text-green-400 font-semibold"
+                : node.desempenoPorcentaje >= 70
+                ? "text-yellow-600 dark:text-yellow-400 font-semibold"
+                : "text-red-600 dark:text-red-400 font-semibold"
+            }`}>
               {Math.round(node.desempenoPorcentaje)}%
             </span>
             <Progress
@@ -82,7 +88,13 @@ export function TeamMemberRow({ node, onClick, showJefe = true }: TeamMemberRowP
       <TableCell>
         {node.tieneEvaluacion && node.potencialPorcentaje !== undefined ? (
           <div className="flex items-center gap-2">
-            <span className="font-medium text-sm w-10">
+            <span className={`font-medium text-sm w-10 ${
+              node.potencialPorcentaje >= 80 
+                ? "text-green-600 dark:text-green-400 font-semibold"
+                : node.potencialPorcentaje >= 65
+                ? "text-yellow-600 dark:text-yellow-400 font-semibold"
+                : "text-red-600 dark:text-red-400 font-semibold"
+            }`}>
               {Math.round(node.potencialPorcentaje)}%
             </span>
             <Progress

@@ -40,6 +40,7 @@ import VistaAutoevaluacionesColaboradores from "./pages/VistaAutoevaluacionesCol
 import VistaEvaluacionesCompletadas from "./pages/VistaEvaluacionesCompletadas";
 import VistaEvaluacionesEnProgreso from "./pages/VistaEvaluacionesEnProgreso";
 import DashboardConsolidado from "./pages/DashboardConsolidado";
+import DashboardUnidad from "./pages/DashboardUnidad";
 import NotFound from "./pages/NotFound";
 import ConfiguracionSistema from "./pages/ConfiguracionSistema";
 import PopulateExplanations from "./pages/PopulateExplanations";
@@ -324,6 +325,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <DashboardConsolidado />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard-unidad"
+              element={
+                <ProtectedRoute>
+                  <DashboardUnidad />
                 </ProtectedRoute>
               }
             />

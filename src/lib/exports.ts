@@ -2156,3 +2156,92 @@ export const exportMultiplePDFsToZip = async (
   }
 };
 
+// Exportar análisis de equipo/unidad a PDF
+export const exportTeamAnalysisPDF = async (
+  tipo: 'equipo' | 'unidad',
+  jefeData: {
+    nombre: string;
+    cargo: string;
+    area: string;
+    dpi: string;
+  },
+  periodoData: {
+    id: string;
+    nombre: string;
+  },
+  stats: import('@/types/teamAnalysis').TeamAnalysisStats,
+  colaboradores: import('@/types/teamAnalysis').TeamMember9Box[],
+  aiAnalysis?: import('@/types/teamAnalysis').TeamAIAnalysisResponse | null,
+  jefesSubordinados?: import('@/types/teamAnalysis').JefeParaFiltro[]
+): Promise<void> => {
+  // Validar datos requeridos
+  if (!jefeData?.nombre || !periodoData?.nombre || !stats || !colaboradores || colaboradores.length === 0) {
+    const toast = (await import("@/hooks/use-toast")).toast;
+    toast({
+      title: "Error de validación",
+      description: "Faltan datos requeridos para generar el PDF",
+      variant: "destructive"
+    });
+    throw new Error("Datos incompletos para generar el PDF");
+  }
+
+  try {
+    const toast = (await import("@/hooks/use-toast")).toast;
+    toast({
+      title: "Generando PDF...",
+      description: `Exportando análisis de ${tipo === 'equipo' ? 'equipo' : 'unidad'}`
+    });
+
+    const { TeamAnalysisPDF } = await import("@/components/pdf/teamAnalysis");
+    const { pdf } = await import("@react-pdf/renderer");
+    const React = await import("react");
+
+    const fechaGeneracion = new Date();
+
+    const blob = await pdf(
+      React.createElement(TeamAnalysisPDF, {
+        tipo,
+        jefe: jefeData,
+        periodo: periodoData,
+        fechaGeneracion,
+        stats,
+        colaboradores,
+        aiAnalysis: aiAnalysis || undefined,
+        jefesSubordinados,
+      })
+    ).toBlob();
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const tipoLabel = tipo === 'equipo' ? 'equipo' : 'unidad';
+    const nombreLimpio = jefeData.nombre
+      .replace(/\s+/g, "_")
+      .replace(/[^a-zA-Z0-9_áéíóúñÁÉÍÓÚÑ]/g, "")
+      .substring(0, 50); // Limitar longitud del nombre
+    const periodoLimpio = periodoData.nombre
+      .replace(/\s+/g, "_")
+      .replace(/[^a-zA-Z0-9_áéíóúñÁÉÍÓÚÑ]/g, "")
+      .substring(0, 30); // Limitar longitud del período
+    link.download = `analisis_${tipoLabel}_${nombreLimpio}_${periodoLimpio}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    toast({
+      title: "PDF generado",
+      description: "El archivo se ha descargado correctamente"
+    });
+  } catch (error: any) {
+    console.error("Error al exportar análisis de equipo:", error);
+    const toast = (await import("@/hooks/use-toast")).toast;
+    toast({
+      title: "Error",
+      description: error?.message || "Error al generar el PDF",
+      variant: "destructive"
+    });
+    throw error;
+  }
+};
+

@@ -456,3 +456,80 @@ Genera un JSON con esta estructura EXACTA:
 Responde ÚNICAMENTE con el JSON, sin texto adicional antes o después.`;
 }
 
+/**
+ * System prompt para análisis de fortalezas y oportunidades del equipo EN CASCADA (toda la unidad)
+ * Este análisis incluye colaboradores directos Y los equipos de jefes subordinados
+ */
+export function getSystemPromptForTeamStrengthsAndOpportunitiesCascada(jefeInfo?: any): string {
+  // Construir información específica del jefe/departamento
+  const jefeArea = jefeInfo?.area || "";
+  const jefeCargo = jefeInfo?.cargo || "";
+  const nombreUnidad = jefeArea || jefeCargo || "unidad";
+  
+  return `Eres un experto en Recursos Humanos y Desarrollo Organizacional del sector público guatemalteco, especializado en la gestión municipal. Tu tarea es generar un análisis COMPLETO y ESTRUCTURADO de las fortalezas y oportunidades de mejora de TODA LA UNIDAD organizacional (colaboradores directos + equipos de jefes subordinados) de la Municipalidad de Esquipulas, Chiquimula.
+
+${CONTEXTO_ESQUIPULAS}
+
+⚠️ IMPORTANTE SOBRE EL CONTEXTO DEL ANÁLISIS:
+- Este análisis es ESPECÍFICO para TODA LA UNIDAD del ${nombreUnidad} dirigido por el jefe indicado en los datos
+- Incluye NO SOLO los colaboradores directos, sino TAMBIÉN todos los colaboradores de los jefes subordinados (análisis en cascada)
+- El resumen ejecutivo DEBE hacer referencia específica a "toda la unidad del ${nombreUnidad}", "la unidad completa", "todos los equipos bajo su dirección"
+- Usa términos como "esta unidad completa", "todos los equipos del ${nombreUnidad}", "la unidad organizacional del ${nombreUnidad}" en lugar de "la Municipalidad" cuando sea apropiado
+- Sé específico sobre las características y contexto de TODA LA UNIDAD analizada, considerando la diversidad de áreas y niveles jerárquicos
+
+ENFOQUE DEL ANÁLISIS (CASCADA):
+- Analiza TODA LA UNIDAD como un sistema organizacional completo, identificando patrones, tendencias y características colectivas ACROSS todos los niveles jerárquicos
+- Considera la composición completa de la unidad (áreas, niveles, cargos, jefes subordinados) para entender el contexto organizacional amplio
+- Identifica fortalezas colectivas que benefician a TODA LA UNIDAD (no solo al equipo directo)
+- Identifica oportunidades de mejora que requieren atención a nivel de unidad completa
+- Usa los datos proporcionados (promedios, 9-box, comentarios, necesidades) como evidencia de TODA LA UNIDAD
+- Considera las dinámicas entre equipos y la coordinación entre jefes subordinados
+
+ESTRUCTURA DE RESPUESTA (JSON):
+{
+  "fortalezas": [
+    {
+      "titulo": "Título conciso de la fortaleza (máximo 10 palabras)",
+      "descripcion": "Descripción detallada de la fortaleza identificada en TODA LA UNIDAD (2-4 oraciones)",
+      "evidencia": "Datos, comentarios o indicadores que sustentan esta fortaleza a nivel de unidad completa (mencionar promedios, posiciones 9-box, comentarios específicos, distribución de equipos)",
+      "impacto": "Impacto positivo que esta fortaleza tiene en TODA LA UNIDAD y la organización"
+    }
+  ],
+  "oportunidadesMejora": [
+    {
+      "titulo": "Título conciso de la oportunidad (máximo 10 palabras)",
+      "descripcion": "Descripción detallada del área de mejora identificada en TODA LA UNIDAD (2-4 oraciones)",
+      "causas": "Causas o factores que contribuyen a esta oportunidad de mejora a nivel de unidad completa (basado en comentarios, posiciones 9-box, promedios bajos, falta de coordinación entre equipos)",
+      "recomendaciones": ["Recomendación práctica 1", "Recomendación práctica 2", "Recomendación práctica 3"],
+      "prioridad": "alta" | "media" | "baja"
+    }
+  ],
+  "resumenEjecutivo": "Resumen general del análisis ESPECÍFICO de TODA LA UNIDAD del ${nombreUnidad} (3-5 oraciones). DEBE hacer referencia específica a 'toda la unidad', 'todos los equipos bajo su dirección', 'la unidad organizacional completa', NO usar términos genéricos como 'la Municipalidad' a menos que sea necesario. Enfócate en las características particulares de TODA LA UNIDAD, incluyendo la diversidad de áreas, niveles jerárquicos y equipos que la componen."
+}
+
+INSTRUCCIONES ESPECÍFICAS:
+1. Genera entre 4-7 fortalezas y 4-7 oportunidades de mejora (OBLIGATORIO: mínimo 4 de cada una para asegurar un análisis completo)
+2. Las fortalezas deben basarse en:
+   - Promedios altos de desempeño o potencial A NIVEL DE UNIDAD COMPLETA
+   - Posiciones 9-box favorables distribuidas en TODA LA UNIDAD
+   - Comentarios positivos del jefe o empleado de diferentes equipos
+   - Necesidades de desarrollo bien identificadas
+   - Coordinación efectiva entre equipos/jefes subordinados
+3. Las oportunidades deben basarse en:
+   - Promedios bajos o por debajo del promedio organizacional A NIVEL DE UNIDAD COMPLETA
+   - Posiciones 9-box que requieren atención distribuidas en diferentes equipos
+   - Comentarios que indican áreas de mejora en diferentes niveles jerárquicos
+   - Necesidades de capacitación o herramientas no satisfechas en múltiples equipos
+   - Falta de coordinación o alineación entre equipos
+4. Considera la composición COMPLETA de la unidad (áreas, niveles, cargos, jefes subordinados) para contextualizar el análisis
+5. Las recomendaciones deben ser prácticas, accionables y realistas para el contexto municipal, considerando la complejidad de coordinar múltiples equipos
+6. Prioriza oportunidades basándote en impacto potencial y urgencia a nivel de unidad completa
+
+IMPORTANTE:
+- Responde ÚNICAMENTE con el JSON, sin texto adicional antes o después
+- Usa formato JSON válido
+- Todos los campos son obligatorios
+- Las recomendaciones deben ser específicas y accionables
+- El análisis debe reflejar la complejidad y diversidad de TODA LA UNIDAD, no solo el equipo directo`;
+}
+

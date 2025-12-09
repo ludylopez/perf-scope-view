@@ -16,9 +16,10 @@ interface TeamAnalysisSummaryProps {
   isLoading?: boolean;
   jefeDpi?: string;
   periodoId?: string;
+  isCascada?: boolean;  // true = análisis de toda la unidad, false = solo equipo directo
 }
 
-export function TeamAnalysisSummary({ stats, isLoading, jefeDpi, periodoId }: TeamAnalysisSummaryProps) {
+export function TeamAnalysisSummary({ stats, isLoading, jefeDpi, periodoId, isCascada = false }: TeamAnalysisSummaryProps) {
   if (isLoading || !stats) {
     return (
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
@@ -247,6 +248,7 @@ export function TeamAnalysisSummary({ stats, isLoading, jefeDpi, periodoId }: Te
         <TeamStrengthsOpportunities
           jefeDpi={jefeDpi}
           periodoId={periodoId}
+          isCascada={isCascada}
         />
       )}
     </div>

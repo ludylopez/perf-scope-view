@@ -58,6 +58,19 @@ export function TeamNineBoxView({
 }: TeamNineBoxViewPropsExtended) {
   const navigate = useNavigate();
   const [filtroJefe, setFiltroJefe] = useState<string>("all");
+  const [expandedCells, setExpandedCells] = useState<Set<NineBoxPosition>>(new Set());
+
+  const toggleCellExpansion = (position: NineBoxPosition) => {
+    setExpandedCells(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(position)) {
+        newSet.delete(position);
+      } else {
+        newSet.add(position);
+      }
+      return newSet;
+    });
+  };
 
   // Filtrar datos
   const filteredData = useMemo(() => {
@@ -183,6 +196,23 @@ export function TeamNineBoxView({
         </CardHeader>
 
         <CardContent className="pt-0">
+          {/* Estilos para scrollbar personalizado */}
+          <style>{`
+            .custom-scrollbar::-webkit-scrollbar {
+              width: 4px;
+            }
+            .custom-scrollbar::-webkit-scrollbar-track {
+              background: transparent;
+            }
+            .custom-scrollbar::-webkit-scrollbar-thumb {
+              background: rgba(0, 0, 0, 0.2);
+              border-radius: 2px;
+            }
+            .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+              background: rgba(0, 0, 0, 0.3);
+            }
+          `}</style>
+          
           {/* Contenedor de la matriz con etiquetas de ejes */}
           <div className="relative">
             {/* Etiqueta eje Y (Potencial) */}
@@ -203,7 +233,7 @@ export function TeamNineBoxView({
                 </Badge>
               </div>
 
-              <div className="grid grid-cols-3 gap-1.5">
+              <div className="grid grid-cols-3 gap-2">
                 {NINE_BOX_POSITIONS.map((row) =>
                   row.map((position) => {
                     const members = dataByPosition[position] || [];
@@ -211,39 +241,101 @@ export function TeamNineBoxView({
                     const colorClass = getPositionColor(position);
                     const count = members.length;
                     const percentage = totalPersonas > 0 ? Math.round((count / totalPersonas) * 100) : 0;
+                    const isExpanded = expandedCells.has(position);
+                    const visibleMembers = isExpanded ? members : members.slice(0, 6);
+                    const remainingMembersCount = members.length - visibleMembers.length;
 
                     return (
                       <div
                         key={position}
-                        onClick={handleVerMatrizCompleta}
-                        className={`
-                          relative rounded-md p-2 min-h-[72px] cursor-pointer
-                          transition-all duration-200 hover:scale-[1.02] hover:shadow-md
-                          border ${colorClass}
-                        `}
+                        className={`relative rounded-md p-2 min-h-[140px] ${expandedCells.has(position) ? 'max-h-[400px]' : 'max-h-[220px]'} transition-all duration-200 hover:shadow-md border ${colorClass} flex flex-col overflow-hidden`}
                         title={`${QUADRANT_LABELS[position]}: ${count} colaboradores (${percentage}%)`}
                       >
-                        {/* Icono y nombre corto */}
-                        <div className="flex items-center gap-1 mb-1">
-                          <span className="text-sm">{metadata.icon}</span>
-                          <span className="text-[10px] font-medium truncate">
-                            {QUADRANT_LABELS[position]}
-                          </span>
-                        </div>
-
-                        {/* Contador grande */}
-                        <div className="flex items-end justify-between">
-                          <span className="text-2xl font-bold leading-none">
-                            {count}
-                          </span>
-                          {percentage > 0 && (
-                            <span className="text-[10px] text-muted-foreground">
-                              {percentage}%
+                        {/* Header con icono, nombre y contador */}
+                        <div className="flex items-center justify-between mb-2 pb-2 border-b border-black/10">
+                          <div className="flex items-center gap-1 flex-1 min-w-0">
+                            <span className="text-sm shrink-0">{metadata.icon}</span>
+                            <span className="text-[10px] font-medium truncate">
+                              {QUADRANT_LABELS[position]}
                             </span>
-                          )}
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <span className="text-lg font-bold leading-none">
+                              {count}
+                            </span>
+                            {percentage > 0 && (
+                              <span className="text-[9px] text-muted-foreground">
+                                ({percentage}%)
+                              </span>
+                            )}
+                          </div>
                         </div>
 
-                        {/* Barra de proporción visual */}
+                        {/* Lista de colaboradores */}
+                        {count > 0 ? (
+                          <div className="flex-1 overflow-y-auto space-y-0.5 pr-1 custom-scrollbar">
+                            {visibleMembers.map((member) => (
+                              <div
+                                key={member.dpi || member.nombre || member.nombreCompleto}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (onMemberClick && member.dpi) {
+                                    // Pasar directamente el member, el handler se encargará de extraer el DPI
+                                    onMemberClick(member);
+                                  }
+                                }}
+                                className="text-[10px] px-1.5 py-1 rounded hover:bg-black/10 cursor-pointer transition-colors flex items-center justify-between group border border-transparent hover:border-black/20"
+                                title={`${member.nombre || member.nombreCompleto}${member.cargo ? ` - ${member.cargo}` : ''}${member.desempenoPorcentaje ? ` (${member.desempenoPorcentaje.toFixed(0)}% / ${member.potencialPorcentaje?.toFixed(0) || 0}%)` : ''}`}
+                              >
+                                <span className="truncate flex-1 min-w-0 font-medium text-gray-900 dark:text-gray-100">
+                                  {member.nombre || member.nombreCompleto}
+                                </span>
+                                {member.desempenoPorcentaje && (
+                                  <span className="text-[9px] text-muted-foreground ml-1 shrink-0">
+                                    {member.desempenoPorcentaje.toFixed(0)}%
+                                  </span>
+                                )}
+                                <span className="text-[9px] text-muted-foreground ml-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  →
+                                </span>
+                              </div>
+                            ))}
+                            {remainingMembersCount > 0 && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="w-full h-auto py-1 text-[10px] text-muted-foreground hover:bg-black/10"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleCellExpansion(position);
+                                }}
+                              >
+                                +{remainingMembersCount} más (expandir)
+                              </Button>
+                            )}
+                            {isExpanded && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="w-full h-auto py-1 text-[10px] text-muted-foreground hover:bg-black/10 mt-1"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleCellExpansion(position);
+                                }}
+                              >
+                                Ver menos
+                              </Button>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="flex-1 flex items-center justify-center py-2">
+                            <span className="text-[10px] text-muted-foreground/50 italic">
+                              Sin colaboradores
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Barra de proporción visual en el fondo */}
                         {count > 0 && (
                           <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/10 rounded-b-md overflow-hidden">
                             <div

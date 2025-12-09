@@ -12,14 +12,16 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, FileText, User, CheckCircle2, Clock, AlertCircle, Sparkles, FileDown, Loader2, Download, XCircle, Wand2 } from "lucide-react";
+import { ArrowLeft, FileText, User, CheckCircle2, Clock, AlertCircle, Sparkles, FileDown, Loader2, Download, XCircle, Wand2, Brain, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { calculatePerformanceScore, calculateDimensionAverage, calculateDimensionPercentage, scoreToPercentage } from "@/lib/calculations";
 import { getInstrumentForUser } from "@/lib/instruments";
 import { getInstrumentCalculationConfig } from "@/lib/instrumentCalculations";
 import { getConsolidatedResult } from "@/lib/finalResultSupabase";
-import { exportEvaluacionCompletaPDFReact, exportMultiplePDFsToZip, ColaboradorExportData, getDirectoraRRHHNombre } from "@/lib/exports";
+import { exportEvaluacionCompletaPDFReact, exportMultiplePDFsToZip, ColaboradorExportData, getDirectoraRRHHNombre, exportTeamAnalysisPDF } from "@/lib/exports";
+import { getEquipoDirectoCompleto, getEquipoCascadaCompleto } from "@/lib/teamAnalysis";
+import type { TeamAnalysisStats, TeamMember9Box, TeamAIAnalysisResponse, JefeParaFiltro } from "@/types/teamAnalysis";
 import { Progress } from "@/components/ui/progress";
 import { Package } from "lucide-react";
 
@@ -43,6 +45,16 @@ const VistaDetalleJefe = () => {
   const [progresoPlanes, setProgresoPlanes] = useState({ current: 0, total: 0, nombre: "", exitosos: 0, errores: 0, tiempoRestante: "" });
   const [nombreDirectoraRRHH, setNombreDirectoraRRHH] = useState<string | null>(null);
   const cancelarGeneracionRef = useRef(false);
+
+  // Estados para análisis IA de equipo/unidad
+  const [analisisEquipoExiste, setAnalisisEquipoExiste] = useState(false);
+  const [analisisUnidadExiste, setAnalisisUnidadExiste] = useState(false);
+  const [generandoAnalisisEquipo, setGenerandoAnalisisEquipo] = useState(false);
+  const [generandoAnalisisUnidad, setGenerandoAnalisisUnidad] = useState(false);
+
+  // Estados para exportación PDF de análisis
+  const [exportandoPDFEquipo, setExportandoPDFEquipo] = useState(false);
+  const [exportandoPDFUnidad, setExportandoPDFUnidad] = useState(false);
 
   // Cargar total de asignaciones esperadas
   useEffect(() => {
@@ -79,7 +91,29 @@ const VistaDetalleJefe = () => {
     getDirectoraRRHHNombre().then(nombre => {
       setNombreDirectoraRRHH(nombre);
     });
+    // Verificar si ya existen análisis IA de equipo/unidad
+    checkExistingAnalysis();
   }, [id, periodoId, user]);
+
+  // Verificar si ya existen análisis IA guardados
+  const checkExistingAnalysis = async () => {
+    if (!id || !periodoId) return;
+
+    try {
+      const { data } = await supabase
+        .from("team_analysis")
+        .select("tipo")
+        .eq("jefe_dpi", id)
+        .eq("periodo_id", periodoId);
+
+      if (data) {
+        setAnalisisEquipoExiste(data.some(d => d.tipo === 'directo'));
+        setAnalisisUnidadExiste(data.some(d => d.tipo === 'cascada'));
+      }
+    } catch (error) {
+      console.error("Error verificando análisis existentes:", error);
+    }
+  };
 
   const loadData = async () => {
     try {
@@ -394,6 +428,141 @@ const VistaDetalleJefe = () => {
         newSet.delete(colaboradorId);
         return newSet;
       });
+    }
+  };
+
+  // Función para generar análisis IA de equipo o unidad
+  const generarAnalisisIA = async (tipo: 'directo' | 'cascada') => {
+    const setGenerando = tipo === 'directo' ? setGenerandoAnalisisEquipo : setGenerandoAnalisisUnidad;
+    const setExiste = tipo === 'directo' ? setAnalisisEquipoExiste : setAnalisisUnidadExiste;
+    const label = tipo === 'directo' ? 'equipo' : 'unidad';
+
+    setGenerando(true);
+
+    try {
+      toast.loading(`Generando análisis de ${label}...`, { id: `analisis-${tipo}` });
+
+      const { data, error } = await supabase.functions.invoke('generate-team-analysis', {
+        body: { jefeDpi: id, periodoId, tipo }
+      });
+
+      if (error) throw error;
+      if (!data.success) throw new Error(data.error || 'Error desconocido');
+
+      setExiste(true);
+      toast.success(`Análisis de ${label} generado correctamente`, { id: `analisis-${tipo}` });
+
+    } catch (err: any) {
+      console.error(`Error generando análisis ${tipo}:`, err);
+      toast.error(`Error: ${err.message || 'No se pudo generar el análisis'}`, { id: `analisis-${tipo}` });
+    } finally {
+      setGenerando(false);
+    }
+  };
+
+  // Función para exportar PDF de análisis de equipo o unidad
+  const exportarAnalisisPDF = async (tipo: 'equipo' | 'unidad') => {
+    const setExportando = tipo === 'equipo' ? setExportandoPDFEquipo : setExportandoPDFUnidad;
+    const tipoAnalisis = tipo === 'equipo' ? 'directo' : 'cascada';
+
+    setExportando(true);
+
+    try {
+      toast.loading(`Preparando exportación de ${tipo}...`, { id: `export-${tipo}` });
+
+      // Obtener datos del equipo/unidad
+      const getData = tipo === 'equipo' ? getEquipoDirectoCompleto : getEquipoCascadaCompleto;
+      const data = await getData(id!, periodoId);
+
+      if (!data || data.colaboradores.length === 0) {
+        throw new Error('No hay datos disponibles para exportar');
+      }
+
+      // Obtener análisis IA si existe
+      const { data: analysisData } = await supabase
+        .from("team_analysis")
+        .select("analysis")
+        .eq("jefe_dpi", id)
+        .eq("periodo_id", periodoId)
+        .eq("tipo", tipoAnalisis)
+        .maybeSingle();
+
+      let aiAnalysis: TeamAIAnalysisResponse | null = null;
+      if (analysisData?.analysis) {
+        try {
+          aiAnalysis = typeof analysisData.analysis === 'string'
+            ? JSON.parse(analysisData.analysis)
+            : analysisData.analysis as TeamAIAnalysisResponse;
+        } catch (e) {
+          console.warn('Error parsing AI analysis:', e);
+        }
+      }
+
+      // Preparar stats
+      const stats: TeamAnalysisStats = {
+        ...data.estadisticas,
+        eNPS: data.eNPS?.valor ?? undefined,
+        eNPSPromoters: data.eNPS?.promoters,
+        eNPSPassives: data.eNPS?.passives,
+        eNPSDetractors: data.eNPS?.detractors,
+        eNPSTotalRespuestas: data.eNPS?.totalRespuestas,
+      };
+
+      // Convertir colaboradores al formato 9-Box
+      const colaboradores: TeamMember9Box[] = data.colaboradores
+        .filter((c: any) => c.tieneEvaluacion && c.posicion9Box)
+        .map((c: any) => ({
+          dpi: c.dpi,
+          nombre: c.nombreCompleto || '',
+          nombreCompleto: c.nombreCompleto || '',
+          cargo: c.cargo || '',
+          area: c.area || '',
+          nivel: c.nivel || '',
+          desempenoFinal: c.desempenoPorcentaje || 0,
+          potencial: c.potencialPorcentaje || 0,
+          desempenoPorcentaje: c.desempenoPorcentaje || 0,
+          potencialPorcentaje: c.potencialPorcentaje || 0,
+          posicion9Box: c.posicion9Box!,
+          jefeDpi: c.jefeDpi || id!,
+          jefeNombre: c.jefeNombre || '',
+        }));
+
+      // Obtener nombre del periodo
+      const { data: periodoData } = await supabase
+        .from("evaluation_periods")
+        .select("nombre")
+        .eq("id", periodoId)
+        .single();
+
+      // Preparar jefes subordinados (solo para unidad)
+      let jefesSubordinados: JefeParaFiltro[] | undefined;
+      if (tipo === 'unidad' && data.jefesSubordinados) {
+        jefesSubordinados = data.jefesSubordinados;
+      }
+
+      // Exportar PDF
+      await exportTeamAnalysisPDF(
+        tipo,
+        {
+          nombre: jefe?.nombre && jefe?.apellidos ? `${jefe.nombre} ${jefe.apellidos}` : jefe?.nombre || '',
+          cargo: jefe?.cargo || '',
+          area: jefe?.area || '',
+          dpi: id!
+        },
+        { id: periodoId, nombre: periodoData?.nombre || periodoId },
+        stats,
+        colaboradores,
+        aiAnalysis,
+        jefesSubordinados
+      );
+
+      toast.success(`PDF de análisis de ${tipo} exportado`, { id: `export-${tipo}` });
+
+    } catch (err: any) {
+      console.error(`Error exportando PDF ${tipo}:`, err);
+      toast.error(`Error: ${err.message || 'No se pudo exportar el PDF'}`, { id: `export-${tipo}` });
+    } finally {
+      setExportando(false);
     }
   };
 
@@ -1190,6 +1359,89 @@ const VistaDetalleJefe = () => {
                       <>
                         <Package className="h-4 w-4" />
                         Exportar Todos ({completadas} PDFs)
+                      </>
+                    )}
+                  </Button>
+
+                  {/* Separador visual */}
+                  <div className="h-8 w-px bg-border mx-1" />
+
+                  {/* Botón Generar/Regenerar Análisis IA Equipo */}
+                  <Button
+                    onClick={() => generarAnalisisIA('directo')}
+                    disabled={generandoAnalisisEquipo || generandoAnalisisUnidad || generandoPlanesMasivo || exportandoTodos}
+                    variant="outline"
+                    className="gap-2"
+                  >
+                    {generandoAnalisisEquipo ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Generando...
+                      </>
+                    ) : (
+                      <>
+                        <Brain className="h-4 w-4" />
+                        {analisisEquipoExiste ? 'Regenerar' : 'Generar'} Análisis Equipo
+                      </>
+                    )}
+                  </Button>
+
+                  {/* Botón Generar/Regenerar Análisis IA Unidad */}
+                  <Button
+                    onClick={() => generarAnalisisIA('cascada')}
+                    disabled={generandoAnalisisEquipo || generandoAnalisisUnidad || generandoPlanesMasivo || exportandoTodos}
+                    variant="outline"
+                    className="gap-2"
+                  >
+                    {generandoAnalisisUnidad ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Generando...
+                      </>
+                    ) : (
+                      <>
+                        <TrendingUp className="h-4 w-4" />
+                        {analisisUnidadExiste ? 'Regenerar' : 'Generar'} Análisis Unidad
+                      </>
+                    )}
+                  </Button>
+
+                  {/* Botón Exportar PDF Análisis Equipo */}
+                  <Button
+                    onClick={() => exportarAnalisisPDF('equipo')}
+                    disabled={exportandoPDFEquipo || exportandoPDFUnidad || generandoPlanesMasivo || exportandoTodos}
+                    variant="outline"
+                    className="gap-2"
+                  >
+                    {exportandoPDFEquipo ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Exportando...
+                      </>
+                    ) : (
+                      <>
+                        <FileDown className="h-4 w-4" />
+                        PDF Análisis Equipo
+                      </>
+                    )}
+                  </Button>
+
+                  {/* Botón Exportar PDF Análisis Unidad */}
+                  <Button
+                    onClick={() => exportarAnalisisPDF('unidad')}
+                    disabled={exportandoPDFEquipo || exportandoPDFUnidad || generandoPlanesMasivo || exportandoTodos}
+                    variant="outline"
+                    className="gap-2"
+                  >
+                    {exportandoPDFUnidad ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Exportando...
+                      </>
+                    ) : (
+                      <>
+                        <FileDown className="h-4 w-4" />
+                        PDF Análisis Unidad
                       </>
                     )}
                   </Button>

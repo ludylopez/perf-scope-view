@@ -49,15 +49,62 @@ export const getJerarquiaInfo = async (usuarioDpi: string): Promise<JerarquiaInf
     const totalColaboradores = (totalColaboradoresAssignments || 0) + (totalColaboradoresJerarquia || 0);
     const tieneColaboradores = totalColaboradores > 0;
 
-    // Verificar si tiene jefes subordinados (que reportan a él)
-    const { count: totalJefesSubordinados } = await supabase
-      .from("users")
-      .select("*", { count: "exact", head: true })
-      .eq("jefe_inmediato_id", usuarioDpi)
-      .eq("estado", "activo")
-      .in("rol", ["jefe", "colaborador"]);
+    // Verificar si tiene jefes subordinados (que reportan a él Y tienen subordinados)
+    // Paso 1: Obtener colaboradores desde user_assignments
+    const { data: colaboradoresAssignments } = await supabase
+      .from("user_assignments")
+      .select("colaborador_id")
+      .eq("jefe_id", usuarioDpi)
+      .eq("activo", true);
 
-    const tieneJefesSubordinados = (totalJefesSubordinados || 0) > 0;
+    // Paso 2: Obtener colaboradores desde jefe_inmediato_id
+    const { data: colaboradoresJerarquia } = await supabase
+      .from("users")
+      .select("dpi")
+      .eq("jefe_inmediato_id", usuarioDpi)
+      .eq("estado", "activo");
+
+    // Paso 3: Combinar ambas listas
+    const colaboradoresDpis = [
+      ...(colaboradoresAssignments?.map((c: any) => c.colaborador_id) || []),
+      ...(colaboradoresJerarquia?.map((c: any) => c.dpi) || [])
+    ];
+
+    // Paso 4: Verificar cuáles de esos colaboradores son jefes (tienen rol='jefe')
+    let jefesSubordinadosDpis: string[] = [];
+    if (colaboradoresDpis.length > 0) {
+      const { data: usuariosJefes } = await supabase
+        .from("users")
+        .select("dpi")
+        .in("dpi", colaboradoresDpis)
+        .eq("rol", "jefe")
+        .eq("estado", "activo");
+
+      jefesSubordinadosDpis = usuariosJefes?.map((u: any) => u.dpi) || [];
+    }
+
+    // Paso 5: Verificar cuántos de esos jefes realmente tienen subordinados
+    let totalJefesConSubordinados = 0;
+    if (jefesSubordinadosDpis.length > 0) {
+      // Verificar en user_assignments
+      const { count: countAssignments } = await supabase
+        .from("user_assignments")
+        .select("*", { count: "exact", head: true })
+        .in("jefe_id", jefesSubordinadosDpis)
+        .eq("activo", true);
+
+      // Verificar en jefe_inmediato_id
+      const { count: countJerarquia } = await supabase
+        .from("users")
+        .select("*", { count: "exact", head: true })
+        .in("jefe_inmediato_id", jefesSubordinadosDpis)
+        .eq("estado", "activo");
+
+      totalJefesConSubordinados = (countAssignments || 0) + (countJerarquia || 0);
+    }
+
+    const tieneJefesSubordinados = totalJefesConSubordinados > 0;
+    const totalJefesSubordinados = jefesSubordinadosDpis.length;
 
     // Verificar si es jefe intermedio (tiene jefe Y tiene colaboradores)
     const { data: esIntermedio } = await supabase

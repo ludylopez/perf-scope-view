@@ -1,5 +1,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { getSystemPromptForTeamStrengthsAndOpportunities } from "../shared/prompt-templates.ts";
+import { 
+  getSystemPromptForTeamStrengthsAndOpportunities,
+  getSystemPromptForTeamStrengthsAndOpportunitiesCascada 
+} from "../shared/prompt-templates.ts";
 
 // Inicializar cliente de Supabase
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
@@ -16,6 +19,7 @@ const corsHeaders = {
 interface GenerateTeamAnalysisRequest {
   jefeDpi: string;
   periodoId: string;
+  tipo?: "directo" | "cascada"; // Tipo de análisis: directo (solo colaboradores directos) o cascada (toda la unidad)
 }
 
 interface TeamAnalysisResponse {
@@ -27,7 +31,7 @@ interface TeamAnalysisResponse {
 /**
  * Construye el user prompt con datos del equipo
  */
-function buildUserPrompt(teamData: any, jefeInfo: any): string {
+function buildUserPrompt(teamData: any, jefeInfo: any, tipo: "directo" | "cascada" = "directo"): string {
   const {
     estadisticasEquipo,
     composicionEquipo,
@@ -46,7 +50,17 @@ function buildUserPrompt(teamData: any, jefeInfo: any): string {
   // Determinar el nombre de la unidad/departamento/dependencia
   const nombreUnidad = jefeArea || jefeCargo || "unidad";
 
-  let prompt = `ANÁLISIS DE EQUIPO - ${nombreUnidad.toUpperCase()}
+  const tituloAnalisis = tipo === "cascada" 
+    ? `ANÁLISIS DE TODA LA UNIDAD - ${nombreUnidad.toUpperCase()}`
+    : `ANÁLISIS DE EQUIPO - ${nombreUnidad.toUpperCase()}`;
+  
+  const contextoAnalisis = tipo === "cascada"
+    ? "Este análisis incluye TODOS los colaboradores de la unidad: colaboradores directos Y todos los colaboradores de los jefes subordinados (análisis en cascada)."
+    : "Este análisis incluye SOLO los colaboradores directos del jefe.";
+
+  let prompt = `${tituloAnalisis}
+
+${contextoAnalisis}
 
 JEFE DEL EQUIPO: ${jefeNombre}
 CARGO: ${jefeCargo}${jefeNivel ? ` (Nivel ${jefeNivel})` : ""}
@@ -167,16 +181,22 @@ INSTRUCCIONES PARA EL ANÁLISIS
 ═══════════════════════════════════════════════════════════════
 
 Basándote en la información proporcionada, genera un análisis completo de:
-1. FORTALEZAS del ${nombreUnidad} (4-7 fortalezas principales - OBLIGATORIO: mínimo 4)
+1. FORTALEZAS ${tipo === "cascada" ? "de TODA LA UNIDAD" : `del ${nombreUnidad}`} (4-7 fortalezas principales - OBLIGATORIO: mínimo 4)
 2. OPORTUNIDADES DE MEJORA (4-7 áreas prioritarias - OBLIGATORIO: mínimo 4)
-3. RESUMEN EJECUTIVO ESPECÍFICO del ${nombreUnidad}
+3. RESUMEN EJECUTIVO ESPECÍFICO ${tipo === "cascada" ? "de TODA LA UNIDAD" : `del ${nombreUnidad}`}
 
 ⚠️ IMPORTANTE PARA EL RESUMEN EJECUTIVO:
-- El resumen DEBE ser específico al ${nombreUnidad} dirigido por ${jefeNombre} (${jefeCargo})
+${tipo === "cascada" 
+  ? `- El resumen DEBE ser específico a TODA LA UNIDAD del ${nombreUnidad} dirigida por ${jefeNombre} (${jefeCargo})
+- Incluye NO SOLO los colaboradores directos, sino TAMBIÉN todos los colaboradores de los jefes subordinados
+- Usa términos como "toda la unidad del ${nombreUnidad}", "todos los equipos bajo su dirección", "la unidad organizacional completa"
+- Menciona características específicas de TODA LA UNIDAD, incluyendo la diversidad de áreas, niveles jerárquicos y equipos que la componen
+- El resumen debe reflejar la complejidad y diversidad de TODA LA UNIDAD, no solo el equipo directo`
+  : `- El resumen DEBE ser específico al ${nombreUnidad} dirigido por ${jefeNombre} (${jefeCargo})
 - NO uses términos genéricos como "la Municipalidad de Esquipulas" a menos que sea absolutamente necesario
 - En su lugar, usa "este ${nombreUnidad}", "el ${nombreUnidad}", "la unidad de ${nombreUnidad}"
 - Menciona características específicas del ${nombreUnidad} basadas en los datos proporcionados
-- El resumen debe reflejar el contexto y realidad PARTICULAR de este ${nombreUnidad}, no generalidades
+- El resumen debe reflejar el contexto y realidad PARTICULAR de este ${nombreUnidad}, no generalidades`}
 
 Considera:
 - Los promedios del equipo vs organización
@@ -209,7 +229,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { jefeDpi, periodoId }: GenerateTeamAnalysisRequest =
+    const { jefeDpi, periodoId, tipo = "directo" }: GenerateTeamAnalysisRequest =
       await req.json();
 
     if (!jefeDpi || !periodoId) {
@@ -225,52 +245,102 @@ Deno.serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    // 1. Obtener datos del equipo usando la función RPC
-    // Nota: Necesitamos obtener los datos desde el frontend o crear una función RPC
-    // Por ahora, vamos a obtener los datos directamente aquí
-
-    // Obtener colaboradores directos
-    const { data: colaboradoresData, error: errorColaboradores } =
-      await supabase.rpc("get_jerarquia_directa_con_resultados", {
-        usuario_dpi: jefeDpi,
-        periodo_id_param: periodoId,
-      });
-
-    if (errorColaboradores) {
-      console.error("Error obteniendo colaboradores:", errorColaboradores);
+    // Validar tipo
+    if (tipo !== "directo" && tipo !== "cascada") {
       return new Response(
         JSON.stringify({
           success: false,
-          error: "Error obteniendo datos del equipo",
+          error: "tipo debe ser 'directo' o 'cascada'",
         }),
         {
-          status: 500,
+          status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
     }
 
-    // Obtener estadísticas del equipo
-    const { data: statsData, error: errorStats } = await supabase.rpc(
-      "get_stats_unidad_directa",
-      {
-        usuario_dpi: jefeDpi,
-        periodo_id_param: periodoId,
-      }
-    );
+    console.log(`📊 Generando análisis ${tipo} para jefe ${jefeDpi}, período ${periodoId}`);
 
-    if (errorStats) {
-      console.error("Error obteniendo estadísticas:", errorStats);
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: "Error obteniendo estadísticas del equipo",
-        }),
+    // 1. Obtener datos del equipo según el tipo
+    let colaboradoresData: any[] = [];
+    let statsData: any = null;
+
+    if (tipo === "cascada") {
+      // Análisis cascada: obtener toda la unidad
+      const { data: equipoCascada, error: errorCascada } = await supabase.rpc(
+        "get_equipo_cascada_completo",
         {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          jefe_dpi_param: jefeDpi,
+          periodo_id_param: periodoId,
         }
       );
+
+      if (errorCascada) {
+        console.error("Error obteniendo equipo en cascada:", errorCascada);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "Error obteniendo datos del equipo en cascada",
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      if (equipoCascada) {
+        colaboradoresData = equipoCascada.colaboradores || [];
+        statsData = equipoCascada.estadisticas || null;
+      }
+    } else {
+      // Análisis directo: solo colaboradores directos
+      const { data: colaboradoresDirectos, error: errorColaboradores } =
+        await supabase.rpc("get_jerarquia_directa_con_resultados", {
+          usuario_dpi: jefeDpi,
+          periodo_id_param: periodoId,
+        });
+
+      if (errorColaboradores) {
+        console.error("Error obteniendo colaboradores:", errorColaboradores);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "Error obteniendo datos del equipo",
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      colaboradoresData = colaboradoresDirectos || [];
+
+      // Obtener estadísticas del equipo directo
+      const { data: statsDirecto, error: errorStats } = await supabase.rpc(
+        "get_stats_unidad_directa",
+        {
+          usuario_dpi: jefeDpi,
+          periodo_id_param: periodoId,
+        }
+      );
+
+      if (errorStats) {
+        console.error("Error obteniendo estadísticas:", errorStats);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "Error obteniendo estadísticas del equipo",
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      statsData = statsDirecto;
     }
 
     // Obtener información del jefe (área, cargo, dependencia)
@@ -473,9 +543,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
       periodoNombre: periodo?.nombre,
     };
 
-    // 2. Construir prompts
-    const systemPrompt = getSystemPromptForTeamStrengthsAndOpportunities(jefeInfo);
-    const userPrompt = buildUserPrompt(teamData, jefeInfo);
+    // 2. Construir prompts según el tipo
+    const systemPrompt = tipo === "cascada"
+      ? getSystemPromptForTeamStrengthsAndOpportunitiesCascada(jefeInfo)
+      : getSystemPromptForTeamStrengthsAndOpportunities(jefeInfo);
+    const userPrompt = buildUserPrompt(teamData, jefeInfo, tipo);
 
     // Log detallado para verificar datos enviados
     console.log("📊 Datos enviados a IA:", {

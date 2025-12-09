@@ -19,11 +19,13 @@ import type { TeamAIAnalysisResponse } from "@/types/teamAnalysis";
 interface TeamStrengthsOpportunitiesProps {
   jefeDpi: string;
   periodoId: string;
+  isCascada?: boolean;  // true = análisis de toda la unidad en cascada
 }
 
 export function TeamStrengthsOpportunities({
   jefeDpi,
   periodoId,
+  isCascada = false,
 }: TeamStrengthsOpportunitiesProps) {
   const [analysis, setAnalysis] = useState<TeamAIAnalysisResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -55,12 +57,15 @@ export function TeamStrengthsOpportunities({
     try {
       setIsLoadingExisting(true);
       console.log("🔍 [TeamStrengthsOpportunities] Cargando análisis existente...", { jefeDpi, periodoId });
-      
+
+      // Buscar análisis existente filtrando por tipo
+      const tipoAnalisis = isCascada ? "cascada" : "directo";
       const { data, error: fetchError } = await supabase
         .from("team_analysis")
         .select("analysis, fecha_generacion")
         .eq("jefe_dpi", jefeDpi)
         .eq("periodo_id", periodoId)
+        .eq("tipo", tipoAnalisis)
         .maybeSingle();
 
       if (fetchError && fetchError.code !== "PGRST116") {
@@ -109,17 +114,19 @@ export function TeamStrengthsOpportunities({
 
   const saveAnalysisToDatabase = async (analysisData: TeamAIAnalysisResponse) => {
     try {
+      const tipoAnalisis = isCascada ? "cascada" : "directo";
       const { error: saveError } = await supabase
         .from("team_analysis")
         .upsert(
           {
             jefe_dpi: jefeDpi,
             periodo_id: periodoId,
+            tipo: tipoAnalisis,
             analysis: analysisData,
             fecha_generacion: new Date().toISOString(),
           },
           {
-            onConflict: "jefe_dpi,periodo_id",
+            onConflict: "jefe_dpi,periodo_id,tipo",
           }
         );
 
@@ -140,12 +147,14 @@ export function TeamStrengthsOpportunities({
       setError(null);
 
       // Llamar a la Edge Function
+      const tipoAnalisis = isCascada ? "cascada" : "directo";
       const { data, error: functionError } = await supabase.functions.invoke(
         "generate-team-analysis",
         {
           body: {
             jefeDpi,
             periodoId,
+            tipo: tipoAnalisis,  // Tipo de análisis: 'directo' o 'cascada'
           },
         }
       );

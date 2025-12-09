@@ -4,6 +4,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   LayoutDashboard,
   List,
   Grid3X3,
@@ -11,48 +18,63 @@ import {
   RefreshCw,
   ShieldAlert,
   LogIn,
+  Filter,
   FileDown,
   Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 
 import { TeamAnalysisSummary } from "./TeamAnalysisSummary";
-import { TeamMembersList } from "./TeamMembersList";
+import { TeamMembersListCascada } from "./TeamMembersListCascada";
 import { TeamNineBoxView } from "./TeamNineBoxView";
 import { TeamMemberDetailModal } from "./TeamMemberDetailModal";
 
-import { getEquipoDirectoCompleto, TeamAnalysisError } from "@/lib/teamAnalysis";
+import {
+  getEquipoCascadaCompleto,
+  get9BoxCascadaFiltrable,
+  TeamAnalysisError
+} from "@/lib/teamAnalysis";
 import { exportTeamAnalysisPDF } from "@/lib/exports";
 import { supabase } from "@/integrations/supabase/client";
 import type { TeamAIAnalysisResponse } from "@/types/teamAnalysis";
 
 import type {
   TeamAnalysisTabProps,
-  TeamAnalysisNode,
+  TeamAnalysisNodeCascada,
   TeamAnalysisStats,
   TeamMember9Box,
+  JefeParaFiltro,
   GrupoParaFiltro,
 } from "@/types/teamAnalysis";
 
 // Tipos de error para UI
 type ErrorType = "generic" | "unauthorized" | "forbidden" | "validation";
 
-export function TeamAnalysisTab({ usuarioDpi, periodoId }: TeamAnalysisTabProps) {
+export function TeamAnalysisUnidadTab({ usuarioDpi, periodoId }: TeamAnalysisTabProps) {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("resumen");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [errorType, setErrorType] = useState<ErrorType>("generic");
 
-  // Datos del equipo directo
-  const [colaboradores, setColaboradores] = useState<TeamAnalysisNode[]>([]);
+  // Datos del equipo en cascada
+  const [colaboradores, setColaboradores] = useState<TeamAnalysisNodeCascada[]>([]);
   const [stats, setStats] = useState<TeamAnalysisStats | null>(null);
   const [nineBoxData, setNineBoxData] = useState<TeamMember9Box[]>([]);
-  const [gruposParaFiltro, setGruposParaFiltro] = useState<GrupoParaFiltro[]>([]);
+  const [jefesSubordinados, setJefesSubordinados] = useState<JefeParaFiltro[]>([]);
+  const [gruposParaFiltro] = useState<GrupoParaFiltro[]>([]);
+
+  // Filtro de jefe para 9-Box
+  const [filtroJefe9Box, setFiltroJefe9Box] = useState<string>("todos");
+  const [isLoading9Box, setIsLoading9Box] = useState(false);
 
   // Modal de detalle
   const [selectedMemberDpi, setSelectedMemberDpi] = useState<string | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+
+  // Nombre del usuario actual para mostrar en la lista
+  const [nombreUsuario, setNombreUsuario] = useState<string>("Tú");
 
   // Estado para exportación PDF
   const [isExporting, setIsExporting] = useState(false);
@@ -69,7 +91,7 @@ export function TeamAnalysisTab({ usuarioDpi, periodoId }: TeamAnalysisTabProps)
         return { message: "Tu sesión ha expirado. Por favor, inicia sesión nuevamente.", type: "unauthorized" };
       }
       if (err.statusCode === 403 || err.message.includes("FORBIDDEN")) {
-        return { message: "No tienes permisos para ver los datos de este equipo.", type: "forbidden" };
+        return { message: "No tienes permisos para ver los datos de esta unidad.", type: "forbidden" };
       }
       return { message: err.message, type: "generic" };
     }
@@ -78,14 +100,14 @@ export function TeamAnalysisTab({ usuarioDpi, periodoId }: TeamAnalysisTabProps)
         return { message: "Tu sesión ha expirado. Por favor, inicia sesión nuevamente.", type: "unauthorized" };
       }
       if (err.message.includes("FORBIDDEN")) {
-        return { message: "No tienes permisos para ver los datos de este equipo.", type: "forbidden" };
+        return { message: "No tienes permisos para ver los datos de esta unidad.", type: "forbidden" };
       }
       return { message: err.message, type: "generic" };
     }
-    return { message: "Error al cargar los datos del equipo. Por favor, intenta de nuevo.", type: "generic" };
+    return { message: "Error al cargar los datos de la unidad. Por favor, intenta de nuevo.", type: "generic" };
   };
 
-  // Cargar datos del equipo directo
+  // Cargar datos del equipo en cascada
   const loadData = useCallback(async () => {
     if (!usuarioDpi || !periodoId) return;
 
@@ -95,7 +117,7 @@ export function TeamAnalysisTab({ usuarioDpi, periodoId }: TeamAnalysisTabProps)
 
     try {
       // Una sola llamada obtiene todo
-      const data = await getEquipoDirectoCompleto(usuarioDpi, periodoId);
+      const data = await getEquipoCascadaCompleto(usuarioDpi, periodoId);
 
       if (data) {
         // Colaboradores
@@ -112,10 +134,13 @@ export function TeamAnalysisTab({ usuarioDpi, periodoId }: TeamAnalysisTabProps)
           eNPSOrganizacion: data.eNPS.valorOrganizacion ?? undefined,
         });
 
+        // Jefes subordinados para filtros
+        setJefesSubordinados(data.jefesSubordinados);
+
         // Convertir colaboradores a formato 9-Box
         const nineBox: TeamMember9Box[] = data.colaboradores
-          .filter((c: TeamAnalysisNode) => c.tieneEvaluacion && c.posicion9Box)
-          .map((c: TeamAnalysisNode) => ({
+          .filter((c) => c.tieneEvaluacion && c.posicion9Box)
+          .map((c) => ({
             dpi: c.dpi,
             nombre: c.nombreCompleto, // Usar nombreCompleto como nombre principal
             nombreCompleto: c.nombreCompleto, // También mantenerlo como nombreCompleto para compatibilidad
@@ -127,13 +152,10 @@ export function TeamAnalysisTab({ usuarioDpi, periodoId }: TeamAnalysisTabProps)
             desempenoPorcentaje: c.desempenoPorcentaje || 0,
             potencialPorcentaje: c.potencialPorcentaje || 0,
             posicion9Box: c.posicion9Box!,
-            jefeDpi: usuarioDpi,
-            jefeNombre: "", // No necesario para equipo directo
+            jefeDpi: c.jefeDpi,
+            jefeNombre: c.jefeNombre,
           }));
         setNineBoxData(nineBox);
-
-        // Grupos no aplican para equipo directo
-        setGruposParaFiltro([]);
 
         // Cargar info del jefe para exportación PDF
         const { data: jefeData } = await supabase
@@ -143,13 +165,15 @@ export function TeamAnalysisTab({ usuarioDpi, periodoId }: TeamAnalysisTabProps)
           .single();
 
         if (jefeData) {
+          const nombreCompleto = jefeData.nombre && jefeData.apellidos 
+            ? `${jefeData.nombre} ${jefeData.apellidos}` 
+            : jefeData.nombre || "";
           setJefeInfo({
-            nombre: jefeData.nombre && jefeData.apellidos 
-              ? `${jefeData.nombre} ${jefeData.apellidos}` 
-              : jefeData.nombre || "",
+            nombre: nombreCompleto,
             cargo: jefeData.cargo || "",
             area: jefeData.area || "",
           });
+          setNombreUsuario(nombreCompleto || "Tú");
         }
 
         // Cargar nombre del periodo
@@ -176,8 +200,30 @@ export function TeamAnalysisTab({ usuarioDpi, periodoId }: TeamAnalysisTabProps)
     loadData();
   }, [loadData]);
 
+  // Cargar 9-Box filtrado cuando cambia el filtro de jefe
+  const load9BoxFiltered = useCallback(async () => {
+    if (!usuarioDpi || !periodoId) return;
+
+    setIsLoading9Box(true);
+    try {
+      const filtroJefeDpi = filtroJefe9Box === "todos" ? undefined : filtroJefe9Box;
+      const data = await get9BoxCascadaFiltrable(usuarioDpi, periodoId, filtroJefeDpi);
+      setNineBoxData(data);
+    } catch (err) {
+      console.error("Error cargando 9-Box filtrado:", err);
+    } finally {
+      setIsLoading9Box(false);
+    }
+  }, [usuarioDpi, periodoId, filtroJefe9Box]);
+
+  useEffect(() => {
+    if (activeTab === "9box" && filtroJefe9Box !== "todos") {
+      load9BoxFiltered();
+    }
+  }, [filtroJefe9Box, activeTab, load9BoxFiltered]);
+
   // Manejar click en miembro
-  const handleMemberClick = (member: TeamAnalysisNode | TeamMember9Box | any) => {
+  const handleMemberClick = (member: TeamAnalysisNodeCascada | TeamMember9Box | any) => {
     // Aceptar cualquier tipo y extraer el DPI
     const dpi = member.dpi || (member as any).dpi;
     if (dpi) {
@@ -209,7 +255,7 @@ export function TeamAnalysisTab({ usuarioDpi, periodoId }: TeamAnalysisTabProps)
         .select("analysis")
         .eq("jefe_dpi", usuarioDpi)
         .eq("periodo_id", periodoId)
-        .eq("tipo", "directo")
+        .eq("tipo", "cascada")
         .maybeSingle();
 
       if (analysisData?.analysis) {
@@ -224,29 +270,14 @@ export function TeamAnalysisTab({ usuarioDpi, periodoId }: TeamAnalysisTabProps)
         }
       }
 
-      // Convertir nineBoxData al formato esperado por el PDF
-      const colaboradoresPDF = nineBoxData.map((c) => ({
-        dpi: c.dpi,
-        nombre: c.nombreCompleto || "",
-        cargo: c.cargo || "",
-        area: c.area || "",
-        nivel: c.nivel || "",
-        desempenoFinal: c.desempenoPorcentaje || 0,
-        potencial: c.potencialPorcentaje || 0,
-        desempenoPorcentaje: c.desempenoPorcentaje || 0,
-        potencialPorcentaje: c.potencialPorcentaje || 0,
-        posicion9Box: c.posicion9Box,
-        jefeDpi: c.jefeDpi,
-        jefeNombre: c.jefeNombre,
-      }));
-
       await exportTeamAnalysisPDF(
-        "equipo",
+        "unidad",
         { ...jefeInfo, dpi: usuarioDpi },
         { id: periodoId, nombre: periodoNombre },
         stats,
-        colaboradoresPDF,
-        aiAnalysis
+        nineBoxData,
+        aiAnalysis,
+        jefesSubordinados
       );
     } catch (err: any) {
       console.error("Error exportando PDF:", err);
@@ -408,22 +439,56 @@ export function TeamAnalysisTab({ usuarioDpi, periodoId }: TeamAnalysisTabProps)
             isLoading={isLoading}
             jefeDpi={usuarioDpi}
             periodoId={periodoId}
+            isCascada={true}
           />
         </TabsContent>
 
         <TabsContent value="colaboradores" className="mt-6">
-          <TeamMembersList
+          <TeamMembersListCascada
             nodes={colaboradores}
-            jefes={[]} // Sin filtro de jefes - es equipo directo
+            jefes={jefesSubordinados}
             grupos={gruposParaFiltro}
             onMemberClick={handleMemberClick}
+            jefePrincipalDpi={usuarioDpi}
+            jefePrincipalNombre={nombreUsuario}
           />
         </TabsContent>
 
         <TabsContent value="9box" className="mt-6">
+          {/* Filtro por jefe subordinado */}
+          {jefesSubordinados.length > 0 && (
+            <div className="flex items-center gap-4 mb-4 p-4 bg-muted/30 rounded-lg">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <Label htmlFor="filtro-jefe" className="text-sm font-medium">
+                Filtrar por equipo de:
+              </Label>
+              <Select
+                value={filtroJefe9Box}
+                onValueChange={setFiltroJefe9Box}
+              >
+                <SelectTrigger id="filtro-jefe" className="w-[280px]">
+                  <SelectValue placeholder="Seleccionar jefe" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">
+                    Toda mi unidad
+                  </SelectItem>
+                  {jefesSubordinados.map((jefe) => (
+                    <SelectItem key={jefe.dpi} value={jefe.dpi}>
+                      {jefe.nombre} ({jefe.cargo})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {isLoading9Box && (
+                <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" />
+              )}
+            </div>
+          )}
+
           <TeamNineBoxView
             data={nineBoxData}
-            jefes={[]} // Sin filtro de jefes - es equipo directo
+            jefes={jefesSubordinados}
             grupos={gruposParaFiltro}
             onMemberClick={handleMemberClick}
             periodoId={periodoId}

@@ -63,6 +63,32 @@ export interface EquipoDirectoCompleto {
 }
 
 /**
+ * Respuesta de la función get_equipo_cascada_completo
+ * Contiene toda la jerarquía en cascada (directos + indirectos)
+ */
+export interface EquipoCascadaCompleto {
+  colaboradores: TeamAnalysisNodeCascada[];
+  estadisticas: TeamAnalysisStats;
+  jefesSubordinados: JefeParaFiltro[];
+  eNPS: {
+    valor: number | null;
+    promoters: number;
+    passives: number;
+    detractors: number;
+    totalRespuestas: number;
+    valorOrganizacion: number | null;
+  };
+}
+
+/**
+ * Nodo de la jerarquía extendido para cascada
+ * Incluye información del jefe directo de cada colaborador
+ */
+export interface TeamAnalysisNodeCascada extends TeamAnalysisNode {
+  jefeNombre?: string;  // Nombre del jefe directo de este colaborador
+}
+
+/**
  * Estadísticas agregadas del equipo directo
  */
 export interface TeamAnalysisStats {
@@ -209,6 +235,7 @@ export interface TeamMemberDetail {
 export interface TeamMember9Box {
   dpi: string;
   nombre: string;
+  nombreCompleto?: string; // Opcional para compatibilidad con ambos casos
   cargo: string;
   area: string;
   nivel: string;

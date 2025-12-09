@@ -11,6 +11,7 @@ import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import type {
   TeamAnalysisNode,
+  TeamAnalysisNodeCascada,
   TeamAnalysisStats,
   TeamComparison,
   TeamMemberDetail,
@@ -19,6 +20,7 @@ import type {
   GrupoParaFiltro,
   TeamAnalysisFilters,
   EquipoDirectoCompleto,
+  EquipoCascadaCompleto,
 } from "@/types/teamAnalysis";
 
 // ============================================================================
@@ -281,6 +283,167 @@ export const getEquipoDirectoCompleto = async (
       "UNEXPECTED_ERROR",
       500
     );
+  }
+};
+
+// ============================================================================
+// FUNCIÓN PRINCIPAL: Equipo Cascada Completo (Directos + Indirectos)
+// ============================================================================
+
+/**
+ * Obtiene toda la jerarquía en cascada (directos + indirectos) con todos los datos en UNA sola query
+ * Esta es la función principal para el módulo de Análisis de Unidad
+ *
+ * @param jefeDpi - DPI del jefe (validado contra formato DPI)
+ * @param periodoId - ID del período de evaluación (validado como UUID)
+ * @returns Colaboradores directos e indirectos con evaluaciones, dimensiones, stats, jefes subordinados y eNPS
+ * @throws TeamAnalysisError si la validación falla o no tiene autorización
+ *
+ * @security
+ * - Valida formato de entrada con Zod
+ * - Verifica que el usuario autenticado tenga permisos
+ * - Registra accesos para auditoría
+ */
+export const getEquipoCascadaCompleto = async (
+  jefeDpi: string,
+  periodoId: string
+): Promise<EquipoCascadaCompleto | null> => {
+  // 1. Validar parámetros de entrada
+  const validationResult = equipoDirectoParamsSchema.safeParse({ jefeDpi, periodoId });
+
+  if (!validationResult.success) {
+    const errorMessages = validationResult.error.errors
+      .map(e => `${e.path.join(".")}: ${e.message}`)
+      .join("; ");
+    throw new TeamAnalysisError(
+      `Parámetros inválidos: ${errorMessages}`,
+      "VALIDATION_ERROR",
+      400
+    );
+  }
+
+  // 2. Verificar autorización del usuario (validación soft - no bloquea)
+  // La seguridad real está en RLS de Supabase
+  await verificarAutorizacion(jefeDpi);
+
+  // 3. Registrar acceso (solo en desarrollo)
+  logSecurityEvent("DATA_ACCESS_CASCADA", {
+    jefeDpi,
+    periodoId,
+    timestamp: new Date().toISOString()
+  });
+
+  try {
+    const { data, error } = await supabase.rpc("get_equipo_cascada_completo", {
+      jefe_dpi_param: jefeDpi,
+      periodo_id_param: periodoId,
+    });
+
+    if (error) {
+      throw new TeamAnalysisError(
+        `Error al obtener equipo en cascada: ${error.message}`,
+        "DATABASE_ERROR",
+        500
+      );
+    }
+
+    if (!data) {
+      return null;
+    }
+
+    // Transformar los datos del backend al formato esperado
+    const resultado: EquipoCascadaCompleto = {
+      colaboradores: (data.colaboradores || []).map((c: Record<string, unknown>) => ({
+        dpi: c.dpi as string,
+        nombreCompleto: c.nombreCompleto as string,
+        nombre: (c.nombreCompleto as string)?.split(' ')[0] || '',
+        apellidos: (c.nombreCompleto as string)?.split(' ').slice(1).join(' ') || '',
+        cargo: c.cargo as string,
+        area: c.area as string,
+        nivel: c.nivel as string,
+        rol: c.esJefe ? 'jefe' : 'colaborador',
+        jefeDpi: c.jefeDpi as string,
+        jefeNombre: c.jefeNombre as string,
+        nivelJerarquico: c.nivelJerarquico as number,
+        tieneEvaluacion: c.tieneEvaluacion as boolean,
+        desempenoPorcentaje: c.desempenoPorcentaje as number,
+        potencialPorcentaje: c.potencialPorcentaje as number,
+        posicion9Box: c.posicion9Box as string,
+        dimensiones: (c.dimensiones as unknown[]) || [],
+        esJefe: c.esJefe as boolean,
+        totalColaboradoresDirectos: c.totalSubordinados as number,
+      })) as TeamAnalysisNodeCascada[],
+      estadisticas: {
+        totalPersonas: (data.estadisticas as Record<string, unknown>)?.totalPersonas as number || 0,
+        totalJefes: (data.estadisticas as Record<string, unknown>)?.totalJefes as number || 0,
+        totalColaboradores: (data.estadisticas as Record<string, unknown>)?.totalColaboradores as number || 0,
+        evaluacionesCompletadas: (data.estadisticas as Record<string, unknown>)?.evaluacionesCompletadas as number || 0,
+        tasaCompletitud: (data.estadisticas as Record<string, unknown>)?.tasaCompletitud as number || 0,
+        promedioDesempenoUnidad: (data.estadisticas as Record<string, unknown>)?.promedioDesempenoUnidad as number || 0,
+        promedioPotencialUnidad: (data.estadisticas as Record<string, unknown>)?.promedioPotencialUnidad as number || 0,
+        promedioDesempenoOrganizacion: (data.estadisticas as Record<string, unknown>)?.promedioDesempenoOrganizacion as number || 0,
+        promedioPotencialOrganizacion: (data.estadisticas as Record<string, unknown>)?.promedioPotencialOrganizacion as number || 0,
+        distribucion9Box: (data.estadisticas as Record<string, unknown>)?.distribucion9Box as Record<string, number> || {},
+      },
+      jefesSubordinados: (data.jefesSubordinados || []).map((j: Record<string, unknown>) => ({
+        dpi: j.dpi as string,
+        nombre: j.nombre as string,
+        cargo: j.cargo as string,
+        nivelJerarquico: j.nivelJerarquico as number,
+        totalColaboradores: j.totalColaboradores as number,
+      })) as JefeParaFiltro[],
+      eNPS: {
+        valor: (data.eNPS as Record<string, unknown>)?.valor as number ?? null,
+        promoters: (data.eNPS as Record<string, unknown>)?.promoters as number || 0,
+        passives: (data.eNPS as Record<string, unknown>)?.passives as number || 0,
+        detractors: (data.eNPS as Record<string, unknown>)?.detractors as number || 0,
+        totalRespuestas: (data.eNPS as Record<string, unknown>)?.totalRespuestas as number || 0,
+        valorOrganizacion: (data.eNPS as Record<string, unknown>)?.valorOrganizacion as number ?? null,
+      },
+    };
+
+    return resultado;
+  } catch (error) {
+    if (error instanceof TeamAnalysisError) {
+      throw error;
+    }
+    throw new TeamAnalysisError(
+      "Error inesperado al obtener equipo en cascada",
+      "UNEXPECTED_ERROR",
+      500
+    );
+  }
+};
+
+/**
+ * Obtiene datos 9-Box para toda la cascada con filtro opcional por jefe subordinado
+ *
+ * @param jefePrincipalDpi - DPI del jefe principal (raíz de la cascada)
+ * @param periodoId - ID del período de evaluación
+ * @param filtroJefeDpi - Opcional: DPI de jefe subordinado para filtrar su cascada
+ * @returns Array de colaboradores con datos 9-Box
+ */
+export const get9BoxCascadaFiltrable = async (
+  jefePrincipalDpi: string,
+  periodoId: string,
+  filtroJefeDpi?: string
+): Promise<TeamMember9Box[]> => {
+  try {
+    const { data, error } = await supabase.rpc("get_9box_cascada_filtrable", {
+      jefe_principal_dpi: jefePrincipalDpi,
+      periodo_id_param: periodoId,
+      filtro_jefe_dpi: filtroJefeDpi || null,
+    });
+
+    if (error) {
+      devLog.error("Error en get9BoxCascadaFiltrable:", error);
+      throw error;
+    }
+
+    return (data as TeamMember9Box[]) || [];
+  } catch (error) {
+    devLog.error("Error obteniendo 9-box cascada filtrable:", error);
+    return [];
   }
 };
 
@@ -1022,6 +1185,180 @@ export const getTeamDataForAIAnalysis = async (
     };
   } catch (error) {
     devLog.error("Error obteniendo datos del equipo para análisis de IA:", error);
+    return null;
+  }
+};
+
+/**
+ * Obtiene todos los datos del equipo en cascada (directos + indirectos) necesarios para análisis de IA
+ * Similar a getTeamDataForAIAnalysis pero incluye toda la unidad
+ */
+export const getTeamDataForAIAnalysisCascada = async (
+  jefeDpi: string,
+  periodoId: string
+): Promise<import("@/types/teamAnalysis").TeamAIAnalysisData | null> => {
+  try {
+    // 1. Obtener equipo completo en cascada
+    const equipoCascada = await getEquipoCascadaCompleto(jefeDpi, periodoId);
+    if (!equipoCascada) {
+      devLog.error("No se pudieron obtener datos del equipo en cascada");
+      return null;
+    }
+
+    // 2. Para cada colaborador, obtener datos detallados (comentarios, preguntas abiertas)
+    const colaboradoresData: import("@/types/teamAnalysis").ColaboradorAIData[] = [];
+
+    // Obtener mapeo de dimensiones (ID -> Nombre) para todos los instrumentos
+    const { data: instrumentConfigs } = await supabase
+      .from("instrument_configs")
+      .select("id, dimensiones_desempeno")
+      .eq("activo", true);
+
+    const dimensionMap: Record<string, string> = {};
+    if (instrumentConfigs) {
+      instrumentConfigs.forEach((config: any) => {
+        if (config.dimensiones_desempeno && Array.isArray(config.dimensiones_desempeno)) {
+          config.dimensiones_desempeno.forEach((dim: any) => {
+            if (dim.id && dim.nombre) {
+              dimensionMap[dim.id] = dim.nombre;
+            }
+          });
+        }
+      });
+    }
+
+    for (const colaborador of equipoCascada.colaboradores) {
+      // Obtener evaluación del jefe
+      const { data: evaluacionJefe } = await supabase
+        .from("evaluations")
+        .select("comments")
+        .eq("tipo", "jefe")
+        .eq("colaborador_id", colaborador.dpi)
+        .eq("periodo_id", periodoId)
+        .eq("estado", "enviado")
+        .maybeSingle();
+
+      // Obtener autoevaluación
+      const { data: autoevaluacion } = await supabase
+        .from("evaluations")
+        .select("comments, id")
+        .eq("tipo", "auto")
+        .eq("usuario_id", colaborador.dpi)
+        .eq("periodo_id", periodoId)
+        .eq("estado", "enviado")
+        .maybeSingle();
+
+      // Procesar comentarios del jefe con nombres de dimensiones
+      const comentariosJefeProcesados: Record<string, string> = {};
+      const comentariosJefeRaw = (evaluacionJefe?.comments as Record<string, string>) || {};
+      Object.entries(comentariosJefeRaw).forEach(([dimId, comentario]) => {
+        if (comentario && typeof comentario === 'string' && comentario.trim()) {
+          comentariosJefeProcesados[dimId] = comentario.trim();
+        }
+      });
+
+      // Procesar comentarios del empleado con nombres de dimensiones
+      const comentariosEmpleadoProcesados: Record<string, string> = {};
+      const comentariosEmpleadoRaw = (autoevaluacion?.comments as Record<string, string>) || {};
+      Object.entries(comentariosEmpleadoRaw).forEach(([dimId, comentario]) => {
+        if (comentario && typeof comentario === 'string' && comentario.trim()) {
+          comentariosEmpleadoProcesados[dimId] = comentario.trim();
+        }
+      });
+
+      // Obtener preguntas abiertas (herramientas y capacitaciones)
+      const comentariosHerramientas: string[] = [];
+      const comentariosCapacitaciones: string[] = [];
+
+      if (autoevaluacion?.id) {
+        const { data: openQuestionResponses } = await supabase
+          .from("open_question_responses")
+          .select(`
+            respuesta,
+            pregunta_id,
+            open_questions!inner(
+              tipo,
+              pregunta
+            )
+          `)
+          .eq("evaluacion_id", autoevaluacion.id);
+
+        if (openQuestionResponses) {
+          openQuestionResponses.forEach((resp: any) => {
+            if (resp.open_questions?.tipo === "herramienta" && resp.respuesta && resp.respuesta.trim()) {
+              comentariosHerramientas.push(resp.respuesta);
+            }
+            if (resp.open_questions?.tipo === "capacitacion" && resp.respuesta && resp.respuesta.trim()) {
+              comentariosCapacitaciones.push(resp.respuesta);
+            }
+          });
+        }
+      }
+
+      colaboradoresData.push({
+        dpi: colaborador.dpi,
+        nombreCompleto: colaborador.nombreCompleto,
+        cargo: colaborador.cargo,
+        area: colaborador.area,
+        nivel: colaborador.nivel,
+        posicion9Box: colaborador.posicion9Box,
+        desempenoPorcentaje: colaborador.desempenoPorcentaje,
+        potencialPorcentaje: colaborador.potencialPorcentaje,
+        comentariosJefe: comentariosJefeProcesados,
+        comentariosEmpleado: comentariosEmpleadoProcesados,
+        comentariosHerramientas,
+        comentariosCapacitaciones,
+      });
+    }
+
+    // 3. Calcular composición del equipo
+    const composicionPorArea: Record<string, number> = {};
+    const composicionPorNivel: Record<string, number> = {};
+    const composicionPorCargo: Record<string, number> = {};
+
+    equipoCascada.colaboradores.forEach((col) => {
+      // Por área
+      const area = col.area || "Sin área";
+      composicionPorArea[area] = (composicionPorArea[area] || 0) + 1;
+
+      // Por nivel
+      const nivel = col.nivel || "Sin nivel";
+      composicionPorNivel[nivel] = (composicionPorNivel[nivel] || 0) + 1;
+
+      // Por cargo
+      const cargo = col.cargo || "Sin cargo";
+      composicionPorCargo[cargo] = (composicionPorCargo[cargo] || 0) + 1;
+    });
+
+    // 4. Obtener nombre del período
+    const { data: periodo } = await supabase
+      .from("evaluation_periods")
+      .select("nombre")
+      .eq("id", periodoId)
+      .maybeSingle();
+
+    return {
+      estadisticasEquipo: {
+        totalColaboradores: equipoCascada.estadisticas.totalPersonas,
+        evaluacionesCompletadas: equipoCascada.estadisticas.evaluacionesCompletadas,
+        promedioDesempeno: equipoCascada.estadisticas.promedioDesempenoUnidad,
+        promedioPotencial: equipoCascada.estadisticas.promedioPotencialUnidad,
+        indiceDesarrollo: (equipoCascada.estadisticas.promedioDesempenoUnidad + equipoCascada.estadisticas.promedioPotencialUnidad) / 2,
+        promedioDesempenoOrganizacion: equipoCascada.estadisticas.promedioDesempenoOrganizacion,
+        promedioPotencialOrganizacion: equipoCascada.estadisticas.promedioPotencialOrganizacion,
+        distribucion9Box: equipoCascada.estadisticas.distribucion9Box,
+      },
+      composicionEquipo: {
+        porArea: composicionPorArea,
+        porNivel: composicionPorNivel,
+        porCargo: composicionPorCargo,
+      },
+      colaboradores: colaboradoresData,
+      periodoId,
+      periodoNombre: periodo?.nombre,
+    };
+  } catch (error) {
+    devLog.error("Error obteniendo datos del equipo en cascada para análisis de IA:", error);
     return null;
   }
 };

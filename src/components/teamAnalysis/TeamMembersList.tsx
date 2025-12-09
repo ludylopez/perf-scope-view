@@ -16,6 +16,8 @@ import {
   ChevronsRight,
   List,
   ArrowUpDown,
+  Info,
+  BarChart3,
 } from "lucide-react";
 import { TeamFilters } from "./TeamFilters";
 import { TeamMemberRow } from "./TeamMemberRow";
@@ -26,6 +28,12 @@ import type {
   GrupoParaFiltro,
 } from "@/types/teamAnalysis";
 import { filtrarJerarquia } from "@/lib/teamAnalysis";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface TeamMembersListProps {
   nodes: TeamAnalysisNode[];
@@ -55,9 +63,16 @@ export function TeamMembersList({
     return filtrarJerarquia(nodes, filters);
   }, [nodes, filters]);
 
-  // Ordenar nodos
+  // Ordenar nodos (por defecto: desempeño descendente, luego nombre)
   const sortedNodes = useMemo(() => {
     return [...filteredNodes].sort((a, b) => {
+      // Si no hay ordenamiento específico, ordenar por desempeño descendente, luego nombre
+      if (sortKey === "nombre" && sortOrder === "asc") {
+        const desempenoComp = (b.desempenoPorcentaje || 0) - (a.desempenoPorcentaje || 0);
+        if (desempenoComp !== 0) return desempenoComp;
+        return a.nombreCompleto.localeCompare(b.nombreCompleto);
+      }
+
       let comparison = 0;
 
       switch (sortKey) {
@@ -88,6 +103,29 @@ export function TeamMembersList({
       return sortOrder === "asc" ? comparison : -comparison;
     });
   }, [filteredNodes, sortKey, sortOrder]);
+
+  // Calcular estadísticas de distribución
+  const estadisticasDistribucion = useMemo(() => {
+    const total = filteredNodes.length;
+    const conEvaluacion = filteredNodes.filter(n => n.tieneEvaluacion).length;
+    const promedioDesempeno = conEvaluacion > 0
+      ? filteredNodes
+          .filter(n => n.tieneEvaluacion && n.desempenoPorcentaje !== undefined)
+          .reduce((sum, n) => sum + (n.desempenoPorcentaje || 0), 0) / conEvaluacion
+      : 0;
+    const promedioPotencial = conEvaluacion > 0
+      ? filteredNodes
+          .filter(n => n.tieneEvaluacion && n.potencialPorcentaje !== undefined)
+          .reduce((sum, n) => sum + (n.potencialPorcentaje || 0), 0) / conEvaluacion
+      : 0;
+
+    return {
+      total,
+      conEvaluacion,
+      promedioDesempeno,
+      promedioPotencial,
+    };
+  }, [filteredNodes]);
 
   // Paginar
   const totalPages = Math.ceil(sortedNodes.length / ITEMS_PER_PAGE);
@@ -138,14 +176,64 @@ export function TeamMembersList({
     <Card>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between mb-4">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <List className="h-5 w-5" />
-            Lista de Colaboradores
-          </CardTitle>
+          <div className="flex items-center gap-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <List className="h-5 w-5" />
+              Lista de Colaboradores
+            </CardTitle>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                    <Info className="h-4 w-4 text-muted-foreground" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p className="font-semibold mb-2">Colores en porcentajes:</p>
+                  <ul className="space-y-1 text-sm">
+                    <li><span className="inline-block w-3 h-3 rounded-full bg-green-500 mr-2"></span><strong>Verde:</strong> Alto desempeño/potencial (≥85% / ≥80%)</li>
+                    <li><span className="inline-block w-3 h-3 rounded-full bg-yellow-500 mr-2"></span><strong>Amarillo:</strong> Medio (70-84% / 65-79%)</li>
+                    <li><span className="inline-block w-3 h-3 rounded-full bg-red-500 mr-2"></span><strong>Rojo:</strong> Requiere atención (&lt;70% / &lt;65%)</li>
+                  </ul>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
           <Badge variant="outline">
             {filteredNodes.length} de {nodes.length} colaboradores
           </Badge>
         </div>
+
+        {/* Resumen estadístico */}
+        {estadisticasDistribucion.total > 0 && (
+          <div className="flex items-center gap-4 p-3 bg-muted/30 rounded-lg border mb-4">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <BarChart3 className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">Resumen:</span>
+            </div>
+            <div className="flex items-center gap-4 flex-wrap">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">
+                  {estadisticasDistribucion.conEvaluacion} con evaluación
+                </span>
+              </div>
+              {estadisticasDistribucion.conEvaluacion > 0 && (
+                <>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">
+                      Promedio Desempeño: <span className="font-semibold">{estadisticasDistribucion.promedioDesempeno.toFixed(0)}%</span>
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">
+                      Promedio Potencial: <span className="font-semibold">{estadisticasDistribucion.promedioPotencial.toFixed(0)}%</span>
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Filtros */}
         <TeamFilters

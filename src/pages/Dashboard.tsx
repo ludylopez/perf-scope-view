@@ -21,7 +21,8 @@ import {
   Sparkles,
   Database,
   Grid3x3,
-  Eye
+  Eye,
+  Building2
 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { getEvaluationDraft, hasSubmittedEvaluation, submitEvaluation, EvaluationDraft, getSubmittedEvaluation, hasJefeEvaluation, getJefeEvaluationDraft } from "@/lib/storage";
@@ -1697,23 +1698,24 @@ const Dashboard = () => {
               </Card>
             )}
 
-            {/* Equipo de colaboradores directos */}
+            {/* Mi Equipo - Sección consolidada */}
             {jerarquiaInfo?.tieneColaboradores && (
-              <Card className="md:col-span-2">
+              <Card className="md:col-span-2 lg:col-span-3">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Users className="h-5 w-5 text-primary" />
                     Mi Equipo
                   </CardTitle>
                   <CardDescription>
-                    Evaluaciones pendientes y completadas
+                    Gestión y análisis de colaboradores a su cargo
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid gap-4 md:grid-cols-3">
+                <CardContent className="space-y-6">
+                  {/* Información del equipo - Grid de 5 columnas en desktop */}
+                  <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
                     <div className="rounded-lg border bg-card p-4 text-center">
                       <p className="text-3xl font-bold text-primary">{jerarquiaInfo?.totalColaboradores || 0}</p>
-                      <p className="text-sm text-muted-foreground">Total Colaboradores</p>
+                      <p className="text-sm text-muted-foreground">Colaboradores</p>
                     </div>
                     <div className="rounded-lg border bg-card p-4 text-center">
                       <p className="text-3xl font-bold text-warning">{equipoEvaluaciones.pendientes}</p>
@@ -1723,72 +1725,65 @@ const Dashboard = () => {
                       <p className="text-3xl font-bold text-success">{equipoEvaluaciones.completadas}</p>
                       <p className="text-sm text-muted-foreground">Completadas</p>
                     </div>
+                    {jerarquiaInfo?.tieneJefesSubordinados && (
+                      <div className="rounded-lg border bg-card p-4 text-center">
+                        <p className="text-3xl font-bold text-info">{jerarquiaInfo?.totalJefesSubordinados || 0}</p>
+                        <p className="text-sm text-muted-foreground">Jefes a Cargo</p>
+                      </div>
+                    )}
+                    <div className="rounded-lg border bg-card p-4 text-center">
+                      <p className="text-lg font-bold text-accent">
+                        {jerarquiaInfo?.esJefeIntermedio ? 'Jefe Intermedio' :
+                         jerarquiaInfo?.esJefeSinJefe ? 'Jefe Superior' : 'Jefe'}
+                      </p>
+                      <p className="text-sm text-muted-foreground">Mi Posición</p>
+                    </div>
                   </div>
-                  
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <Button className="w-full" size="lg" onClick={() => navigate("/evaluacion-equipo")}>
-                      <Users className="mr-2 h-4 w-4" />
-                      Evaluar Mi Equipo
-                    </Button>
-                    <Button className="w-full" size="lg" variant="outline" onClick={() => navigate("/matriz-9box")}>
-                      <Grid3x3 className="mr-2 h-4 w-4" />
-                      Matriz 9-Box
-                    </Button>
-                  </div>
-                  {/* Botón para Dashboard Consolidado - Siempre visible para jefes */}
-                  <Button 
-                    className="w-full mt-3" 
-                    size="lg" 
-                    variant="default"
-                    onClick={() => navigate("/dashboard-consolidado")}
-                  >
-                    <BarChart3 className="mr-2 h-4 w-4" />
-                    Dashboard Consolidado
-                  </Button>
-              </CardContent>
-            </Card>
-            )}
 
-            {/* Dashboard Consolidado - Siempre visible para jefes */}
-            <Card className="md:col-span-2 lg:col-span-3">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5 text-accent" />
-                  Dashboard Consolidado
-                </CardTitle>
-                <CardDescription>
-                  Vista consolidada de toda su jerarquía organizacional y equipos
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 md:grid-cols-3">
-                  <div className="p-4 rounded-lg border bg-card">
-                    <p className="text-sm text-muted-foreground mb-1">Total Colaboradores Directos</p>
-                    <p className="text-2xl font-bold text-primary">{jerarquiaInfo?.totalColaboradores || 0}</p>
+                  {/* Acciones principales */}
+                  <div className="space-y-3">
+                    <p className="text-sm font-medium text-muted-foreground">Acciones</p>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <Button className="w-full" size="lg" onClick={() => navigate("/evaluacion-equipo")}>
+                        <Users className="mr-2 h-4 w-4" />
+                        Evaluar Mi Equipo
+                      </Button>
+                      <Button className="w-full" size="lg" variant="outline" onClick={() => navigate("/matriz-9box")}>
+                        <Grid3x3 className="mr-2 h-4 w-4" />
+                        Matriz 9-Box
+                      </Button>
+                    </div>
                   </div>
-                  <div className="p-4 rounded-lg border bg-card">
-                    <p className="text-sm text-muted-foreground mb-1">Jefes Subordinados</p>
-                    <p className="text-2xl font-bold text-info">{jerarquiaInfo?.totalJefesSubordinados || 0}</p>
+
+                  {/* Análisis */}
+                  <div className="space-y-3">
+                    <p className="text-sm font-medium text-muted-foreground">Análisis</p>
+                    <div className={`grid gap-3 ${jerarquiaInfo?.tieneJefesSubordinados ? 'md:grid-cols-2' : 'md:grid-cols-1'}`}>
+                      <Button
+                        className="w-full"
+                        size="lg"
+                        variant="default"
+                        onClick={() => navigate("/dashboard-consolidado")}
+                      >
+                        <BarChart3 className="mr-2 h-4 w-4" />
+                        Análisis de Mi Equipo
+                      </Button>
+                      {jerarquiaInfo?.tieneJefesSubordinados && (
+                        <Button
+                          className="w-full"
+                          size="lg"
+                          variant="outline"
+                          onClick={() => navigate("/dashboard-unidad")}
+                        >
+                          <Building2 className="mr-2 h-4 w-4" />
+                          Análisis de Mi Unidad
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                  <div className="p-4 rounded-lg border bg-card">
-                    <p className="text-sm text-muted-foreground mb-1">Posición</p>
-                    <p className="text-lg font-bold text-accent">
-                      {jerarquiaInfo?.esJefeIntermedio ? 'Jefe Intermedio' : 
-                       jerarquiaInfo?.esJefeSinJefe ? 'Jefe Superior' : 'Jefe'}
-                    </p>
-                  </div>
-                </div>
-                <Button 
-                  variant="default" 
-                  className="w-full mt-4" 
-                  size="lg"
-                  onClick={() => navigate("/dashboard-consolidado")}
-                >
-                  <BarChart3 className="mr-2 h-4 w-4" />
-                  Ver Dashboard Consolidado Completo
-                </Button>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            )}
           </div>
         )}
 
