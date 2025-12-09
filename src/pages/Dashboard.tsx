@@ -496,68 +496,90 @@ const Dashboard = () => {
           }
         }
 
-        console.log('📊 [Dashboard] Respuestas a usar:', { 
-          count: Object.keys(responsesToUse).length,
-          sample: Object.entries(responsesToUse).slice(0, 5)
-        });
+        // USAR DATOS DEL BACKEND en lugar de calcular en el frontend
+        // Obtener resultado final del backend que ya incluye dimensiones
+        const { getFinalResultFromSupabase } = await import("@/lib/finalResultSupabase");
+        const resultadoFinal = await getFinalResultFromSupabase(user.dpi, activePeriodId);
+        
+        let performancePercentage = 0;
+        let radarData: Array<{
+          dimension: string;
+          nombreCompleto: string;
+          numero: number;
+          tuEvaluacion: number;
+          puntaje: number;
+          dimensionData: any;
+        }> = [];
 
-        const performanceScore = calculatePerformanceScore(responsesToUse, instrument.dimensionesDesempeno);
-        const performancePercentage = scoreToPercentage(performanceScore);
-        console.log('📊 [Dashboard] Score calculado:', { performanceScore, performancePercentage });
-
-        // Primero generar todos los títulos para detectar duplicados
-        const titulosGenerados: string[] = [];
-        const radarData = instrument.dimensionesDesempeno.map((dim, idx) => {
-          const promedio = calculateDimensionAverage(responsesToUse, dim);
-          const porcentaje = calculateDimensionPercentage(responsesToUse, dim);
+        if (resultadoFinal && resultadoFinal.dimensiones && jefeCompleto) {
+          // USAR DATOS DEL BACKEND: porcentajes por dimensión ya calculados
+          performancePercentage = scoreToPercentage(resultadoFinal.desempenoFinal);
           
-          // Log detallado para cada dimensión
-          const itemIds = dim.items.map(item => item.id);
-          const itemValues = itemIds.map(id => responsesToUse[id]).filter(v => v !== undefined);
-          console.log(`📊 [Dashboard] Dimensión ${idx + 1} (${dim.nombre}):`, {
-            id: dim.id,
-            itemsCount: dim.items.length,
-            itemIds: itemIds,
-            itemValues: itemValues,
-            promedio: promedio,
-            porcentaje: porcentaje,
-            verificado: `Promedio ${promedio} → Porcentaje ${porcentaje}%`,
-            conversion: `scoreToPercentage(${promedio}) = ${porcentaje}`
+          const titulosGenerados: string[] = [];
+          radarData = instrument.dimensionesDesempeno.map((dim, idx) => {
+            // Obtener porcentaje del BACKEND
+            const dimensionBackend = resultadoFinal.dimensiones?.find((d: any) => d.id === dim.id);
+            const porcentaje = dimensionBackend?.porcentaje ?? 0;
+            const promedio = dimensionBackend?.promedio ?? 0;
+            
+            // Asegurar que el porcentaje sea un número válido
+            const porcentajeFinal = typeof porcentaje === 'number' && !isNaN(porcentaje) ? porcentaje : 0;
+            
+            // Generar título único para evitar duplicados en el gráfico
+            let dimensionTitle = getDimensionFriendlyTitle(dim);
+            // Si el título ya existe, usar el nombre completo o agregar un identificador
+            if (titulosGenerados.includes(dimensionTitle)) {
+              // Usar el nombre completo si es corto, o una versión truncada con identificador
+              dimensionTitle = dim.nombre.length <= 30 
+                ? dim.nombre 
+                : `${dimensionTitle} (${idx + 1})`;
+              console.warn(`⚠️ [Dashboard] Título duplicado detectado para "${getDimensionFriendlyTitle(dim)}", usando: "${dimensionTitle}"`);
+            }
+            titulosGenerados.push(dimensionTitle);
+            
+            return {
+              dimension: dimensionTitle,
+              nombreCompleto: dim.nombre,
+              numero: idx + 1,
+              tuEvaluacion: porcentajeFinal, // Asegurar que es porcentaje (0-100)
+              puntaje: promedio, // Mantener el promedio para referencia
+              dimensionData: dim
+            };
           });
           
-          // Log adicional para verificar la conversión
-          if (porcentaje < 0 || porcentaje > 100) {
-            console.error(`❌ [Dashboard] ERROR: Porcentaje fuera de rango para ${dim.nombre}:`, {
-              promedio,
-              porcentaje,
-              esperado: '0-100'
-            });
-          }
+          console.log('✅ [Dashboard] Usando datos del BACKEND para radar:', radarData);
+        } else {
+          // FALLBACK: calcular desde respuestas si no hay resultado del backend
+          console.warn('⚠️ [Dashboard] No hay resultado del backend, calculando desde respuestas (fallback)');
+          performancePercentage = scoreToPercentage(calculatePerformanceScore(responsesToUse, instrument.dimensionesDesempeno));
           
-          // Asegurar que el porcentaje sea un número válido
-          const porcentajeFinal = typeof porcentaje === 'number' && !isNaN(porcentaje) ? porcentaje : 0;
-          
-          // Generar título único para evitar duplicados en el gráfico
-          let dimensionTitle = getDimensionFriendlyTitle(dim);
-          // Si el título ya existe, usar el nombre completo o agregar un identificador
-          if (titulosGenerados.includes(dimensionTitle)) {
-            // Usar el nombre completo si es corto, o una versión truncada con identificador
-            dimensionTitle = dim.nombre.length <= 30 
-              ? dim.nombre 
-              : `${dimensionTitle} (${idx + 1})`;
-            console.warn(`⚠️ [Dashboard] Título duplicado detectado para "${getDimensionFriendlyTitle(dim)}", usando: "${dimensionTitle}"`);
-          }
-          titulosGenerados.push(dimensionTitle);
-          
-          return {
-            dimension: dimensionTitle,
-            nombreCompleto: dim.nombre,
-            numero: idx + 1,
-            tuEvaluacion: porcentajeFinal, // Asegurar que es porcentaje (0-100)
-            puntaje: promedio, // Mantener el promedio para referencia
-            dimensionData: dim
-          };
-        });
+          const titulosGenerados: string[] = [];
+          radarData = instrument.dimensionesDesempeno.map((dim, idx) => {
+            const promedio = calculateDimensionAverage(responsesToUse, dim);
+            const porcentaje = calculateDimensionPercentage(responsesToUse, dim);
+            
+            // Asegurar que el porcentaje sea un número válido
+            const porcentajeFinal = typeof porcentaje === 'number' && !isNaN(porcentaje) ? porcentaje : 0;
+            
+            // Generar título único para evitar duplicados en el gráfico
+            let dimensionTitle = getDimensionFriendlyTitle(dim);
+            if (titulosGenerados.includes(dimensionTitle)) {
+              dimensionTitle = dim.nombre.length <= 30 
+                ? dim.nombre 
+                : `${dimensionTitle} (${idx + 1})`;
+            }
+            titulosGenerados.push(dimensionTitle);
+            
+            return {
+              dimension: dimensionTitle,
+              nombreCompleto: dim.nombre,
+              numero: idx + 1,
+              tuEvaluacion: porcentajeFinal,
+              puntaje: promedio,
+              dimensionData: dim
+            };
+          });
+        }
 
         console.log('📊 [Dashboard] RadarData generado:', radarData);
         console.log('📊 [Dashboard] Verificación de porcentajes:');
@@ -574,83 +596,21 @@ const Dashboard = () => {
         const fortalezas = sortedDimensions.slice(0, 3);
         const areasOportunidad = sortedDimensions.slice(-3).reverse();
 
-        // Calcular promedio municipal de resultados finales consolidados SOLO para el mismo nivel de puesto
+        // Obtener promedio municipal desde el BACKEND (no calcular en frontend)
         let promedioMunicipal: Record<string, number> = {};
         try {
-          // Primero obtener los DPIs de colaboradores del mismo nivel
-          const { data: usuariosMismoNivel } = await supabase
-            .from('users')
-            .select('dpi')
-            .eq('nivel', user.nivel)
-            .eq('estado', 'activo')
-            .in('rol', ['colaborador', 'jefe']);
-
-          const dpisMismoNivel = usuariosMismoNivel?.map(u => u.dpi) || [];
+          const { getMunicipalAverageByDimension } = await import("@/lib/backendStatistics");
+          const promedioMunicipalData = await getMunicipalAverageByDimension(user.nivel, activePeriodId);
           
-          console.log('📊 [Dashboard] Calculando promedio municipal para nivel:', {
-            nivel: user.nivel,
-            totalUsuariosMismoNivel: dpisMismoNivel.length
+          // Convertir a formato esperado por el componente
+          instrument.dimensionesDesempeno.forEach((dim) => {
+            const dimData = promedioMunicipalData[dim.id];
+            promedioMunicipal[dim.id] = dimData?.porcentaje || 0;
           });
 
-          if (dpisMismoNivel.length > 0) {
-            // Usar vista consolidada para obtener resultados con múltiples evaluadores
-            const { data: finalResults } = await supabase
-              .from('final_evaluation_results_consolidated')
-              .select('colaborador_id, desempeno_final_promedio')
-              .eq('periodo_id', activePeriodId)
-              .in('colaborador_id', dpisMismoNivel); // Filtrar solo mismo nivel
-
-            console.log('📊 [Dashboard] Resultados consolidados encontrados para mismo nivel:', finalResults?.length || 0);
-
-            if (finalResults && finalResults.length > 0) {
-              // Obtener autoevaluaciones para calcular promedios por dimensión
-              const { data: autoEvals } = await supabase
-                .from('evaluations')
-                .select('id, responses, usuario_id')
-                .eq('periodo_id', activePeriodId)
-                .eq('tipo', 'auto')
-                .eq('estado', 'enviado')
-                .in('usuario_id', dpisMismoNivel);
-
-              const autoEvalMap = new Map((autoEvals || []).map(e => [e.usuario_id, (e.responses as Record<string, number>) || {}]));
-
-              instrument.dimensionesDesempeno.forEach((dim) => {
-                let sumaPorcentajes = 0;
-                let contador = 0;
-
-                finalResults.forEach((resultado) => {
-                  const autoResponses = autoEvalMap.get(resultado.colaborador_id) || {};
-                  
-                  // Para resultados consolidados, usar el desempeño promedio directamente
-                  if (resultado.desempeno_final_promedio) {
-                    // Usar el promedio consolidado directamente
-                    const porcentaje = scoreToPercentage(resultado.desempeno_final_promedio);
-                    if (porcentaje > 0) {
-                      sumaPorcentajes += porcentaje;
-                      contador++;
-                    }
-                  } else {
-                    // Fallback: calcular desde autoevaluación si no hay promedio consolidado
-                    const porcentaje = calculateDimensionPercentage(autoResponses, dim);
-                    if (porcentaje > 0) {
-                      sumaPorcentajes += porcentaje;
-                      contador++;
-                    }
-                  }
-                });
-
-                promedioMunicipal[dim.id] = contador > 0 ? Math.round(sumaPorcentajes / contador) : 0;
-              });
-
-              console.log('📊 [Dashboard] Promedio municipal calculado:', promedioMunicipal);
-            } else {
-              console.warn('⚠️ [Dashboard] No se encontraron resultados finales para calcular promedio municipal');
-            }
-          } else {
-            console.warn('⚠️ [Dashboard] No se encontraron usuarios del mismo nivel para calcular promedio');
-          }
+          console.log('✅ [Dashboard] Promedio municipal obtenido del BACKEND:', promedioMunicipal);
         } catch (error) {
-          console.error('❌ Error calculando promedio municipal:', error);
+          console.error('❌ Error obteniendo promedio municipal del backend:', error);
         }
 
         // Agregar promedio municipal a radarData
@@ -1275,8 +1235,70 @@ const Dashboard = () => {
                         <CardHeader>
                           <CardTitle>Plan de Acción Detallado</CardTitle>
                           <CardDescription>
-                            Acciones concretas con responsables, fechas e indicadores
+                            Acciones concretas con responsables, fechas e indicadores. El color del borde izquierdo indica la dimensión que desarrolla cada acción.
                           </CardDescription>
+                          {/* Leyenda de dimensiones - Solo las usadas */}
+                          {(() => {
+                            const usedDimensions = planDesarrollo.planEstructurado.acciones
+                              .map((accion: any) => {
+                                const dimension = accion.dimension && accion.dimension.trim()
+                                  ? accion.dimension.trim()
+                                  : planDesarrollo.planEstructurado.dimensionesDebiles && Array.isArray(planDesarrollo.planEstructurado.dimensionesDebiles)
+                                    ? (() => {
+                                        const descripcionLower = accion.descripcion.toLowerCase();
+                                        let bestMatch: { dimension: string; score: number } | null = null;
+                                        planDesarrollo.planEstructurado.dimensionesDebiles.forEach((dim: any) => {
+                                          const dimLower = dim.dimension.toLowerCase();
+                                          const palabrasDimension = dimLower.split(/\s+/);
+                                          let score = 0;
+                                          palabrasDimension.forEach((palabra: string) => {
+                                            if (palabra.length > 3 && descripcionLower.includes(palabra)) {
+                                              score += palabra.length;
+                                            }
+                                          });
+                                          if (score > 0 && (!bestMatch || score > bestMatch.score)) {
+                                            bestMatch = { dimension: dim.dimension, score };
+                                          }
+                                        });
+                                        return bestMatch && bestMatch.score > 5 ? bestMatch.dimension : null;
+                                      })()
+                                    : null;
+                                return dimension;
+                              })
+                              .filter((dim: string | null): dim is string => dim !== null);
+                            
+                            const uniqueDimensions = Array.from(new Set(usedDimensions))
+                              .map((dimName) => {
+                                const dimLower = dimName.toLowerCase();
+                                let color = '#6b7280';
+                                if (dimLower.includes('productividad') || dimLower.includes('cumplimiento') || dimLower.includes('objetivos')) color = '#3b82f6';
+                                else if (dimLower.includes('calidad')) color = '#10b981';
+                                else if (dimLower.includes('competencia') || dimLower.includes('técnica') || dimLower.includes('laboral')) color = '#f59e0b';
+                                else if (dimLower.includes('comportamiento') || dimLower.includes('actitud') || dimLower.includes('organizacional')) color = '#8b5cf6';
+                                else if (dimLower.includes('relaciones') || dimLower.includes('equipo') || dimLower.includes('interpersonal')) color = '#ec4899';
+                                else if (dimLower.includes('servicio') || dimLower.includes('atención') || dimLower.includes('usuario') || dimLower.includes('orientación')) color = '#06b6d4';
+                                else if (dimLower.includes('liderazgo') || dimLower.includes('dirección') || dimLower.includes('coordinación')) color = '#6366f1';
+                                else if (dimLower.includes('transparencia') || dimLower.includes('probidad') || dimLower.includes('ética')) color = '#14b8a6';
+                                return { name: dimName, color };
+                              })
+                              .sort((a, b) => a.name.localeCompare(b.name));
+                            
+                            if (uniqueDimensions.length === 0) return null;
+                            
+                            return (
+                              <div className="mt-4 p-3 bg-muted/50 rounded-md">
+                                <p className="text-sm font-semibold mb-2">Leyenda de Dimensiones:</p>
+                                <div className={`grid gap-2 text-xs ${uniqueDimensions.length <= 4 ? 'grid-cols-2' : 'grid-cols-2'}`}>
+                                  {uniqueDimensions.map((dim, idx) => (
+                                    <div key={idx} className="flex items-center gap-2">
+                                      <div className="w-4 h-4 rounded" style={{ backgroundColor: dim.color }}></div>
+                                      <span>{dim.name}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })()}
                         </CardHeader>
                         <CardContent>
                           <div className="rounded-md border">
@@ -1285,6 +1307,7 @@ const Dashboard = () => {
                                 <TableRow>
                                   <TableHead className="w-[50px]">#</TableHead>
                                   <TableHead className="min-w-[300px]">Acción</TableHead>
+                                  <TableHead className="w-[120px]">Tipo</TableHead>
                                   <TableHead className="w-[120px]">Prioridad</TableHead>
                                   <TableHead className="w-[140px]">Responsable</TableHead>
                                   <TableHead className="w-[140px]">Fecha</TableHead>
@@ -1298,13 +1321,67 @@ const Dashboard = () => {
                                     const prioridadOrder = { alta: 1, media: 2, baja: 3 };
                                     return (prioridadOrder[a.prioridad] || 99) - (prioridadOrder[b.prioridad] || 99);
                                   })
-                                  .map((accion: any, idx: number) => (
-                                    <TableRow key={idx}>
-                                      <TableCell className="font-medium text-center">
-                                        {idx + 1}
-                                      </TableCell>
-                                      <TableCell className="font-medium">
-                                        {accion.descripcion}
+                                  .map((accion: any, idx: number) => {
+                                    // Obtener dimensión de la acción (con fallback si no existe)
+                                    const dimension = accion.dimension && accion.dimension.trim()
+                                      ? accion.dimension.trim()
+                                      : planDesarrollo.planEstructurado.dimensionesDebiles && Array.isArray(planDesarrollo.planEstructurado.dimensionesDebiles)
+                                        ? (() => {
+                                            const descripcionLower = accion.descripcion.toLowerCase();
+                                            let bestMatch: { dimension: string; score: number } | null = null;
+                                            planDesarrollo.planEstructurado.dimensionesDebiles.forEach((dim: any) => {
+                                              const dimLower = dim.dimension.toLowerCase();
+                                              const palabrasDimension = dimLower.split(/\s+/);
+                                              let score = 0;
+                                              palabrasDimension.forEach((palabra: string) => {
+                                                if (palabra.length > 3 && descripcionLower.includes(palabra)) {
+                                                  score += palabra.length;
+                                                }
+                                              });
+                                              if (score > 0 && (!bestMatch || score > bestMatch.score)) {
+                                                bestMatch = { dimension: dim.dimension, score };
+                                              }
+                                            });
+                                            return bestMatch && bestMatch.score > 5 ? bestMatch.dimension : null;
+                                          })()
+                                        : null;
+                                    const dimensionColor = dimension
+                                      ? (() => {
+                                          const dimLower = dimension.toLowerCase();
+                                          if (dimLower.includes('productividad') || dimLower.includes('cumplimiento') || dimLower.includes('objetivos')) return '#3b82f6';
+                                          if (dimLower.includes('calidad')) return '#10b981';
+                                          if (dimLower.includes('competencia') || dimLower.includes('técnica') || dimLower.includes('laboral')) return '#f59e0b';
+                                          if (dimLower.includes('comportamiento') || dimLower.includes('actitud') || dimLower.includes('organizacional')) return '#8b5cf6';
+                                          if (dimLower.includes('relaciones') || dimLower.includes('equipo') || dimLower.includes('interpersonal')) return '#ec4899';
+                                          if (dimLower.includes('servicio') || dimLower.includes('atención') || dimLower.includes('usuario') || dimLower.includes('orientación')) return '#06b6d4';
+                                          if (dimLower.includes('liderazgo') || dimLower.includes('dirección') || dimLower.includes('coordinación')) return '#6366f1';
+                                          if (dimLower.includes('transparencia') || dimLower.includes('probidad') || dimLower.includes('ética')) return '#14b8a6';
+                                          return '#6b7280';
+                                        })()
+                                      : null;
+                                    
+                                    return (
+                                      <TableRow 
+                                        key={idx}
+                                        style={dimension ? { borderLeft: `4px solid ${dimensionColor}` } : {}}
+                                      >
+                                        <TableCell className="font-medium text-center">
+                                          {idx + 1}
+                                        </TableCell>
+                                        <TableCell className="font-medium">
+                                          <div>
+                                            {accion.descripcion}
+                                            {dimension && (
+                                              <Badge variant="outline" className="ml-2 text-xs" style={{ borderColor: dimensionColor, color: dimensionColor }}>
+                                                {dimension}
+                                              </Badge>
+                                            )}
+                                          </div>
+                                        </TableCell>
+                                      <TableCell>
+                                        <Badge variant="outline" className="text-xs">
+                                          {accion.tipoAprendizaje === "experiencia" ? "🔄 Experiencia" : accion.tipoAprendizaje === "social" ? "👥 Social" : accion.tipoAprendizaje === "formal" ? "📚 Formal" : "N/A"}
+                                        </Badge>
                                       </TableCell>
                                       <TableCell>
                                         <Badge 
@@ -1330,7 +1407,8 @@ const Dashboard = () => {
                                         }
                                       </TableCell>
                                     </TableRow>
-                                  ))}
+                                    );
+                                  })}
                               </TableBody>
                             </Table>
                           </div>
@@ -1338,58 +1416,8 @@ const Dashboard = () => {
                       </Card>
                     )}
 
-                    {/* Dimensiones que Requieren Atención */}
-                    {planDesarrollo.planEstructurado.dimensionesDebiles && Array.isArray(planDesarrollo.planEstructurado.dimensionesDebiles) && planDesarrollo.planEstructurado.dimensionesDebiles.length > 0 && (
-                      <Card className="border-warning">
-                        <CardHeader>
-                          <CardTitle className="flex items-center gap-2">
-                            <AlertCircle className="h-5 w-5 text-warning" />
-                            Dimensiones que Requieren Atención
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="space-y-4">
-                            {planDesarrollo.planEstructurado.dimensionesDebiles.map((dim: any, idx: number) => (
-                              <div key={idx} className="border-l-4 border-warning pl-4">
-                                <div className="flex items-center justify-between mb-2">
-                                  <h4 className="font-semibold">{dim.dimension}</h4>
-                                  <Badge variant="outline">
-                                    Score: {dim.score?.toFixed(2) || "N/A"}/5.0 ({dim.score ? ((dim.score / 5) * 100).toFixed(0) : "N/A"}%)
-                                  </Badge>
-                                </div>
-                                <ul className="space-y-1 text-sm">
-                                  {dim.accionesEspecificas && Array.isArray(dim.accionesEspecificas) && dim.accionesEspecificas.map((accion: string, i: number) => (
-                                    <li key={i} className="flex items-start gap-2">
-                                      <span className="text-warning mt-1">•</span>
-                                      <span>{accion}</span>
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-                            ))}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    )}
-
-                    {/* Recomendaciones */}
-                    {planDesarrollo.recomendaciones && Array.isArray(planDesarrollo.recomendaciones) && planDesarrollo.recomendaciones.length > 0 && (
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="text-lg">Recomendaciones Generales</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <ul className="space-y-2">
-                            {planDesarrollo.recomendaciones.map((rec: string, idx: number) => (
-                              <li key={idx} className="flex items-start gap-2">
-                                <span className="text-primary mt-1">→</span>
-                                <span>{rec}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </CardContent>
-                      </Card>
-                    )}
+                    {/* Secciones eliminadas: Dimensiones que Requieren Atención y Recomendaciones Generales */}
+                    {/* La información ahora se muestra en la tabla de acciones con indicador visual por dimensión */}
                       </>
                     )}
                   </div>
@@ -1707,51 +1735,60 @@ const Dashboard = () => {
                       Matriz 9-Box
                     </Button>
                   </div>
+                  {/* Botón para Dashboard Consolidado - Siempre visible para jefes */}
+                  <Button 
+                    className="w-full mt-3" 
+                    size="lg" 
+                    variant="default"
+                    onClick={() => navigate("/dashboard-consolidado")}
+                  >
+                    <BarChart3 className="mr-2 h-4 w-4" />
+                    Dashboard Consolidado
+                  </Button>
               </CardContent>
             </Card>
             )}
 
-            {/* Dashboard Consolidado (si tiene jefes subordinados O colaboradores) */}
-            {(jerarquiaInfo?.tieneJefesSubordinados || jerarquiaInfo?.tieneColaboradores) && (
-              <Card className="md:col-span-2 lg:col-span-3">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <BarChart3 className="h-5 w-5 text-accent" />
-                    Dashboard Consolidado
-                  </CardTitle>
-                  <CardDescription>
-                    Vista consolidada de toda su jerarquía organizacional y equipos
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid gap-4 md:grid-cols-3">
-                    <div className="p-4 rounded-lg border bg-card">
-                      <p className="text-sm text-muted-foreground mb-1">Total Colaboradores Directos</p>
-                      <p className="text-2xl font-bold text-primary">{jerarquiaInfo?.totalColaboradores || 0}</p>
-                    </div>
-                    <div className="p-4 rounded-lg border bg-card">
-                      <p className="text-sm text-muted-foreground mb-1">Jefes Subordinados</p>
-                      <p className="text-2xl font-bold text-info">{jerarquiaInfo?.totalJefesSubordinados || 0}</p>
-                    </div>
-                    <div className="p-4 rounded-lg border bg-card">
-                      <p className="text-sm text-muted-foreground mb-1">Posición</p>
-                      <p className="text-lg font-bold text-accent">
-                        {jerarquiaInfo?.esJefeIntermedio ? 'Jefe Intermedio' : 
-                         jerarquiaInfo?.esJefeSinJefe ? 'Jefe Superior' : 'Jefe'}
-                      </p>
-                    </div>
+            {/* Dashboard Consolidado - Siempre visible para jefes */}
+            <Card className="md:col-span-2 lg:col-span-3">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5 text-accent" />
+                  Dashboard Consolidado
+                </CardTitle>
+                <CardDescription>
+                  Vista consolidada de toda su jerarquía organizacional y equipos
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="p-4 rounded-lg border bg-card">
+                    <p className="text-sm text-muted-foreground mb-1">Total Colaboradores Directos</p>
+                    <p className="text-2xl font-bold text-primary">{jerarquiaInfo?.totalColaboradores || 0}</p>
                   </div>
-                  <Button 
-                    variant="outline" 
-                    className="w-full mt-4" 
-                    onClick={() => navigate("/dashboard-consolidado")}
-                  >
-                    <BarChart3 className="mr-2 h-4 w-4" />
-                    Ver Dashboard Consolidado Completo
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
+                  <div className="p-4 rounded-lg border bg-card">
+                    <p className="text-sm text-muted-foreground mb-1">Jefes Subordinados</p>
+                    <p className="text-2xl font-bold text-info">{jerarquiaInfo?.totalJefesSubordinados || 0}</p>
+                  </div>
+                  <div className="p-4 rounded-lg border bg-card">
+                    <p className="text-sm text-muted-foreground mb-1">Posición</p>
+                    <p className="text-lg font-bold text-accent">
+                      {jerarquiaInfo?.esJefeIntermedio ? 'Jefe Intermedio' : 
+                       jerarquiaInfo?.esJefeSinJefe ? 'Jefe Superior' : 'Jefe'}
+                    </p>
+                  </div>
+                </div>
+                <Button 
+                  variant="default" 
+                  className="w-full mt-4" 
+                  size="lg"
+                  onClick={() => navigate("/dashboard-consolidado")}
+                >
+                  <BarChart3 className="mr-2 h-4 w-4" />
+                  Ver Dashboard Consolidado Completo
+                </Button>
+              </CardContent>
+            </Card>
           </div>
         )}
 

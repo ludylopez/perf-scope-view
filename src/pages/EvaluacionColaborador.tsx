@@ -862,7 +862,8 @@ const EvaluacionColaborador = () => {
                               />
                             ))}
                           </div>
-                          {autoevaluacion.comments[dim.id] && (
+                          {/* Solo RRHH puede ver comentarios del colaborador */}
+                          {(user?.rol === 'admin_rrhh' || user?.rol === 'admin_general') && autoevaluacion.comments[dim.id] && (
                             <div className="mt-3 p-3 bg-background rounded border">
                               <Label className="text-xs text-muted-foreground">Comentarios del colaborador:</Label>
                               <p className="text-sm mt-1">{autoevaluacion.comments[dim.id]}</p>

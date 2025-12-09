@@ -107,7 +107,20 @@ export const getFinalResultFromSupabase = async (
 
     // Si el resultado_final tiene los datos completos, usarlos
     if (data.resultado_final) {
-      return data.resultado_final as FinalScore;
+      const resultado = data.resultado_final as FinalScore;
+      // Asegurar que las dimensiones estén incluidas si vienen del backend
+      if (resultado.dimensiones && Array.isArray(resultado.dimensiones)) {
+        return resultado;
+      }
+      // Si no tiene dimensiones, intentar obtenerlas del resultado_final directamente
+      const resultadoFinal = data.resultado_final as any;
+      if (resultadoFinal.dimensiones && Array.isArray(resultadoFinal.dimensiones)) {
+        return {
+          ...resultado,
+          dimensiones: resultadoFinal.dimensiones
+        };
+      }
+      return resultado;
     }
 
     // Si no, construir desde los campos individuales

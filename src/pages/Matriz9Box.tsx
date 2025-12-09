@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -88,13 +88,20 @@ interface NineBoxData {
 const Matriz9Box = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [loadingStep, setLoadingStep] = useState<string>("");
   const [teamMembers, setTeamMembers] = useState<TeamMember9Box[]>([]);
   const [showLegend, setShowLegend] = useState(false);
   const [activePeriodName, setActivePeriodName] = useState<string>("");
+
+  // Leer parámetros URL para pre-filtrar
+  const jefeFromUrl = searchParams.get("jefe");
+  const periodoFromUrl = searchParams.get("periodo");
+
   const [filters, setFilters] = useState<FilterOptions>({
     searchTerm: "",
+    jefe: jefeFromUrl || undefined, // Pre-aplicar filtro de jefe si viene en URL
   });
   const [nineBoxData, setNineBoxData] = useState<NineBoxData>({
     "alto-alto": [],
@@ -119,6 +126,13 @@ const Matriz9Box = () => {
     }
     loadTeamNineBox();
   }, [user, navigate]);
+
+  // Actualizar filtros si cambian los parámetros de URL
+  useEffect(() => {
+    if (jefeFromUrl) {
+      setFilters(prev => ({ ...prev, jefe: jefeFromUrl }));
+    }
+  }, [jefeFromUrl]);
 
   const loadTeamNineBox = async () => {
     try {

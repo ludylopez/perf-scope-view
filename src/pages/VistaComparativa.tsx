@@ -5,6 +5,7 @@ import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { ArrowLeft, BarChart3, TrendingUp, TrendingDown, Minus, Users2, User, Target, CheckCircle2, AlertCircle, FileText, MessageSquare, Shield, Briefcase, Award, Zap, Users, Heart, Building2, FileDown, Printer } from "lucide-react";
@@ -27,6 +28,7 @@ import { GenerarGuiaRetroalimentacion } from "@/components/development/GuiaRetro
 import { GenerarFeedbackGrupal } from "@/components/development/GenerarFeedbackGrupal";
 import { EditarPlanDesarrollo } from "@/components/development/EditarPlanDesarrollo";
 import { PerformanceRadarAnalysis } from "@/components/evaluation/PerformanceRadarAnalysis";
+import { VerFormulariosEvaluacion } from "@/components/evaluation/VerFormulariosEvaluacion";
 import { Edit } from "lucide-react";
 
 const MOCK_COLABORADORES: Record<string, any> = {
@@ -92,6 +94,12 @@ const VistaComparativa = () => {
   const [periodoNombre, setPeriodoNombre] = useState<string>("");
   const [mostrarEditarPlan, setMostrarEditarPlan] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("resumen");
+  const [mostrarFormularios, setMostrarFormularios] = useState(false);
+  const [preguntasAbiertas, setPreguntasAbiertas] = useState<Array<{
+    pregunta: string;
+    tipo: "capacitacion" | "herramienta" | "otro";
+    respuesta: string;
+  }>>([]);
 
   // Helper para obtener icono según la dimensión
   const getDimensionIcon = (dimensionNombre: string) => {
@@ -456,6 +464,7 @@ const VistaComparativa = () => {
         }
 
         // Calcular comparativo por dimensión
+        // USAR DATOS DEL BACKEND en lugar de calcular en el frontend
         const comparativoData = userInstrument.dimensionesDesempeno.map((dim) => {
           const autoItems = dim.items.map(item => auto.responses[item.id]).filter(v => v !== undefined);
           const jefeItems = dim.items.map(item => jefe.responses[item.id]).filter(v => v !== undefined);
@@ -468,15 +477,82 @@ const VistaComparativa = () => {
             : 0;
           const diferencia = jefeAvg - autoAvg;
           
+          // Obtener porcentaje consolidado del BACKEND (calculado con 70/30 a nivel de ítem)
+          // Si no está disponible, calcular como fallback (no debería pasar)
+          const dimensionBackend = resultado?.dimensiones?.find((d: any) => d.id === dim.id);
+          const porcentajeConsolidado = dimensionBackend?.porcentaje ?? 0;
+          
           return {
             dimensionId: dim.id,
             nombre: dim.nombre,
             autoevaluacion: autoAvg,
             evaluacionJefe: jefeAvg,
             diferencia,
+            porcentajeConsolidado, // Porcentaje del BACKEND (consolidado 70/30 a nivel de ítem)
           };
         });
         setComparativo(comparativoData);
+
+        // Cargar respuestas a preguntas abiertas de la autoevaluación
+        const autoevaluacionId = await getEvaluationIdFromSupabase(
+          colaboradorFormatted.dpi,
+          currentPeriodoId,
+          "auto"
+        );
+        
+        if (autoevaluacionId) {
+          try {
+            // Primero obtener las respuestas
+            const { data: responsesData, error: responsesError } = await supabase
+              .from("open_question_responses")
+              .select("respuesta, pregunta_id")
+              .eq("evaluacion_id", autoevaluacionId);
+
+            if (responsesError) {
+              console.error("❌ Error cargando respuestas a preguntas abiertas:", responsesError);
+            } else if (responsesData && responsesData.length > 0) {
+              // Obtener los IDs de las preguntas
+              const preguntaIds = responsesData.map((r: any) => r.pregunta_id).filter(Boolean);
+              
+              // Obtener las preguntas
+              const { data: questionsData, error: questionsError } = await supabase
+                .from("open_questions")
+                .select("id, pregunta, tipo, orden")
+                .in("id", preguntaIds);
+
+              if (questionsError) {
+                console.error("❌ Error cargando preguntas:", questionsError);
+              } else if (questionsData) {
+                // Combinar respuestas con preguntas
+                const preguntasMap = new Map(questionsData.map((q: any) => [q.id, q]));
+                const preguntas = responsesData
+                  .map((respuesta: any) => {
+                    const pregunta = preguntasMap.get(respuesta.pregunta_id);
+                    if (!pregunta || !respuesta.respuesta || respuesta.respuesta.trim().length === 0) {
+                      return null;
+                    }
+                    return {
+                      pregunta: pregunta.pregunta,
+                      tipo: pregunta.tipo || "otro",
+                      respuesta: respuesta.respuesta,
+                      orden: pregunta.orden || 999,
+                    };
+                  })
+                  .filter((p: any) => p !== null)
+                  .sort((a: any, b: any) => a.orden - b.orden);
+                
+                setPreguntasAbiertas(preguntas);
+                console.log("✅ Preguntas abiertas cargadas:", preguntas);
+              }
+            } else {
+              console.log("ℹ️ No se encontraron respuestas a preguntas abiertas para esta evaluación");
+            }
+          } catch (error) {
+            console.error("❌ Error cargando preguntas abiertas:", error);
+          }
+        } else {
+          console.log("ℹ️ No se encontró ID de autoevaluación para cargar preguntas abiertas");
+        }
 
         setLoading(false);
       } catch (error) {
@@ -515,76 +591,21 @@ const VistaComparativa = () => {
     };
   });
 
-  // Helper para calcular respuestas consolidadas con pesos dinámicos según el nivel
-  // A1 (Alcalde): 55% jefe + 45% auto
-  // C1 (Concejo): 100% auto (no tiene jefe)
-  // Otros: 70% jefe + 30% auto
-  const calculateConsolidatedResponses = (
-    autoResponses: Record<string, number>,
-    jefeResponses: Record<string, number>,
-    instrumentId?: string
-  ): Record<string, number> => {
-    const consolidated: Record<string, number> = {};
-    
-    // Obtener pesos del instrumento (por defecto 70/30)
-    let pesoJefe = 0.7;
-    let pesoAuto = 0.3;
-    
-    if (instrumentId) {
-      try {
-        const instrumentConfig = getInstrumentCalculationConfig(instrumentId);
-        if (instrumentConfig?.pesoJefe !== undefined && instrumentConfig?.pesoAuto !== undefined) {
-          pesoJefe = instrumentConfig.pesoJefe;
-          pesoAuto = instrumentConfig.pesoAuto;
-          console.log(`📊 [VistaComparativa] Usando pesos del instrumento ${instrumentId}:`, { pesoJefe, pesoAuto });
-        }
-      } catch (error) {
-        console.warn(`⚠️ [VistaComparativa] No se pudo obtener configuración del instrumento ${instrumentId}, usando pesos por defecto 70/30`);
-      }
-    }
-    
-    const allItemIds = new Set([
-      ...Object.keys(autoResponses),
-      ...Object.keys(jefeResponses)
-    ]);
-    
-    allItemIds.forEach((itemId) => {
-      const autoValue = autoResponses[itemId] || 0;
-      const jefeValue = jefeResponses[itemId] || 0;
-      
-      if (autoResponses[itemId] !== undefined && jefeResponses[itemId] !== undefined) {
-        // Aplicar pesos dinámicos
-        consolidated[itemId] = Math.round((jefeValue * pesoJefe + autoValue * pesoAuto) * 100) / 100;
-      } else if (autoResponses[itemId] !== undefined) {
-        consolidated[itemId] = autoValue;
-      } else if (jefeResponses[itemId] !== undefined) {
-        consolidated[itemId] = jefeValue;
-      }
-    });
-    
-    return consolidated;
-  };
+  // NOTA: Los cálculos de respuestas consolidadas y porcentajes por dimensión
+  // ahora se realizan en el BACKEND. Los datos vienen en resultadoFinal.dimensiones
 
-  // Preparar datos para PDF del colaborador (usando EXACTAMENTE el mismo método que Dashboard)
+  // Preparar datos para PDF del colaborador (usando DATOS DEL BACKEND)
   const prepararDatosParaPDF = async () => {
-    // Consolidar respuestas a nivel de ítem (igual que Dashboard)
-    // Pasar el ID del instrumento para obtener los pesos correctos (A1=45/55, otros=70/30)
-    const instrumentId = instrument?.id || colaborador?.nivel;
-    const responsesToUse = calculateConsolidatedResponses(
-      autoevaluacion.responses,
-      evaluacionJefe.responses,
-      instrumentId
-    );
+    // USAR DATOS DEL BACKEND en lugar de calcular en el frontend
+    const performancePercentage = scoreToPercentage(resultadoFinal.desempenoFinal);
     
-    // Calcular performance score y percentage (igual que Dashboard)
-    const performanceScore = calculatePerformanceScore(responsesToUse, instrument.dimensionesDesempeno);
-    const performancePercentage = scoreToPercentage(performanceScore);
-    
-    // Preparar radarData usando las respuestas consolidadas (igual que Dashboard)
+    // Preparar radarData usando los porcentajes del BACKEND
     const titulosGenerados: string[] = [];
     const radarDataPDF = instrument.dimensionesDesempeno.map((dim, idx) => {
-      const promedio = calculateDimensionAverage(responsesToUse, dim);
-      const porcentaje = calculateDimensionPercentage(responsesToUse, dim);
+      // Obtener datos del BACKEND
+      const dimensionBackend = resultadoFinal.dimensiones?.find((d: any) => d.id === dim.id);
+      const porcentaje = dimensionBackend?.porcentaje ?? 0;
+      const promedio = dimensionBackend?.promedio ?? 0;
       
       // Generar título único para evitar duplicados
       let dimensionTitle = getDimensionFriendlyTitle(dim);
@@ -599,8 +620,8 @@ const VistaComparativa = () => {
         dimension: dimensionTitle,
         nombreCompleto: dim.nombre,
         numero: idx + 1,
-        tuEvaluacion: porcentaje,
-        puntaje: promedio,
+        tuEvaluacion: porcentaje, // Del BACKEND
+        puntaje: promedio, // Del BACKEND
         dimensionData: dim
       };
     });
@@ -640,21 +661,17 @@ const VistaComparativa = () => {
             .in('id', jefeEvaluacionIds)
             .eq('tipo', 'jefe');
 
-          // Calcular promedio por dimensión usando respuestas consolidadas (EXACTAMENTE igual que Dashboard)
-          const autoEvalMap = new Map((autoEvals || []).map(e => [e.id, (e.responses as Record<string, number>) || {}]));
-          const jefeEvalMap = new Map((jefeEvals || []).map(e => [e.id, (e.responses as Record<string, number>) || {}]));
-
+          // Calcular promedio municipal usando DATOS DEL BACKEND (resultado_final->dimensiones)
           instrument.dimensionesDesempeno.forEach((dim) => {
             let sumaPorcentajes = 0;
             let contador = 0;
 
             finalResults.forEach((resultado) => {
-              const autoResponses = autoEvalMap.get(resultado.autoevaluacion_id) || {};
-              const jefeResponses = jefeEvalMap.get(resultado.evaluacion_jefe_id) || {};
-              // Usar el mismo instrumentId del colaborador para calcular promedio municipal
-              const instrumentId = instrument?.id || colaborador?.nivel;
-              const consolidadas = calculateConsolidatedResponses(autoResponses, jefeResponses, instrumentId);
-              const porcentaje = calculateDimensionPercentage(consolidadas, dim);
+              // Obtener porcentaje del BACKEND (resultado_final->dimensiones)
+              const resultadoFinal = resultado.resultado_final as any;
+              const dimensionBackend = resultadoFinal?.dimensiones?.find((d: any) => d.id === dim.id);
+              const porcentaje = dimensionBackend?.porcentaje ?? 0;
+              
               if (porcentaje > 0) {
                 sumaPorcentajes += porcentaje;
                 contador++;
@@ -695,7 +712,7 @@ const VistaComparativa = () => {
       })),
       fortalezas,
       areasOportunidad,
-      performancePercentage: performancePercentage, // Usar el mismo cálculo que Dashboard
+      performancePercentage: performancePercentage, // Del BACKEND
       jefeCompleto: true // Siempre completo en vista del jefe
     };
   };
@@ -704,6 +721,7 @@ const VistaComparativa = () => {
     dimension: item.nombre.substring(0, 15),
     autoevaluacion: scoreToPercentage(item.autoevaluacion),
     evaluacionJefe: scoreToPercentage(item.evaluacionJefe),
+    resultadoConsolidado: item.porcentajeConsolidado || 0,
     diferencia: scoreToPercentage(item.evaluacionJefe) - scoreToPercentage(item.autoevaluacion),
   }));
 
@@ -1019,6 +1037,15 @@ const VistaComparativa = () => {
                         />
                       </>
                     )}
+                    <Button
+                      variant="outline"
+                      size="lg"
+                      onClick={() => setMostrarFormularios(true)}
+                      className="gap-2"
+                    >
+                      <FileText className="h-4 w-4" />
+                      Ver Formularios Completos
+                    </Button>
                     <GenerarGuiaRetroalimentacion
                       colaboradorId={colaborador.dpi}
                       periodoId={periodoId}
@@ -1118,27 +1145,60 @@ const VistaComparativa = () => {
           {/* Tab: Análisis */}
           <TabsContent value="analisis" className="space-y-6 mt-6">
             {/* Nueva vista integrada de radar con análisis */}
-            <PerformanceRadarAnalysis
-            radarData={radarData.map(d => ({
-              dimension: d.dimension,
-              tuResultado: d.evaluacionJefe,
-              promedioMunicipal: d.autoevaluacion,
-            }))}
-            dimensionAnalysis={comparativo.map(dim => {
-              const porcentaje = scoreToPercentage(dim.evaluacionJefe);
-              // Consideramos fortaleza si está por encima del 80% o si la diferencia con autoevaluación es positiva y alta
-              const isFortaleza = porcentaje >= 80 || (dim.diferencia > 0.3 && porcentaje >= 75);
-              return {
-                nombre: dim.nombre,
-                descripcion: instrument.dimensionesDesempeno.find(d => d.id === dim.dimensionId)?.descripcion,
-                porcentaje: porcentaje,
-                isFortaleza: isFortaleza,
-                promedioMunicipal: scoreToPercentage(dim.autoevaluacion),
-              };
-            })}
-            title="Panorama de Competencias"
-            description="Vista integral del desempeño por dimensión comparado con la autoevaluación"
-          />
+            {(() => {
+              // USAR DATOS DEL BACKEND en lugar de calcular en el frontend
+              // Los porcentajes por dimensión vienen de resultadoFinal.dimensiones (calculados en el backend)
+              
+              const dimensionesConPorcentaje = instrument.dimensionesDesempeno.map((dim) => {
+                // Obtener porcentaje del BACKEND (calculado con 70/30 a nivel de ítem)
+                const dimensionBackend = resultadoFinal.dimensiones?.find((d: any) => d.id === dim.id);
+                const porcentaje = dimensionBackend?.porcentaje ?? 0;
+                
+                return {
+                  dimension: dim.nombre.substring(0, 20),
+                  nombreCompleto: dim.nombre,
+                  dimensionId: dim.id,
+                  porcentaje: porcentaje, // Porcentaje del BACKEND (consolidado 70/30 a nivel de ítem)
+                  promedioMunicipal: scoreToPercentage(calculateDimensionAverage(autoevaluacion.responses, dim)),
+                };
+              });
+              
+              // Verificar que el promedio de los porcentajes coincida con el desempeño final
+              const desempenoFinalPorcentaje = scoreToPercentage(resultadoFinal.desempenoFinal);
+              const promedioPorcentajes = dimensionesConPorcentaje.reduce((sum, d) => sum + d.porcentaje, 0) / dimensionesConPorcentaje.length;
+              console.log('📊 [VistaComparativa] Verificación de consistencia (BACKEND):', {
+                desempenoFinalPorcentaje,
+                promedioPorcentajes,
+                diferencia: Math.abs(desempenoFinalPorcentaje - promedioPorcentajes),
+                coincide: Math.abs(desempenoFinalPorcentaje - promedioPorcentajes) < 1
+              });
+              
+              return (
+                <PerformanceRadarAnalysis
+                  radarData={dimensionesConPorcentaje.map(d => ({
+                    dimension: d.dimension,
+                    tuResultado: d.porcentaje,
+                    promedioMunicipal: d.promedioMunicipal,
+                  }))}
+                  dimensionAnalysis={dimensionesConPorcentaje.map(d => {
+                    const dimComparativo = comparativo.find(c => c.dimensionId === d.dimensionId);
+                    const diferencia = dimComparativo ? dimComparativo.diferencia : 0;
+                    
+                    // Consideramos fortaleza si está por encima del 80% o si la diferencia con autoevaluación es positiva y alta
+                    const isFortaleza = d.porcentaje >= 80 || (diferencia > 0.3 && d.porcentaje >= 75);
+                    return {
+                      nombre: d.nombreCompleto,
+                      descripcion: instrument.dimensionesDesempeno.find(dim => dim.id === d.dimensionId)?.descripcion,
+                      porcentaje: d.porcentaje,
+                      isFortaleza: isFortaleza,
+                      promedioMunicipal: d.promedioMunicipal,
+                    };
+                  })}
+                  title="Panorama de Competencias"
+                  description="Vista integral del desempeño por dimensión comparado con la autoevaluación"
+                />
+              );
+            })()}
 
             {/* Gráficos adicionales en vista grupal */}
             {vistaModo === "grupal" && perteneceCuadrilla && promedioGrupo !== null && (
@@ -1309,6 +1369,25 @@ const VistaComparativa = () => {
                                   </span>
                                 </div>
 
+                                {/* Resultado Consolidado */}
+                                <div className="flex items-center gap-4">
+                                  <div className="flex items-center gap-2 min-w-[140px]">
+                                    <div className="w-2 h-2 rounded-full bg-primary/70"></div>
+                                    <span className="text-sm font-medium text-muted-foreground">Resultado Consolidado</span>
+                                  </div>
+                                  <div className="flex-1 relative">
+                                    <div className="h-4 bg-muted rounded-lg overflow-hidden relative">
+                                      <div 
+                                        className="absolute top-0 left-0 h-full bg-primary/70 rounded-lg transition-all"
+                                        style={{ width: `${item.porcentajeConsolidado || 0}%` }}
+                                      ></div>
+                                    </div>
+                                  </div>
+                                  <span className="text-base font-bold text-primary min-w-[50px] text-right">
+                                    {item.porcentajeConsolidado || 0}%
+                                  </span>
+                                </div>
+
                                 {/* Promedio Grupal (si aplica) */}
                                 {vistaModo === "grupal" && perteneceCuadrilla && promedioGrupo !== null && (
                                   <div className="flex items-center gap-4">
@@ -1351,9 +1430,11 @@ const VistaComparativa = () => {
                               </div>
 
                               {/* Comentarios */}
-                              {(autoevaluacion.comments[item.dimensionId] || evaluacionJefe.comments[item.dimensionId]) && (
+                              {/* Solo RRHH puede ver comentarios del colaborador */}
+                              {((user?.rol === 'admin_rrhh' || user?.rol === 'admin_general') && autoevaluacion.comments[item.dimensionId] || evaluacionJefe.comments[item.dimensionId]) && (
                                 <div className="grid gap-3 md:grid-cols-2 mt-4 pt-4 border-t">
-                                  {autoevaluacion.comments[item.dimensionId] && (
+                                  {/* Comentarios del colaborador - Solo visible para RRHH */}
+                                  {(user?.rol === 'admin_rrhh' || user?.rol === 'admin_general') && autoevaluacion.comments[item.dimensionId] && (
                                     <div className="text-sm">
                                       <p className="font-medium text-muted-foreground mb-1">
                                         Comentarios del Colaborador:
@@ -1361,6 +1442,7 @@ const VistaComparativa = () => {
                                       <p className="text-sm text-foreground">{autoevaluacion.comments[item.dimensionId]}</p>
                                     </div>
                                   )}
+                                  {/* Comentarios del jefe - Visible para todos */}
                                   {evaluacionJefe.comments[item.dimensionId] && (
                                     <div className="text-sm">
                                       <p className="font-medium text-muted-foreground mb-1">
@@ -1389,6 +1471,10 @@ const VistaComparativa = () => {
                     <div className="w-2 h-2 rounded-full bg-accent"></div>
                     <span>Evaluación Jefe</span>
                   </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-primary/70"></div>
+                    <span>Resultado Consolidado</span>
+                  </div>
                   {vistaModo === "grupal" && perteneceCuadrilla && (
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-info"></div>
@@ -1399,6 +1485,47 @@ const VistaComparativa = () => {
                     <span>Diferencia: % de variación</span>
                   </div>
                 </div>
+
+                {/* Preguntas Abiertas - Necesidades de Desarrollo y Recursos */}
+                {preguntasAbiertas.length > 0 && (
+                  <Card className="mt-6">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <AlertCircle className="h-5 w-5 text-primary" />
+                        Necesidades de Desarrollo y Recursos
+                      </CardTitle>
+                      <CardDescription>
+                        Respuestas del colaborador sobre capacitaciones y herramientas necesarias
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      {preguntasAbiertas.map((pregunta, idx) => (
+                        <div key={idx} className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <Label className="text-base font-medium">
+                              {pregunta.pregunta}
+                            </Label>
+                            {pregunta.tipo === "capacitacion" && (
+                              <Badge variant="outline" className="text-xs">
+                                Capacitación
+                              </Badge>
+                            )}
+                            {pregunta.tipo === "herramienta" && (
+                              <Badge variant="outline" className="text-xs">
+                                Herramienta
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="p-4 rounded-lg border bg-muted/50">
+                            <p className="text-sm text-foreground whitespace-pre-wrap">
+                              {pregunta.respuesta}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -1513,8 +1640,70 @@ const VistaComparativa = () => {
                 <CardHeader>
                   <CardTitle>Plan de Acción Detallado</CardTitle>
                   <CardDescription>
-                    Acciones concretas con responsables, fechas e indicadores
+                    Acciones concretas con responsables, fechas e indicadores. El color del borde izquierdo indica la dimensión que desarrolla cada acción.
                   </CardDescription>
+                  {/* Leyenda de dimensiones - Solo las usadas */}
+                  {(() => {
+                    const usedDimensions = planDesarrollo.planEstructurado.acciones
+                      .map((accion: any) => {
+                        const dimension = accion.dimension && accion.dimension.trim()
+                          ? accion.dimension.trim()
+                          : planDesarrollo.planEstructurado.dimensionesDebiles && Array.isArray(planDesarrollo.planEstructurado.dimensionesDebiles) && planDesarrollo.planEstructurado.dimensionesDebiles.length > 0
+                            ? (() => {
+                                const descripcionLower = accion.descripcion.toLowerCase();
+                                let bestMatch: { dimension: string; score: number } | null = null;
+                                planDesarrollo.planEstructurado.dimensionesDebiles.forEach((dim: any) => {
+                                  const dimLower = dim.dimension.toLowerCase();
+                                  const palabrasDimension = dimLower.split(/\s+/);
+                                  let score = 0;
+                                  palabrasDimension.forEach((palabra: string) => {
+                                    if (palabra.length > 3 && descripcionLower.includes(palabra)) {
+                                      score += palabra.length;
+                                    }
+                                  });
+                                  if (score > 0 && (!bestMatch || score > bestMatch.score)) {
+                                    bestMatch = { dimension: dim.dimension, score };
+                                  }
+                                });
+                                return bestMatch && bestMatch.score > 5 ? bestMatch.dimension : null;
+                              })()
+                            : null;
+                        return dimension;
+                      })
+                      .filter((dim: string | null): dim is string => dim !== null);
+                    
+                    const uniqueDimensions = Array.from(new Set(usedDimensions))
+                      .map((dimName) => {
+                        const dimLower = dimName.toLowerCase();
+                        let color = '#6b7280';
+                        if (dimLower.includes('productividad') || dimLower.includes('cumplimiento') || dimLower.includes('objetivos')) color = '#3b82f6';
+                        else if (dimLower.includes('calidad')) color = '#10b981';
+                        else if (dimLower.includes('competencia') || dimLower.includes('técnica') || dimLower.includes('laboral')) color = '#f59e0b';
+                        else if (dimLower.includes('comportamiento') || dimLower.includes('actitud') || dimLower.includes('organizacional')) color = '#8b5cf6';
+                        else if (dimLower.includes('relaciones') || dimLower.includes('equipo') || dimLower.includes('interpersonal')) color = '#ec4899';
+                        else if (dimLower.includes('servicio') || dimLower.includes('atención') || dimLower.includes('usuario') || dimLower.includes('orientación')) color = '#06b6d4';
+                        else if (dimLower.includes('liderazgo') || dimLower.includes('dirección') || dimLower.includes('coordinación')) color = '#6366f1';
+                        else if (dimLower.includes('transparencia') || dimLower.includes('probidad') || dimLower.includes('ética')) color = '#14b8a6';
+                        return { name: dimName, color };
+                      })
+                      .sort((a, b) => a.name.localeCompare(b.name));
+                    
+                    if (uniqueDimensions.length === 0) return null;
+                    
+                    return (
+                      <div className="mt-4 p-3 bg-muted/50 rounded-md">
+                        <p className="text-sm font-semibold mb-2">Leyenda de Dimensiones:</p>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          {uniqueDimensions.map((dim, idx) => (
+                            <div key={idx} className="flex items-center gap-2">
+                              <div className="w-4 h-4 rounded" style={{ backgroundColor: dim.color }}></div>
+                              <span>{dim.name}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
@@ -1523,15 +1712,71 @@ const VistaComparativa = () => {
                         const prioridadOrder = { alta: 1, media: 2, baja: 3 };
                         return (prioridadOrder[a.prioridad] || 99) - (prioridadOrder[b.prioridad] || 99);
                       })
-                      .map((accion: any, idx: number) => (
-                        <div key={idx} className="border rounded-lg p-4 hover:bg-accent/5 transition-colors">
+                      .map((accion: any, idx: number) => {
+                        // Obtener dimensión de la acción (con fallback si no existe)
+                        const dimension = accion.dimension && accion.dimension.trim()
+                          ? accion.dimension.trim()
+                          : planDesarrollo.planEstructurado.dimensionesDebiles && Array.isArray(planDesarrollo.planEstructurado.dimensionesDebiles) && planDesarrollo.planEstructurado.dimensionesDebiles.length > 0
+                            ? (() => {
+                                const descripcionLower = accion.descripcion.toLowerCase();
+                                let bestMatch: { dimension: string; score: number } | null = null;
+                                planDesarrollo.planEstructurado.dimensionesDebiles.forEach((dim: any) => {
+                                  const dimLower = dim.dimension.toLowerCase();
+                                  const palabrasDimension = dimLower.split(/\s+/);
+                                  let score = 0;
+                                  palabrasDimension.forEach((palabra: string) => {
+                                    if (palabra.length > 3 && descripcionLower.includes(palabra)) {
+                                      score += palabra.length;
+                                    }
+                                  });
+                                  if (score > 0 && (!bestMatch || score > bestMatch.score)) {
+                                    bestMatch = { dimension: dim.dimension, score };
+                                  }
+                                });
+                                return bestMatch && bestMatch.score > 5 ? bestMatch.dimension : null;
+                              })()
+                            : null;
+                        const dimensionColor = dimension
+                          ? (() => {
+                              const dimLower = dimension.toLowerCase();
+                              if (dimLower.includes('productividad') || dimLower.includes('cumplimiento') || dimLower.includes('objetivos')) return '#3b82f6';
+                              if (dimLower.includes('calidad')) return '#10b981';
+                              if (dimLower.includes('competencia') || dimLower.includes('técnica') || dimLower.includes('laboral')) return '#f59e0b';
+                              if (dimLower.includes('comportamiento') || dimLower.includes('actitud') || dimLower.includes('organizacional')) return '#8b5cf6';
+                              if (dimLower.includes('relaciones') || dimLower.includes('equipo') || dimLower.includes('interpersonal')) return '#ec4899';
+                              if (dimLower.includes('servicio') || dimLower.includes('atención') || dimLower.includes('usuario') || dimLower.includes('orientación')) return '#06b6d4';
+                              if (dimLower.includes('liderazgo') || dimLower.includes('dirección') || dimLower.includes('coordinación')) return '#6366f1';
+                              if (dimLower.includes('transparencia') || dimLower.includes('probidad') || dimLower.includes('ética')) return '#14b8a6';
+                              return '#6b7280';
+                            })()
+                          : null;
+                        
+                        return (
+                          <div 
+                            key={idx} 
+                            className="border rounded-lg p-4 hover:bg-accent/5 transition-colors"
+                            style={dimension ? { borderLeft: `4px solid ${dimensionColor}` } : {}}
+                          >
                           <div className="flex items-start justify-between gap-4 mb-3">
-                            <p className="font-medium flex-1">{accion.descripcion}</p>
+                            <div className="flex-1">
+                              <p className="font-medium">{accion.descripcion}</p>
+                              {dimension && (
+                                <Badge variant="outline" className="mt-1 text-xs" style={{ borderColor: dimensionColor, color: dimensionColor }}>
+                                  {dimension}
+                                </Badge>
+                              )}
+                            </div>
                             <Badge variant={accion.prioridad === "alta" ? "destructive" : accion.prioridad === "media" ? "default" : "secondary"}>
                               {accion.prioridad === "alta" ? "🔴 Alta" : accion.prioridad === "media" ? "🟡 Media" : "🟢 Baja"}
                             </Badge>
                           </div>
                           <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                              <span className="text-muted-foreground">Tipo de aprendizaje:</span>{" "}
+                              <Badge variant="outline" className="ml-1">
+                                {accion.tipoAprendizaje === "experiencia" ? "🔄 Experiencia" : accion.tipoAprendizaje === "social" ? "👥 Social" : accion.tipoAprendizaje === "formal" ? "📚 Formal" : "N/A"}
+                              </Badge>
+                            </div>
                             <div>
                               <span className="text-muted-foreground">Responsable:</span>{" "}
                               <span className="font-medium">{accion.responsable}</span>
@@ -1552,66 +1797,17 @@ const VistaComparativa = () => {
                             )}
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
                   </div>
                 </CardContent>
               </Card>
             )}
 
-            {/* Dimensiones que Requieren Atención */}
-            {planDesarrollo.planEstructurado.dimensionesDebiles && Array.isArray(planDesarrollo.planEstructurado.dimensionesDebiles) && planDesarrollo.planEstructurado.dimensionesDebiles.length > 0 && (
-              <Card className="border-warning">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <AlertCircle className="h-5 w-5 text-warning" />
-                    Dimensiones que Requieren Atención
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {planDesarrollo.planEstructurado.dimensionesDebiles.map((dim: any, idx: number) => (
-                      <div key={idx} className="border-l-4 border-warning pl-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="font-semibold">{dim.dimension}</h4>
-                          <Badge variant="outline">
-                            Score: {dim.score?.toFixed(2) || "N/A"}/5.0 ({dim.score ? ((dim.score / 5) * 100).toFixed(0) : "N/A"}%)
-                          </Badge>
-                        </div>
-                        <ul className="space-y-1 text-sm">
-                          {dim.accionesEspecificas && Array.isArray(dim.accionesEspecificas) && dim.accionesEspecificas.map((accion: string, i: number) => (
-                            <li key={i} className="flex items-start gap-2">
-                              <span className="text-warning mt-1">•</span>
-                              <span>{accion}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+            {/* Secciones eliminadas: Dimensiones que Requieren Atención y Recomendaciones Generales */}
+            {/* La información ahora se muestra en la tabla de acciones con indicador visual por dimensión */}
           </div>
         )}
-
-            {/* Recomendaciones */}
-            {planDesarrollo.recomendaciones && Array.isArray(planDesarrollo.recomendaciones) && planDesarrollo.recomendaciones.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Recomendaciones Generales</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ul className="space-y-2">
-                    {planDesarrollo.recomendaciones.map((rec: string, idx: number) => (
-                      <li key={idx} className="flex items-start gap-2">
-                        <span className="text-primary mt-1">→</span>
-                        <span>{rec}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-              </Card>
-            )}
               </>
             )}
           </TabsContent>
@@ -1829,6 +2025,16 @@ const VistaComparativa = () => {
             onClose={() => setMostrarEditarPlan(false)}
           />
         )}
+
+        {/* Modal de Formularios Completos */}
+        <VerFormulariosEvaluacion
+          open={mostrarFormularios}
+          onOpenChange={setMostrarFormularios}
+          colaboradorNombre={colaborador.apellidos ? `${colaborador.nombre} ${colaborador.apellidos}` : colaborador.nombre}
+          instrument={instrument}
+          autoevaluacion={autoevaluacion}
+          evaluacionJefe={evaluacionJefe}
+        />
       </main>
     </div>
   );

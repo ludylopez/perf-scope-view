@@ -335,6 +335,24 @@ export const EditarPlanDesarrollo = ({
                       </div>
                       <div className="flex flex-col gap-2">
                         <div>
+                          <Label>Tipo de aprendizaje</Label>
+                          <Select
+                            value={accion.tipoAprendizaje || "experiencia"}
+                            onValueChange={(value: "experiencia" | "social" | "formal") =>
+                              actualizarAccion(idx, "tipoAprendizaje", value)
+                            }
+                          >
+                            <SelectTrigger className="w-40">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="experiencia">🔄 Experiencia</SelectItem>
+                              <SelectItem value="social">👥 Social</SelectItem>
+                              <SelectItem value="formal">📚 Formal</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
                           <Label>Prioridad</Label>
                           <Select
                             value={accion.prioridad}

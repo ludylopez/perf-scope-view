@@ -80,20 +80,20 @@ export const calculateNineBoxPosition = (
   if (potencial === undefined || potencial === null) {
     // Si no hay potencial, solo clasificamos por desempeño (usando porcentajes)
     // Esto es para casos donde solo se evaluó desempeño
-    if (desempenoPorcentaje > 75) return "alto-medio"; // Alto desempeño, potencial desconocido
-    if (desempenoPorcentaje >= 50) return "medio-medio"; // Medio desempeño, potencial desconocido
+    if (desempenoPorcentaje >= 80) return "alto-medio"; // Alto desempeño, potencial desconocido
+    if (desempenoPorcentaje >= 60) return "medio-medio"; // Medio desempeño, potencial desconocido
     return "bajo-medio"; // Bajo desempeño, potencial desconocido
   }
   
   const potencialPorcentaje = scoreToPercentage(potencial);
   
-  // Clasificar desempeño usando porcentajes según metodología estándar:
-  // Bajo: < 50%, Medio: 50-75%, Alto: > 75%
-  const desempenoLevel = desempenoPorcentaje < 50 ? "bajo" : desempenoPorcentaje <= 75 ? "medio" : "alto";
+  // Clasificar desempeño usando porcentajes según nueva metodología:
+  // Bajo: < 60%, Medio: 60-80%, Alto: >= 80%
+  const desempenoLevel = desempenoPorcentaje < 60 ? "bajo" : desempenoPorcentaje < 80 ? "medio" : "alto";
   
-  // Clasificar potencial usando porcentajes según metodología estándar:
-  // Bajo: < 50%, Medio: 50-75%, Alto: > 75%
-  const potencialLevel = potencialPorcentaje < 50 ? "bajo" : potencialPorcentaje <= 75 ? "medio" : "alto";
+  // Clasificar potencial usando porcentajes según nueva metodología:
+  // Bajo: < 60%, Medio: 60-80%, Alto: >= 80%
+  const potencialLevel = potencialPorcentaje < 60 ? "bajo" : potencialPorcentaje < 80 ? "medio" : "alto";
   
   return `${desempenoLevel}-${potencialLevel}`;
 };

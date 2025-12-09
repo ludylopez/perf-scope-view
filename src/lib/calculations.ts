@@ -26,14 +26,21 @@ export const calculatePerformanceScore = (
 ): number => {
   if (!responses || typeof responses !== 'object') return 0;
   
-  let totalScore = 0;
+  // Calcular promedio simple de todas las dimensiones (sin usar pesos)
+  let totalAverage = 0;
+  let validDimensions = 0;
 
   for (const dimension of dimensions) {
     const avg = calculateDimensionAverage(responses, dimension);
-    totalScore += calculateDimensionScore(avg, dimension.peso);
+    if (avg > 0) {
+      totalAverage += avg;
+      validDimensions++;
+    }
   }
 
-  return Math.round(totalScore * 100) / 100;
+  if (validDimensions === 0) return 0;
+
+  return Math.round((totalAverage / validDimensions) * 100) / 100;
 };
 
 export const getIncompleteDimensions = (
@@ -81,11 +88,11 @@ export const getDimensionProgress = (
 
 // Convertir puntaje Likert (1-5) a porcentaje (0-100%)
 export const scoreToPercentage = (score: number): number => {
-  // Escala 1-5 → 0-100%
-  // 1 = 0%, 2 = 25%, 3 = 50%, 4 = 75%, 5 = 100%
+  // Escala 1-5 → 0-100% (fórmula proporcional matemáticamente correcta)
+  // 1 = 20%, 2 = 40%, 3 = 60%, 4 = 80%, 5 = 100%
   if (score < 1) return 0;
   if (score > 5) return 100;
-  return Math.round(((score - 1) / 4) * 100);
+  return Math.round((score / 5) * 100);
 };
 
 // Convertir porcentaje (0-100%) a puntaje Likert (1-5) - útil para conversiones inversas

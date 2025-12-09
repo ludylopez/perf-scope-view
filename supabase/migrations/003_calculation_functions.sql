@@ -17,13 +17,13 @@ BEGIN
     RETURN 100;
   END IF;
   
-  -- Fórmula: ((score - 1) / 4) * 100
-  -- 1 = 0%, 2 = 25%, 3 = 50%, 4 = 75%, 5 = 100%
-  RETURN ROUND(((score - 1) / 4) * 100)::INTEGER;
+  -- Fórmula: (score / 5) * 100 (fórmula proporcional matemáticamente correcta)
+  -- 1 = 20%, 2 = 40%, 3 = 60%, 4 = 80%, 5 = 100%
+  RETURN ROUND((score / 5) * 100)::INTEGER;
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
-COMMENT ON FUNCTION score_to_percentage(NUMERIC) IS 'Convierte un score Likert (1-5) a porcentaje (0-100)';
+COMMENT ON FUNCTION score_to_percentage(NUMERIC) IS 'Convierte un score Likert (1-5) a porcentaje (0-100) usando fórmula proporcional: (score/5)*100';
 
 -- Función para calcular promedio de una dimensión
 CREATE OR REPLACE FUNCTION calculate_dimension_average(
@@ -102,7 +102,7 @@ $$ LANGUAGE plpgsql IMMUTABLE;
 
 COMMENT ON FUNCTION calculate_dimension_score(JSONB, JSONB) IS 'Calcula el score ponderado de una dimensión (promedio * peso)';
 
--- Función para calcular score total de desempeño
+-- Función para calcular score total de desempeño (promedio simple de dimensiones)
 CREATE OR REPLACE FUNCTION calculate_performance_score(
   responses JSONB,
   dimensions JSONB
@@ -110,26 +110,35 @@ CREATE OR REPLACE FUNCTION calculate_performance_score(
 RETURNS NUMERIC AS $$
 DECLARE
   dimension JSONB;
-  total_score NUMERIC := 0;
-  dimension_score NUMERIC;
+  total_average NUMERIC := 0;
+  dimension_average NUMERIC;
+  valid_dimensions INTEGER := 0;
 BEGIN
   -- Validar inputs
   IF responses IS NULL OR dimensions IS NULL THEN
     RETURN 0;
   END IF;
   
-  -- Iterar sobre cada dimensión
+  -- Iterar sobre cada dimensión y calcular promedio simple
   FOR dimension IN SELECT * FROM jsonb_array_elements(dimensions)
   LOOP
-    dimension_score := calculate_dimension_score(responses, dimension);
-    total_score := total_score + dimension_score;
+    dimension_average := calculate_dimension_average(responses, dimension);
+    IF dimension_average > 0 THEN
+      total_average := total_average + dimension_average;
+      valid_dimensions := valid_dimensions + 1;
+    END IF;
   END LOOP;
   
-  RETURN ROUND(total_score::NUMERIC, 2);
+  -- Retornar promedio simple (no suma ponderada)
+  IF valid_dimensions = 0 THEN
+    RETURN 0;
+  END IF;
+  
+  RETURN ROUND((total_average / valid_dimensions)::NUMERIC, 2);
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
-COMMENT ON FUNCTION calculate_performance_score(JSONB, JSONB) IS 'Calcula el score total de desempeño sumando todas las dimensiones ponderadas';
+COMMENT ON FUNCTION calculate_performance_score(JSONB, JSONB) IS 'Calcula el score total de desempeño como promedio simple de todas las dimensiones (sin usar pesos)';
 
 -- Función para calcular score de potencial
 CREATE OR REPLACE FUNCTION calculate_potential_score(
@@ -186,9 +195,9 @@ BEGIN
   
   -- Si no hay potencial, clasificar solo por desempeño
   IF potencial IS NULL THEN
-    IF desempeno_porcentaje > 75 THEN
+    IF desempeno_porcentaje >= 80 THEN
       RETURN 'alto-medio'; -- Alto desempeño, potencial desconocido
-    ELSIF desempeno_porcentaje >= 50 THEN
+    ELSIF desempeno_porcentaje >= 60 THEN
       RETURN 'medio-medio'; -- Medio desempeño, potencial desconocido
     ELSE
       RETURN 'bajo-medio'; -- Bajo desempeño, potencial desconocido
@@ -198,19 +207,19 @@ BEGIN
   -- Convertir potencial a porcentaje
   potencial_porcentaje := score_to_percentage(potencial);
   
-  -- Clasificar desempeño: Bajo (< 50%), Medio (50-75%), Alto (> 75%)
-  IF desempeno_porcentaje < 50 THEN
+  -- Clasificar desempeño: Bajo (< 60%), Medio (60-80%), Alto (>= 80%)
+  IF desempeno_porcentaje < 60 THEN
     desempeno_level := 'bajo';
-  ELSIF desempeno_porcentaje <= 75 THEN
+  ELSIF desempeno_porcentaje < 80 THEN
     desempeno_level := 'medio';
   ELSE
     desempeno_level := 'alto';
   END IF;
   
-  -- Clasificar potencial: Bajo (< 50%), Medio (50-75%), Alto (> 75%)
-  IF potencial_porcentaje < 50 THEN
+  -- Clasificar potencial: Bajo (< 60%), Medio (60-80%), Alto (>= 80%)
+  IF potencial_porcentaje < 60 THEN
     potencial_level := 'bajo';
-  ELSIF potencial_porcentaje <= 75 THEN
+  ELSIF potencial_porcentaje < 80 THEN
     potencial_level := 'medio';
   ELSE
     potencial_level := 'alto';

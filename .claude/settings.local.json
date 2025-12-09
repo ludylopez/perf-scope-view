@@ -3,7 +3,16 @@
     "allow": [
       "Bash(npm run build:*)",
       "Bash(npx tsc --noEmit)",
-      "Bash(timeout 15 npm run dev:*)"
+      "Bash(timeout 15 npm run dev:*)",
+      "Bash(cat:*)",
+      "Bash(grep:*)",
+      "Bash(find:*)",
+      "Bash(ls:*)",
+      "Bash(npm install:*)",
+      "Bash(dir:*)",
+      "Bash(wc:*)",
+      "Bash(xargs cat:*)",
+      "Bash(xargs:*)"
     ],
     "deny": [],
     "ask": []

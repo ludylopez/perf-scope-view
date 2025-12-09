@@ -10,6 +10,8 @@ import { WhatsAppButton } from "@/components/layout/WhatsAppButton";
 import "./lib/diagnosticoEvaluaciones"; // Cargar funciones de diagnóstico
 import "./lib/buscarAutoevaluacion"; // Cargar función de búsqueda de autoevaluaciones
 import "./lib/diagnosticoAutoevaluacionesColaboradores"; // Cargar funciones de diagnóstico de autoevaluaciones de colaboradores
+import "./utils/diagnosticoEvaluacion"; // Cargar función de diagnóstico de cálculos de evaluación
+import "./lib/recalcularResultado"; // Cargar función para recalcular resultados
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Autoevaluacion from "./pages/Autoevaluacion";
@@ -43,6 +45,7 @@ import ConfiguracionSistema from "./pages/ConfiguracionSistema";
 import PopulateExplanations from "./pages/PopulateExplanations";
 import DashboardPersonal from "./pages/DashboardPersonal";
 import CambioContrasena from "./pages/CambioContrasena";
+import AnalisisEstadisticoEvaluaciones from "./pages/AnalisisEstadisticoEvaluaciones";
 
 const queryClient = new QueryClient();
 
@@ -339,6 +342,10 @@ const App = () => (
                   <CambioContrasena />
                 </ProtectedRoute>
               }
+            />
+            <Route
+              path="/analisis-estadistico"
+              element={<AnalisisEstadisticoEvaluaciones />}
             />
             <Route path="*" element={<NotFound />} />
           </Routes>

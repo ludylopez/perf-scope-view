@@ -297,19 +297,137 @@ const VistaPlanDesarrollo = () => {
             <CardHeader>
               <CardTitle>Plan de Acción Detallado</CardTitle>
               <CardDescription>
-                Acciones concretas con responsables, fechas e indicadores
+                Acciones concretas con responsables, fechas e indicadores. El color del borde izquierdo indica la dimensión que desarrolla cada acción.
               </CardDescription>
+              {/* Leyenda de dimensiones - Solo las usadas */}
+              {(() => {
+                const usedDimensions = currentPlan.planEstructurado.acciones
+                  .map((accion) => {
+                    const dimension = accion.dimension && accion.dimension.trim()
+                      ? accion.dimension.trim()
+                      : currentPlan.planEstructurado.dimensionesDebiles && currentPlan.planEstructurado.dimensionesDebiles.length > 0
+                        ? (() => {
+                            const descripcionLower = accion.descripcion.toLowerCase();
+                            let bestMatch: { dimension: string; score: number } | null = null;
+                            currentPlan.planEstructurado.dimensionesDebiles.forEach((dim) => {
+                              const dimLower = dim.dimension.toLowerCase();
+                              const palabrasDimension = dimLower.split(/\s+/);
+                              let score = 0;
+                              palabrasDimension.forEach((palabra) => {
+                                if (palabra.length > 3 && descripcionLower.includes(palabra)) {
+                                  score += palabra.length;
+                                }
+                              });
+                              if (score > 0 && (!bestMatch || score > bestMatch.score)) {
+                                bestMatch = { dimension: dim.dimension, score };
+                              }
+                            });
+                            return bestMatch && bestMatch.score > 5 ? bestMatch.dimension : null;
+                          })()
+                        : null;
+                    return dimension;
+                  })
+                  .filter((dim): dim is string => dim !== null);
+                
+                const uniqueDimensions = Array.from(new Set(usedDimensions))
+                  .map((dimName) => {
+                    const dimLower = dimName.toLowerCase();
+                    let color = '#6b7280';
+                    if (dimLower.includes('productividad') || dimLower.includes('cumplimiento') || dimLower.includes('objetivos')) color = '#3b82f6';
+                    else if (dimLower.includes('calidad')) color = '#10b981';
+                    else if (dimLower.includes('competencia') || dimLower.includes('técnica') || dimLower.includes('laboral')) color = '#f59e0b';
+                    else if (dimLower.includes('comportamiento') || dimLower.includes('actitud') || dimLower.includes('organizacional')) color = '#8b5cf6';
+                    else if (dimLower.includes('relaciones') || dimLower.includes('equipo') || dimLower.includes('interpersonal')) color = '#ec4899';
+                    else if (dimLower.includes('servicio') || dimLower.includes('atención') || dimLower.includes('usuario') || dimLower.includes('orientación')) color = '#06b6d4';
+                    else if (dimLower.includes('liderazgo') || dimLower.includes('dirección') || dimLower.includes('coordinación')) color = '#6366f1';
+                    else if (dimLower.includes('transparencia') || dimLower.includes('probidad') || dimLower.includes('ética')) color = '#14b8a6';
+                    return { name: dimName, color };
+                  })
+                  .sort((a, b) => a.name.localeCompare(b.name));
+                
+                if (uniqueDimensions.length === 0) return null;
+                
+                return (
+                  <div className="mt-4 p-3 bg-muted/50 rounded-md">
+                    <p className="text-sm font-semibold mb-2">Leyenda de Dimensiones:</p>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      {uniqueDimensions.map((dim, idx) => (
+                        <div key={idx} className="flex items-center gap-2">
+                          <div className="w-4 h-4 rounded" style={{ backgroundColor: dim.color }}></div>
+                          <span>{dim.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
             </CardHeader>
             <CardContent className="space-y-4">
-              {currentPlan.planEstructurado.acciones.map((accion, index) => (
-                <div key={index} className="border rounded-lg p-4 space-y-3">
-                  <div className="flex items-start justify-between">
-                    <p className="font-medium flex-1">{accion.descripcion}</p>
+              {currentPlan.planEstructurado.acciones.map((accion, index) => {
+                // Obtener dimensión de la acción (con fallback si no existe)
+                const dimension = accion.dimension && accion.dimension.trim()
+                  ? accion.dimension.trim()
+                  : currentPlan.planEstructurado.dimensionesDebiles && currentPlan.planEstructurado.dimensionesDebiles.length > 0
+                    ? (() => {
+                        const descripcionLower = accion.descripcion.toLowerCase();
+                        let bestMatch: { dimension: string; score: number } | null = null;
+                        currentPlan.planEstructurado.dimensionesDebiles.forEach((dim) => {
+                          const dimLower = dim.dimension.toLowerCase();
+                          const palabrasDimension = dimLower.split(/\s+/);
+                          let score = 0;
+                          palabrasDimension.forEach((palabra) => {
+                            if (palabra.length > 3 && descripcionLower.includes(palabra)) {
+                              score += palabra.length;
+                            }
+                          });
+                          if (score > 0 && (!bestMatch || score > bestMatch.score)) {
+                            bestMatch = { dimension: dim.dimension, score };
+                          }
+                        });
+                        return bestMatch && bestMatch.score > 5 ? bestMatch.dimension : null;
+                      })()
+                    : null;
+                const dimensionColor = dimension
+                  ? (() => {
+                      const dimLower = dimension.toLowerCase();
+                      if (dimLower.includes('productividad') || dimLower.includes('cumplimiento') || dimLower.includes('objetivos')) return '#3b82f6';
+                      if (dimLower.includes('calidad')) return '#10b981';
+                      if (dimLower.includes('competencia') || dimLower.includes('técnica') || dimLower.includes('laboral')) return '#f59e0b';
+                      if (dimLower.includes('comportamiento') || dimLower.includes('actitud') || dimLower.includes('organizacional')) return '#8b5cf6';
+                      if (dimLower.includes('relaciones') || dimLower.includes('equipo') || dimLower.includes('interpersonal')) return '#ec4899';
+                      if (dimLower.includes('servicio') || dimLower.includes('atención') || dimLower.includes('usuario') || dimLower.includes('orientación')) return '#06b6d4';
+                      if (dimLower.includes('liderazgo') || dimLower.includes('dirección') || dimLower.includes('coordinación')) return '#6366f1';
+                      if (dimLower.includes('transparencia') || dimLower.includes('probidad') || dimLower.includes('ética')) return '#14b8a6';
+                      return '#6b7280';
+                    })()
+                  : null;
+                
+                return (
+                  <div 
+                    key={index} 
+                    className="border rounded-lg p-4 space-y-3"
+                    style={dimension ? { borderLeft: `4px solid ${dimensionColor}` } : {}}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <p className="font-medium">{accion.descripcion}</p>
+                        {dimension && (
+                          <Badge variant="outline" className="mt-1 text-xs" style={{ borderColor: dimensionColor, color: dimensionColor }}>
+                            {dimension}
+                          </Badge>
+                        )}
+                      </div>
                     <Badge variant={accion.prioridad === "alta" ? "destructive" : accion.prioridad === "media" ? "default" : "secondary"}>
                       {accion.prioridad === "alta" ? "🔴 Alta" : accion.prioridad === "media" ? "🟡 Media" : "🟢 Baja"}
                     </Badge>
                   </div>
                   <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Tipo de aprendizaje:</span>{" "}
+                      <Badge variant="outline" className="ml-1">
+                        {accion.tipoAprendizaje === "experiencia" ? "🔄 Experiencia" : accion.tipoAprendizaje === "social" ? "👥 Social" : "📚 Formal"}
+                      </Badge>
+                    </div>
                     <div>
                       <span className="text-muted-foreground">Responsable:</span> <span className="font-medium">{accion.responsable}</span>
                     </div>
@@ -326,39 +444,14 @@ const VistaPlanDesarrollo = () => {
                     )}
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </CardContent>
           </Card>
         )}
 
-        {/* Dimensiones que Requieren Atención */}
-        {currentPlan.planEstructurado && currentPlan.planEstructurado.dimensionesDebiles && currentPlan.planEstructurado.dimensionesDebiles.length > 0 && (
-          <Card className="mb-6 border-warning print:border-0 print:shadow-none">
-            <CardHeader>
-              <CardTitle>Dimensiones que Requieren Atención</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {currentPlan.planEstructurado.dimensionesDebiles.map((dim, idx) => (
-                <div key={idx} className="border-l-4 border-warning pl-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="font-semibold">{dim.dimension}</h4>
-                    <Badge variant="outline">
-                      Score: {dim.score.toFixed(2)}/5.0 ({((dim.score / 5) * 100).toFixed(0)}%)
-                    </Badge>
-                  </div>
-                  <ul className="space-y-1 text-sm">
-                    {dim.accionesEspecificas.map((accion, i) => (
-                      <li key={i} className="flex items-start gap-2">
-                        <span className="text-warning mt-1">•</span>
-                        <span>{accion}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
+        {/* Sección eliminada: Dimensiones que Requieren Atención */}
+        {/* La información ahora se muestra en la tabla de acciones con indicador visual por dimensión */}
 
         {/* Feedback Individual */}
         {currentPlan.feedbackIndividual && (
@@ -400,24 +493,8 @@ const VistaPlanDesarrollo = () => {
           </Card>
         )}
 
-        {/* Recomendaciones */}
-        {currentPlan.recomendaciones && currentPlan.recomendaciones.length > 0 && (
-          <Card className="mb-6 print:border-0 print:shadow-none">
-            <CardHeader>
-              <CardTitle>Recomendaciones Generales</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-2">
-                {currentPlan.recomendaciones.map((rec, idx) => (
-                  <li key={idx} className="flex items-start gap-2">
-                    <span className="text-primary mt-1">→</span>
-                    <span>{rec}</span>
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
-        )}
+        {/* Sección eliminada: Recomendaciones Generales */}
+        {/* La información ahora se muestra en la tabla de acciones con indicador visual por dimensión */}
 
         {/* Espacio para Firmas */}
         <Card className="print:border-0 print:shadow-none print:mt-12">

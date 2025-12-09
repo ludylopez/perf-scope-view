@@ -362,7 +362,7 @@ const ExplanationBox = ({ competencia, nivel, barColor }: {
       borderLeftColor: barColor || '#6b7280',
     }}>
       <Text style={{
-        fontSize: 6,
+        fontSize: 9,
         color: '#374151',
         lineHeight: 1.35,
       }}>
@@ -418,7 +418,6 @@ export const CompetenciasCardsPDF = ({
           const titulo = getDimensionFriendlyTitle(competencia.dimension) || `Dimensión ${index + 1}`;
           const descripcion = getDimensionDescription(competencia.dimension) || 'Evaluación de desempeño en esta dimensión.';
           const porcentaje = competencia.tuEvaluacion || 0;
-          const barWidth = Math.min((porcentaje / 100) * 100, 100);
 
           // Construir el texto del badge de forma segura
           const badgeContent = badgeText 
@@ -496,7 +495,7 @@ export const CompetenciasCardsPDF = ({
               {/* Descripción */}
               {descripcion && descripcion.trim() !== '' && (
                 <Text style={{
-                  fontSize: 6.5,
+                  fontSize: 7.5,
                   color: '#6b7280',
                   marginBottom: 4,
                   lineHeight: 1.3,
@@ -511,30 +510,6 @@ export const CompetenciasCardsPDF = ({
                 nivel={nivel}
                 barColor={barColor}
               />
-
-              {/* Barra de progreso */}
-              <View style={{ marginTop: 4 }}>
-                <View style={{
-                  width: '100%',
-                  height: 6,
-                  backgroundColor: '#e5e7eb',
-                  borderRadius: 3,
-                  overflow: 'hidden',
-                  position: 'relative',
-                }}>
-                  <View style={{
-                    width: `${barWidth}%`,
-                    height: '100%',
-                    backgroundColor: barColor,
-                    borderRadius: 3,
-                  }} />
-                </View>
-                {competencia.promedioMunicipal && competencia.promedioMunicipal > 0 && (
-                  <Text style={{ fontSize: 6, color: '#6b7280', marginTop: 2, textAlign: 'right' }}>
-                    Promedio: {competencia.promedioMunicipal.toFixed(1)}%
-                  </Text>
-                )}
-              </View>
             </View>
           );
         })}

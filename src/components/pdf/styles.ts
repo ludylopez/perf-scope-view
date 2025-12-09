@@ -13,8 +13,8 @@ export const pdfStyles = StyleSheet.create({
   header: {
     backgroundColor: '#ffffff',
     color: '#000000',
-    padding: 10,
-    marginBottom: 8,
+    padding: 6,
+    marginBottom: 5,
     textAlign: 'center',
     borderRadius: 6,
     borderWidth: 1,
@@ -24,19 +24,59 @@ export const pdfStyles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: '#000000',
-    marginBottom: 3,
+    marginBottom: 2,
   },
   headerSubtitle: {
     fontSize: 10,
     color: '#374151',
     opacity: 1,
   },
+  headerPercentageContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#2563eb',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  headerPercentage: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    lineHeight: 1,
+  },
+  headerPercentageLabel: {
+    fontSize: 10,
+    color: '#ffffff',
+  },
+  headerResultadoContainer: {
+    backgroundColor: '#f0fdf4',
+    borderLeftWidth: 4,
+    borderLeftColor: '#22c55e',
+    borderRadius: 4,
+    padding: 6,
+    minWidth: 100,
+    maxWidth: 150,
+    flexShrink: 0,
+  },
+  headerResultadoText: {
+    fontSize: 9,
+    fontWeight: 'bold',
+    color: '#16a34a',
+    marginBottom: 3,
+  },
+  headerResultadoDescription: {
+    fontSize: 7,
+    color: '#000000',
+    lineHeight: 1.2,
+  },
   
   // Info Card
   infoCard: {
     backgroundColor: '#ffffff',
     padding: 0,
-    marginBottom: 8,
+    marginBottom: 5,
   },
   infoCardTitle: {
     fontSize: 0,
@@ -82,6 +122,7 @@ export const pdfStyles = StyleSheet.create({
     borderRadius: 4,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   resultadoSectionInner: {
     flexDirection: 'row',
@@ -307,37 +348,44 @@ export const pdfStyles = StyleSheet.create({
     flexDirection: 'row',
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
-    padding: 2,
-    minHeight: 16,
+    padding: 1,
+    minHeight: 14,
   },
   tableHeader: {
     backgroundColor: '#f3f4f6',
     fontWeight: 'bold',
     borderBottomWidth: 1,
     borderBottomColor: '#d1d5db',
+    fontSize: 8, // Aumentado para mejor legibilidad de encabezados
   },
   tableCell: {
-    fontSize: 6.5,
+    fontSize: 7.5, // Aumentado de 6.5 a 7.5 para mejor legibilidad general
     padding: 3,
   },
   tableCellNumber: {
     width: '5%',
     textAlign: 'center',
+    fontSize: 8, // Ligeramente más grande para números
   },
   tableCellAccion: {
     width: '32%',
+    fontSize: 9.5, // Mantener el más grande para priorizar legibilidad de acciones
   },
   tableCellPrioridad: {
     width: '8%',
+    fontSize: 7.5, // Proporcional pero legible
   },
   tableCellResponsable: {
     width: '15%',
+    fontSize: 7.5, // Proporcional pero legible
   },
   tableCellFecha: {
     width: '15%',
+    fontSize: 7.5, // Proporcional pero legible
   },
   tableCellIndicador: {
     width: '25%',
+    fontSize: 8, // Un poco más grande porque también es importante
   },
   
   // Badges
@@ -395,7 +443,7 @@ export const pdfStyles = StyleSheet.create({
     marginBottom: 8,
   },
   objetivoItem: {
-    fontSize: 7.5,
+    fontSize: 10, // Aumentado de 9 a 10 para mejor legibilidad
     marginBottom: 3,
     paddingLeft: 8,
     color: '#374151',
@@ -406,7 +454,43 @@ export const pdfStyles = StyleSheet.create({
   recomendacionItem: {
     fontSize: 7.5,
     marginBottom: 3,
-    paddingLeft: 8,
+  },
+  
+  // Leyenda de dimensiones
+  dimensionLegend: {
+    backgroundColor: '#f9fafb',
+    padding: 6,
+    marginTop: 4,
+    marginBottom: 6,
+    borderRadius: 3,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  dimensionLegendTitle: {
+    fontSize: 7,
+    fontWeight: 'bold',
+    marginBottom: 4,
+    color: '#374151',
+  },
+  dimensionLegendGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+  },
+  dimensionLegendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '48%',
+    marginBottom: 3,
+  },
+  dimensionLegendColor: {
+    width: 8,
+    height: 8,
+    borderRadius: 2,
+    marginRight: 4,
+  },
+  dimensionLegendText: {
+    fontSize: 6,
     color: '#374151',
   },
   
@@ -469,6 +553,12 @@ export const pdfStyles = StyleSheet.create({
     fontSize: 7.5,
     color: '#000000',
     marginTop: 2,
+  },
+  firmaCargo: {
+    fontSize: 6.5,
+    color: '#6b7280',
+    marginTop: 2,
+    fontStyle: 'italic',
   },
 });
 

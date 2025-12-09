@@ -21,6 +21,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { getConsolidatedResult, getResultsByEvaluator } from "@/lib/finalResultSupabase";
 import { PDFDownloadLink } from "@react-pdf/renderer";
 import { EvaluacionPDF } from "@/components/pdf/EvaluacionPDF";
+import { getDirectoraRRHHNombre } from "@/lib/exports";
 
 const VistaResultadosFinales = () => {
   const { user } = useAuth();
@@ -33,6 +34,8 @@ const VistaResultadosFinales = () => {
   const [autoevaluacion, setAutoevaluacion] = useState<any>(null);
   const [evaluacionJefe, setEvaluacionJefe] = useState<any>(null);
   const [instrument, setInstrument] = useState<any>(null);
+  const [nombreDirectoraRRHH, setNombreDirectoraRRHH] = useState<string | null>(null);
+  const [jefeCargo, setJefeCargo] = useState<string | undefined>(undefined);
 
   const isRestrictedLevel = ["O1", "O2"].includes((user?.nivel || "").toUpperCase());
   const canShowConsolidatedResults = (import.meta.env.VITE_MOSTRAR_RESULTADOS_CONSOLIDADOS || "").toLowerCase() === "true";
@@ -43,6 +46,50 @@ const VistaResultadosFinales = () => {
       return;
     }
     loadResultados();
+    // Cargar nombre de la directora de RRHH
+    getDirectoraRRHHNombre().then(nombre => {
+      setNombreDirectoraRRHH(nombre);
+    });
+    
+    // Obtener cargo del jefe si existe
+    const obtenerCargoJefe = async () => {
+      if (!user?.dpi || user?.nivel === 'C1') return; // C1 no tiene jefe
+      
+      try {
+        const { supabase } = await import("@/integrations/supabase/client");
+        
+        // Primero intentar obtener desde user_assignments
+        const { data: assignment } = await supabase
+          .from("user_assignments")
+          .select("jefe_id")
+          .eq("colaborador_id", user.dpi)
+          .eq("activo", true)
+          .maybeSingle();
+        
+        let jefeId = null;
+        if (assignment?.jefe_id) {
+          jefeId = assignment.jefe_id;
+        } else if (user?.jefeInmediatoId) {
+          jefeId = user.jefeInmediatoId;
+        }
+        
+        if (jefeId) {
+          const { data: jefeData } = await supabase
+            .from("users")
+            .select("cargo")
+            .eq("dpi", jefeId)
+            .maybeSingle();
+          
+          if (jefeData?.cargo && typeof jefeData.cargo === 'string' && jefeData.cargo.trim() !== '') {
+            setJefeCargo(jefeData.cargo.trim());
+          }
+        }
+      } catch (error) {
+        console.error("Error obteniendo cargo del jefe:", error);
+      }
+    };
+    
+    obtenerCargoJefe();
   }, [user, navigate]);
 
   const loadResultados = async () => {
@@ -489,7 +536,9 @@ const VistaResultadosFinales = () => {
                       correo: user?.correo || "",
                       telefono: user?.telefono || "",
                       jefeNombre: user?.jefeInmediato || "N/A",
-                      directoraRRHHNombre: "Brenda Carolina Lopez Perez",
+                      jefeCargo: jefeCargo,
+                      directoraRRHHNombre: nombreDirectoraRRHH || undefined,
+                      directoraRRHHCargo: undefined, // Se obtendrá automáticamente en preparePDFData
                     }}
                     periodo={activePeriod?.nombre || "N/A"}
                     fechaGeneracion={new Date()}

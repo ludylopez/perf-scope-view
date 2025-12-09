@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
@@ -12,14 +12,16 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, FileText, User, CheckCircle2, Clock, AlertCircle, Sparkles, FileDown, Loader2, Download } from "lucide-react";
+import { ArrowLeft, FileText, User, CheckCircle2, Clock, AlertCircle, Sparkles, FileDown, Loader2, Download, XCircle, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { calculatePerformanceScore, calculateDimensionAverage, calculateDimensionPercentage, scoreToPercentage } from "@/lib/calculations";
 import { getInstrumentForUser } from "@/lib/instruments";
 import { getInstrumentCalculationConfig } from "@/lib/instrumentCalculations";
 import { getConsolidatedResult } from "@/lib/finalResultSupabase";
-import { exportEvaluacionCompletaPDFReact } from "@/lib/exports";
+import { exportEvaluacionCompletaPDFReact, exportMultiplePDFsToZip, ColaboradorExportData, getDirectoraRRHHNombre } from "@/lib/exports";
+import { Progress } from "@/components/ui/progress";
+import { Package } from "lucide-react";
 
 const VistaDetalleJefe = () => {
   const { user } = useAuth();
@@ -35,6 +37,12 @@ const VistaDetalleJefe = () => {
   const [planesDesarrollo, setPlanesDesarrollo] = useState<Map<string, any>>(new Map());
   const [generandoPlanes, setGenerandoPlanes] = useState<Set<string>>(new Set());
   const [datosExportacionPDF, setDatosExportacionPDF] = useState<Map<string, any>>(new Map());
+  const [exportandoTodos, setExportandoTodos] = useState(false);
+  const [progresoExportacion, setProgresoExportacion] = useState({ current: 0, total: 0, nombre: "" });
+  const [generandoPlanesMasivo, setGenerandoPlanesMasivo] = useState(false);
+  const [progresoPlanes, setProgresoPlanes] = useState({ current: 0, total: 0, nombre: "", exitosos: 0, errores: 0, tiempoRestante: "" });
+  const [nombreDirectoraRRHH, setNombreDirectoraRRHH] = useState<string | null>(null);
+  const cancelarGeneracionRef = useRef(false);
 
   // Cargar total de asignaciones esperadas
   useEffect(() => {
@@ -67,6 +75,10 @@ const VistaDetalleJefe = () => {
     }
 
     loadData();
+    // Cargar nombre de la directora de RRHH
+    getDirectoraRRHHNombre().then(nombre => {
+      setNombreDirectoraRRHH(nombre);
+    });
   }, [id, periodoId, user]);
 
   const loadData = async () => {
@@ -385,6 +397,174 @@ const VistaDetalleJefe = () => {
     }
   };
 
+  // Función para generar todos los planes de desarrollo masivamente
+  const generarTodosLosPlanes = async (soloSinPlan: boolean = true) => {
+    const periodoFinal = periodoId || (await getActivePeriodId());
+    if (!periodoFinal) {
+      toast.error("No hay período activo");
+      return;
+    }
+
+    // Filtrar evaluaciones completadas
+    const evaluacionesCompletadas = evaluaciones.filter(e => e.estado === "enviado");
+
+    // Filtrar según si solo queremos los que no tienen plan
+    const evaluacionesParaProcesar = soloSinPlan
+      ? evaluacionesCompletadas.filter(e => !planesDesarrollo.has(e.colaborador_id))
+      : evaluacionesCompletadas;
+
+    if (evaluacionesParaProcesar.length === 0) {
+      toast.info(soloSinPlan
+        ? "Todos los colaboradores ya tienen plan de desarrollo generado"
+        : "No hay evaluaciones completadas para generar planes"
+      );
+      return;
+    }
+
+    // Confirmar acción
+    const tiempoEstimado = Math.ceil((evaluacionesParaProcesar.length * 40) / 60);
+    const confirmado = window.confirm(
+      `Se generarán ${evaluacionesParaProcesar.length} planes de desarrollo.\n\n` +
+      `Tiempo estimado: ${tiempoEstimado} minutos aproximadamente.\n\n` +
+      `Durante este proceso:\n` +
+      `• No cierre esta ventana\n` +
+      `• Puede cancelar en cualquier momento\n\n` +
+      `¿Desea continuar?`
+    );
+
+    if (!confirmado) return;
+
+    setGenerandoPlanesMasivo(true);
+    cancelarGeneracionRef.current = false;
+    setProgresoPlanes({
+      current: 0,
+      total: evaluacionesParaProcesar.length,
+      nombre: "",
+      exitosos: 0,
+      errores: 0,
+      tiempoRestante: `~${tiempoEstimado} min`
+    });
+
+    const { data: { session } } = await supabase.auth.getSession();
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://oxadpbdlpvwyapuondei.supabase.co";
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im94YWRwYmRscHZ3eWFwdW9uZGVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIzMjU5MzcsImV4cCI6MjA3NzkwMTkzN30.HjIoMaw20qx7DscE-XWCaz88EWa0Jv_aCDcMtv6eadw";
+
+    let exitosos = 0;
+    let errores = 0;
+    const erroresDetalle: string[] = [];
+    const tiempoInicio = Date.now();
+
+    try {
+      for (let i = 0; i < evaluacionesParaProcesar.length; i++) {
+        // Verificar si se canceló
+        if (cancelarGeneracionRef.current) {
+          toast.info(`Generación cancelada. ${exitosos} planes generados, ${errores} errores.`);
+          break;
+        }
+
+        const evaluacion = evaluacionesParaProcesar[i];
+        const colaborador = evaluacion.colaborador;
+        const nombreCompleto = `${colaborador?.nombre || ""} ${colaborador?.apellidos || ""}`.trim();
+
+        // Calcular tiempo restante
+        const tiempoTranscurrido = (Date.now() - tiempoInicio) / 1000;
+        const tiempoPorPlan = i > 0 ? tiempoTranscurrido / i : 40;
+        const planesRestantes = evaluacionesParaProcesar.length - i;
+        const segundosRestantes = Math.ceil(tiempoPorPlan * planesRestantes);
+        const minutosRestantes = Math.floor(segundosRestantes / 60);
+        const segsRestantes = segundosRestantes % 60;
+        const tiempoRestante = minutosRestantes > 0
+          ? `~${minutosRestantes}m ${segsRestantes}s`
+          : `~${segsRestantes}s`;
+
+        setProgresoPlanes({
+          current: i + 1,
+          total: evaluacionesParaProcesar.length,
+          nombre: nombreCompleto,
+          exitosos,
+          errores,
+          tiempoRestante
+        });
+
+        try {
+          // Validar que tenga ambas evaluaciones
+          const tieneAuto = await supabase
+            .from("evaluations")
+            .select("id")
+            .eq("usuario_id", evaluacion.colaborador_id)
+            .eq("periodo_id", periodoFinal)
+            .eq("tipo", "auto")
+            .eq("estado", "enviado")
+            .single();
+
+          if (!tieneAuto.data) {
+            errores++;
+            erroresDetalle.push(`${nombreCompleto}: Falta autoevaluación`);
+            continue;
+          }
+
+          // Llamar a la API para generar el plan
+          const response = await fetch(`${supabaseUrl}/functions/v1/generate-development-plan`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session?.access_token || supabaseKey}`,
+              'apikey': supabaseKey,
+            },
+            body: JSON.stringify({
+              colaborador_id: evaluacion.colaborador_id,
+              periodo_id: periodoFinal,
+            }),
+          });
+
+          const responseData = await response.json();
+
+          if (!response.ok || !responseData?.success) {
+            throw new Error(responseData?.error || "Error generando plan");
+          }
+
+          exitosos++;
+          console.log(`✅ Plan generado para ${nombreCompleto} (${i + 1}/${evaluacionesParaProcesar.length})`);
+
+        } catch (error: any) {
+          errores++;
+          erroresDetalle.push(`${nombreCompleto}: ${error?.message || "Error desconocido"}`);
+          console.error(`❌ Error generando plan para ${nombreCompleto}:`, error);
+        }
+
+        // Pequeña pausa entre cada generación para no saturar la API
+        // Solo pausar si no es el último
+        if (i < evaluacionesParaProcesar.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 2000)); // 2 segundos de pausa
+        }
+      }
+
+      // Mostrar resultado final
+      if (erroresDetalle.length > 0) {
+        console.warn("⚠️ Errores durante la generación de planes:", erroresDetalle);
+      }
+
+      if (exitosos > 0) {
+        toast.success(
+          `Generación completada: ${exitosos} planes generados${errores > 0 ? `, ${errores} errores` : ""}`
+        );
+      } else if (errores > 0) {
+        toast.error(`No se pudo generar ningún plan. ${errores} errores.`);
+      }
+
+      // Recargar datos para actualizar los indicadores
+      await loadData();
+
+    } catch (error: any) {
+      console.error("Error en generación masiva de planes:", error);
+      toast.error(`Error en generación masiva: ${error?.message || "Error desconocido"}`);
+    } finally {
+      setGenerandoPlanesMasivo(false);
+      cancelarGeneracionRef.current = false;
+      setProgresoPlanes({ current: 0, total: 0, nombre: "", exitosos: 0, errores: 0, tiempoRestante: "" });
+    }
+  };
+
   // Función para preparar datos para PDF
   const prepararDatosParaPDF = async (colaborador: any, evaluacionJefe: any) => {
     try {
@@ -410,100 +590,102 @@ const VistaDetalleJefe = () => {
         throw new Error("Instrumento no encontrado");
       }
 
-      const instrumentId = instrument.id || colaborador.nivel;
-      const responsesToUse = calculateConsolidatedResponses(
-        autoevaluacion.responses,
-        evaluacionJefe.responses,
-        instrumentId
-      );
+      // USAR DATOS DEL BACKEND en lugar de calcular en el frontend
+      const { getFinalResultFromSupabase } = await import("@/lib/finalResultSupabase");
+      const resultadoFinal = await getFinalResultFromSupabase(colaborador.dpi, periodoFinal);
+      
+      let performancePercentage = 0;
+      let radarDataPDF: Array<{
+        dimension: string;
+        nombreCompleto: string;
+        numero: number;
+        tuEvaluacion: number;
+        puntaje: number;
+        dimensionData: any;
+      }> = [];
 
-      // Calcular performance score y percentage
-      const performanceScore = calculatePerformanceScore(responsesToUse, instrument.dimensionesDesempeno);
-      const performancePercentage = scoreToPercentage(performanceScore);
-
-      // Preparar radarData
-      const titulosGenerados: string[] = [];
-      const radarDataPDF = instrument.dimensionesDesempeno.map((dim, idx) => {
-        const promedio = calculateDimensionAverage(responsesToUse, dim);
-        const porcentaje = calculateDimensionPercentage(responsesToUse, dim);
+      if (resultadoFinal && resultadoFinal.dimensiones) {
+        // USAR DATOS DEL BACKEND: porcentajes por dimensión ya calculados
+        performancePercentage = scoreToPercentage(resultadoFinal.desempenoFinal);
         
-        let dimensionTitle = getDimensionFriendlyTitle(dim);
-        if (titulosGenerados.includes(dimensionTitle)) {
-          dimensionTitle = dim.nombre.length <= 30 
-            ? dim.nombre 
-            : `${dimensionTitle} (${idx + 1})`;
-        }
-        titulosGenerados.push(dimensionTitle);
+        const titulosGenerados: string[] = [];
+        radarDataPDF = instrument.dimensionesDesempeno.map((dim, idx) => {
+          // Obtener porcentaje del BACKEND
+          const dimensionBackend = resultadoFinal.dimensiones?.find((d: any) => d.id === dim.id);
+          const porcentaje = dimensionBackend?.porcentaje ?? 0;
+          const promedio = dimensionBackend?.promedio ?? 0;
+          
+          let dimensionTitle = getDimensionFriendlyTitle(dim);
+          if (titulosGenerados.includes(dimensionTitle)) {
+            dimensionTitle = dim.nombre.length <= 30 
+              ? dim.nombre 
+              : `${dimensionTitle} (${idx + 1})`;
+          }
+          titulosGenerados.push(dimensionTitle);
+          
+          return {
+            dimension: dimensionTitle,
+            nombreCompleto: dim.nombre,
+            numero: idx + 1,
+            tuEvaluacion: porcentaje,
+            puntaje: promedio,
+            dimensionData: dim
+          };
+        });
         
-        return {
-          dimension: dimensionTitle,
-          nombreCompleto: dim.nombre,
-          numero: idx + 1,
-          tuEvaluacion: porcentaje,
-          puntaje: promedio,
-          dimensionData: dim
-        };
-      });
+        console.log('✅ [VistaDetalleJefe] Usando datos del BACKEND para PDF:', radarDataPDF);
+      } else {
+        // FALLBACK: calcular desde respuestas si no hay resultado del backend
+        console.warn('⚠️ [VistaDetalleJefe] No hay resultado del backend, calculando desde respuestas (fallback)');
+        const instrumentId = instrument.id || colaborador.nivel;
+        const responsesToUse = calculateConsolidatedResponses(
+          autoevaluacion.responses,
+          evaluacionJefe.responses,
+          instrumentId
+        );
+        
+        const performanceScore = calculatePerformanceScore(responsesToUse, instrument.dimensionesDesempeno);
+        performancePercentage = scoreToPercentage(performanceScore);
+        
+        const titulosGenerados: string[] = [];
+        radarDataPDF = instrument.dimensionesDesempeno.map((dim, idx) => {
+          const promedio = calculateDimensionAverage(responsesToUse, dim);
+          const porcentaje = calculateDimensionPercentage(responsesToUse, dim);
+          
+          let dimensionTitle = getDimensionFriendlyTitle(dim);
+          if (titulosGenerados.includes(dimensionTitle)) {
+            dimensionTitle = dim.nombre.length <= 30 
+              ? dim.nombre 
+              : `${dimensionTitle} (${idx + 1})`;
+          }
+          titulosGenerados.push(dimensionTitle);
+          
+          return {
+            dimension: dimensionTitle,
+            nombreCompleto: dim.nombre,
+            numero: idx + 1,
+            tuEvaluacion: porcentaje,
+            puntaje: promedio,
+            dimensionData: dim
+          };
+        });
+      }
 
-      // Calcular promedio municipal por dimensión
+      // Obtener promedio municipal desde el BACKEND (no calcular en frontend)
       let promedioMunicipal: Record<string, number> = {};
       try {
-        const { data: usuariosMismoNivel } = await supabase
-          .from('users')
-          .select('dpi')
-          .eq('nivel', colaborador.nivel)
-          .eq('estado', 'activo')
-          .in('rol', ['colaborador', 'jefe']);
-
-        const dpisMismoNivel = usuariosMismoNivel?.map(u => u.dpi) || [];
+        const { getMunicipalAverageByDimension } = await import("@/lib/backendStatistics");
+        const promedioMunicipalData = await getMunicipalAverageByDimension(colaborador.nivel, periodoFinal);
         
-        if (dpisMismoNivel.length > 0) {
-          const { data: finalResults } = await supabase
-            .from('final_evaluation_results')
-            .select('colaborador_id, resultado_final, autoevaluacion_id, evaluacion_jefe_id')
-            .eq('periodo_id', periodoFinal)
-            .in('colaborador_id', dpisMismoNivel);
+        // Convertir a formato esperado por el componente
+        instrument.dimensionesDesempeno.forEach((dim) => {
+          const dimData = promedioMunicipalData[dim.id];
+          promedioMunicipal[dim.id] = dimData?.porcentaje || 0;
+        });
 
-          if (finalResults && finalResults.length > 0) {
-            const autoevaluacionIds = finalResults.map(r => r.autoevaluacion_id).filter(id => id);
-            const jefeEvaluacionIds = finalResults.map(r => r.evaluacion_jefe_id).filter(id => id);
-            
-            const { data: autoEvals } = await supabase
-              .from('evaluations')
-              .select('id, responses')
-              .in('id', autoevaluacionIds)
-              .eq('tipo', 'auto');
-
-            const { data: jefeEvals } = await supabase
-              .from('evaluations')
-              .select('id, responses')
-              .in('id', jefeEvaluacionIds)
-              .eq('tipo', 'jefe');
-
-            const autoEvalMap = new Map((autoEvals || []).map(e => [e.id, (e.responses as Record<string, number>) || {}]));
-            const jefeEvalMap = new Map((jefeEvals || []).map(e => [e.id, (e.responses as Record<string, number>) || {}]));
-
-            instrument.dimensionesDesempeno.forEach((dim) => {
-              let sumaPorcentajes = 0;
-              let contador = 0;
-
-              finalResults.forEach((resultado) => {
-                const autoResponses = autoEvalMap.get(resultado.autoevaluacion_id) || {};
-                const jefeResponses = jefeEvalMap.get(resultado.evaluacion_jefe_id) || {};
-                const consolidadas = calculateConsolidatedResponses(autoResponses, jefeResponses, instrumentId);
-                const porcentaje = calculateDimensionPercentage(consolidadas, dim);
-                if (porcentaje > 0) {
-                  sumaPorcentajes += porcentaje;
-                  contador++;
-                }
-              });
-
-              promedioMunicipal[dim.id] = contador > 0 ? Math.round(sumaPorcentajes / contador) : 0;
-            });
-          }
-        }
+        console.log('✅ [VistaDetalleJefe] Promedio municipal obtenido del BACKEND:', promedioMunicipal);
       } catch (error) {
-        console.error("Error calculando promedio municipal:", error);
+        console.error('❌ Error obteniendo promedio municipal del backend:', error);
       }
 
       // Identificar fortalezas y áreas de oportunidad
@@ -538,6 +720,121 @@ const VistaDetalleJefe = () => {
     } catch (error: any) {
       console.error("Error preparando datos para PDF:", error);
       throw error;
+    }
+  };
+
+  // Función para exportar todos los PDFs de evaluaciones completadas en un ZIP
+  const exportarTodosLosPDFs = async () => {
+    const evaluacionesCompletadas = evaluaciones.filter(e => e.estado === "enviado");
+
+    if (evaluacionesCompletadas.length === 0) {
+      toast.error("No hay evaluaciones completadas para exportar");
+      return;
+    }
+
+    setExportandoTodos(true);
+    setProgresoExportacion({ current: 0, total: evaluacionesCompletadas.length, nombre: "" });
+
+    try {
+      const periodoFinal = periodoId || (await getActivePeriodId());
+      if (!periodoFinal) {
+        toast.error("No hay período activo");
+        setExportandoTodos(false);
+        return;
+      }
+
+      // Obtener nombre del período
+      const { data: periodoData } = await supabase
+        .from("evaluation_periods")
+        .select("nombre")
+        .eq("id", periodoFinal)
+        .single();
+
+      const periodoNombre = periodoData?.nombre || periodoFinal;
+
+      // Preparar datos para cada colaborador
+      const colaboradoresData: ColaboradorExportData[] = [];
+
+      for (const evaluacion of evaluacionesCompletadas) {
+        const colaborador = evaluacion.colaborador;
+
+        try {
+          // Obtener datos completos del colaborador
+          const { data: colaboradorCompleto } = await supabase
+            .from("users")
+            .select("*")
+            .eq("dpi", colaborador.dpi)
+            .single();
+
+          if (!colaboradorCompleto) continue;
+
+          // Usar prepararDatosParaPDF para obtener datos correctos
+          const datosPreparados = await prepararDatosParaPDF(colaboradorCompleto, evaluacion);
+
+          // Cargar plan de desarrollo si existe
+          const planDesarrollo = planesDesarrollo.get(colaborador.dpi);
+          let planParaPDF = null;
+          if (planDesarrollo) {
+            const competencias = planDesarrollo.competencias_desarrollar || {};
+            planParaPDF = {
+              planEstructurado: planDesarrollo.planEstructurado || (typeof competencias === 'object' && competencias.acciones ? competencias : null),
+              recomendaciones: planDesarrollo.recomendaciones || (typeof competencias === 'object' && competencias.recomendaciones ? competencias.recomendaciones : [])
+            };
+          }
+
+          colaboradoresData.push({
+            empleado: {
+              nombre: colaboradorCompleto.nombre || colaborador.nombre || "",
+              apellidos: colaboradorCompleto.apellidos || colaborador.apellidos || "",
+              dpi: colaboradorCompleto.dpi || colaborador.dpi || "",
+              cargo: colaboradorCompleto.cargo || colaborador.cargo || "",
+              area: colaboradorCompleto.area || colaborador.area || "",
+              nivel: colaboradorCompleto.nivel || colaborador.nivel || "",
+              direccionUnidad: colaboradorCompleto.direccion_unidad || "",
+              departamentoDependencia: colaboradorCompleto.departamento_dependencia || "",
+              profesion: colaboradorCompleto.profesion || "",
+              correo: colaboradorCompleto.correo || "",
+              telefono: colaboradorCompleto.telefono || "",
+              jefeNombre: jefe ? `${jefe.nombre} ${jefe.apellidos}` : "",
+              directoraRRHHNombre: nombreDirectoraRRHH || undefined,
+            },
+            resultadoData: {
+              performancePercentage: datosPreparados.performancePercentage,
+              jefeCompleto: datosPreparados.jefeCompleto,
+              fortalezas: datosPreparados.fortalezas,
+              areasOportunidad: datosPreparados.areasOportunidad,
+              radarData: datosPreparados.radarDataPDF,
+            },
+            planDesarrollo: planParaPDF
+          });
+
+        } catch (error) {
+          console.error(`Error preparando datos para ${colaborador?.nombre}:`, error);
+        }
+      }
+
+      if (colaboradoresData.length === 0) {
+        toast.error("No se pudieron preparar los datos de ningún colaborador");
+        setExportandoTodos(false);
+        return;
+      }
+
+      // Exportar todos en ZIP
+      await exportMultiplePDFsToZip(
+        colaboradoresData,
+        periodoNombre,
+        jefe ? `${jefe.nombre} ${jefe.apellidos}` : "Jefe",
+        (current, total, nombre) => {
+          setProgresoExportacion({ current, total, nombre });
+        }
+      );
+
+    } catch (error: any) {
+      console.error("Error en exportación masiva:", error);
+      toast.error(`Error al exportar: ${error?.message || "Error desconocido"}`);
+    } finally {
+      setExportandoTodos(false);
+      setProgresoExportacion({ current: 0, total: 0, nombre: "" });
     }
   };
 
@@ -599,7 +896,7 @@ const VistaDetalleJefe = () => {
           .eq("id", periodoFinal)
           .single();
 
-        // Obtener nombre del jefe
+        // Obtener nombre y cargo del jefe
         const { data: assignment } = await supabase
           .from("user_assignments")
           .select("jefe_id")
@@ -608,14 +905,18 @@ const VistaDetalleJefe = () => {
           .single();
 
         let nombreJefe = "N/A";
+        let cargoJefe = "Jefe Inmediato";
         if (assignment?.jefe_id) {
           const { data: jefeData } = await supabase
             .from("users")
-            .select("nombre, apellidos")
+            .select("nombre, apellidos, cargo")
             .eq("dpi", assignment.jefe_id)
             .single();
           if (jefeData) {
-            nombreJefe = `${jefeData.nombre} ${jefeData.apellidos}`;
+            nombreJefe = `${jefeData.nombre} ${jefeData.apellidos || ''}`.trim();
+            if (jefeData.cargo && typeof jefeData.cargo === 'string' && jefeData.cargo.trim() !== '') {
+              cargoJefe = jefeData.cargo.trim();
+            }
           }
         }
 
@@ -639,13 +940,15 @@ const VistaDetalleJefe = () => {
             cargo: colaboradorCompleto.cargo || colaborador.cargo || "",
             area: colaboradorCompleto.area || colaborador.area || "",
             nivel: colaboradorCompleto.nivel || colaborador.nivel || "",
-            direccionUnidad: colaboradorCompleto.direccionUnidad || "",
-            departamentoDependencia: colaboradorCompleto.departamentoDependencia || "",
+            direccionUnidad: colaboradorCompleto.direccion_unidad || "",
+            departamentoDependencia: colaboradorCompleto.departamento_dependencia || "",
             profesion: colaboradorCompleto.profesion || "",
             correo: colaboradorCompleto.correo || "",
             telefono: colaboradorCompleto.telefono || "",
             jefeNombre: nombreJefe,
-            directoraRRHHNombre: "Brenda Carolina Lopez Perez",
+            jefeCargo: cargoJefe,
+            directoraRRHHNombre: nombreDirectoraRRHH || undefined,
+            directoraRRHHCargo: undefined, // Se obtendrá automáticamente en preparePDFData
           },
           periodoData?.nombre || periodoFinal,
           new Date(),
@@ -813,13 +1116,163 @@ const VistaDetalleJefe = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Evaluaciones por Colaborador
-            </CardTitle>
-            <CardDescription>
-              Lista detallada de todas las evaluaciones: completadas, en progreso y pendientes
-            </CardDescription>
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Evaluaciones por Colaborador
+                </CardTitle>
+                <CardDescription>
+                  Lista detallada de todas las evaluaciones: completadas, en progreso y pendientes
+                </CardDescription>
+              </div>
+              {completadas > 0 && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* Botón para generar todos los planes */}
+                  {(() => {
+                    const sinPlan = evaluaciones.filter(e => e.estado === "enviado" && !planesDesarrollo.has(e.colaborador_id)).length;
+                    return sinPlan > 0 && (
+                      <Button
+                        onClick={() => generarTodosLosPlanes(true)}
+                        disabled={generandoPlanesMasivo || exportandoTodos}
+                        variant="outline"
+                        className="gap-2"
+                      >
+                        {generandoPlanesMasivo ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Generando planes...
+                          </>
+                        ) : (
+                          <>
+                            <Wand2 className="h-4 w-4" />
+                            Generar Planes ({sinPlan})
+                          </>
+                        )}
+                      </Button>
+                    );
+                  })()}
+
+                  {/* Botón para regenerar todos los planes */}
+                  {planesDesarrollo.size > 0 && (
+                    <Button
+                      onClick={() => generarTodosLosPlanes(false)}
+                      disabled={generandoPlanesMasivo || exportandoTodos}
+                      variant="outline"
+                      className="gap-2"
+                    >
+                      {generandoPlanesMasivo ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Regenerando...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-4 w-4" />
+                          Regenerar Todos ({completadas})
+                        </>
+                      )}
+                    </Button>
+                  )}
+
+                  {/* Botón para exportar todos los PDFs */}
+                  <Button
+                    onClick={exportarTodosLosPDFs}
+                    disabled={exportandoTodos || generandoPlanesMasivo}
+                    className="gap-2"
+                  >
+                    {exportandoTodos ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Exportando...
+                      </>
+                    ) : (
+                      <>
+                        <Package className="h-4 w-4" />
+                        Exportar Todos ({completadas} PDFs)
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
+            </div>
+            {/* Barra de progreso para exportación masiva */}
+            {exportandoTodos && progresoExportacion.total > 0 && (
+              <div className="mt-4 space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">
+                    Generando PDF {progresoExportacion.current} de {progresoExportacion.total}
+                  </span>
+                  <span className="font-medium">
+                    {Math.round((progresoExportacion.current / progresoExportacion.total) * 100)}%
+                  </span>
+                </div>
+                <Progress
+                  value={(progresoExportacion.current / progresoExportacion.total) * 100}
+                  className="h-2"
+                />
+                {progresoExportacion.nombre && (
+                  <p className="text-xs text-muted-foreground">
+                    Procesando: {progresoExportacion.nombre}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Barra de progreso para generación masiva de planes */}
+            {generandoPlanesMasivo && progresoPlanes.total > 0 && (
+              <div className="mt-4 space-y-2 p-4 bg-muted/50 rounded-lg border">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground flex items-center gap-2">
+                    <Wand2 className="h-4 w-4 animate-pulse" />
+                    Generando plan {progresoPlanes.current} de {progresoPlanes.total}
+                  </span>
+                  <div className="flex items-center gap-4">
+                    <span className="text-xs text-muted-foreground">
+                      {progresoPlanes.tiempoRestante}
+                    </span>
+                    <span className="font-medium">
+                      {Math.round((progresoPlanes.current / progresoPlanes.total) * 100)}%
+                    </span>
+                  </div>
+                </div>
+                <Progress
+                  value={(progresoPlanes.current / progresoPlanes.total) * 100}
+                  className="h-2"
+                />
+                <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-4">
+                    {progresoPlanes.nombre && (
+                      <span className="text-muted-foreground">
+                        Procesando: <span className="font-medium">{progresoPlanes.nombre}</span>
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-green-600">
+                      ✓ {progresoPlanes.exitosos} exitosos
+                    </span>
+                    {progresoPlanes.errores > 0 && (
+                      <span className="text-red-600">
+                        ✗ {progresoPlanes.errores} errores
+                      </span>
+                    )}
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => {
+                        cancelarGeneracionRef.current = true;
+                        toast.info("Cancelando... espere a que termine el plan actual");
+                      }}
+                      className="h-6 px-2 text-xs"
+                    >
+                      <XCircle className="h-3 w-3 mr-1" />
+                      Cancelar
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
           </CardHeader>
           <CardContent>
             {evaluaciones.length === 0 ? (

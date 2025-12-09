@@ -6,6 +6,16 @@ const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+/**
+ * Convierte un score de escala 0-5 a porcentaje 0-100
+ * (misma lógica que scoreToPercentage en el frontend)
+ */
+function scoreToPercentage(score: number): number {
+  if (score < 1) return 0;
+  if (score > 5) return 100;
+  return Math.round((score / 5) * 100);
+}
+
 interface GenerateDevelopmentPlanRequest {
   colaborador_id: string;
   periodo_id: string;
@@ -22,7 +32,7 @@ interface DevelopmentPlanResponse {
  * Construye el user prompt con datos específicos (sin contexto estático)
  */
 function buildUserPrompt(data: any): string {
-  const { colaborador, autoevaluacion, evaluacionJefe, resultadoFinal, instrumento, grupos } = data;
+  const { colaborador, autoevaluacion, evaluacionJefe, resultadoFinal, instrumento, grupos, npsScore, necesidadesDesarrollo } = data;
 
   // Validar que los datos necesarios estén presentes
   if (!autoevaluacion || !evaluacionJefe || !instrumento || !resultadoFinal) {
@@ -40,93 +50,23 @@ function buildUserPrompt(data: any): string {
     throw new Error("Configuración de instrumento inválida: dimensionesDesempeno no encontrada");
   }
 
-  // Construir detalle de evaluación ítem por ítem
-  let detalleDesempeno = "";
-  instrumento.dimensionesDesempeno.forEach((dim: any) => {
-    if (!dim.items || !Array.isArray(dim.items)) {
-      console.warn("Dimensión sin items válidos:", dim);
-      return;
-    }
-
-    const dimScoreAuto = dim.items.map((item: any) => {
-      const value = autoResponses[item.id];
-      return typeof value === 'number' ? value : 0;
-    });
-    const dimScoreJefe = dim.items.map((item: any) => {
-      const value = jefeResponses[item.id];
-      return typeof value === 'number' ? value : 0;
-    });
-    
-    const avgAuto = dimScoreAuto.length > 0 
-      ? dimScoreAuto.reduce((a: number, b: number) => a + b, 0) / dimScoreAuto.length 
-      : 0;
-    const avgJefe = dimScoreJefe.length > 0 
-      ? dimScoreJefe.reduce((a: number, b: number) => a + b, 0) / dimScoreJefe.length 
-      : 0;
-
-    detalleDesempeno += `\n### ${dim.nombre || 'Dimensión sin nombre'} (Peso: ${((dim.peso || 0) * 100).toFixed(1)}%)\n`;
-    detalleDesempeno += `Score Autoevaluación: ${avgAuto.toFixed(2)}/5.0 (${((avgAuto / 5) * 100).toFixed(1)}%)\n`;
-    detalleDesempeno += `Score Evaluación Jefe: ${avgJefe.toFixed(2)}/5.0 (${((avgJefe / 5) * 100).toFixed(1)}%)\n`;
-
-    // Ordenar ítems por puntuación del jefe (de menor a mayor) para que los más críticos aparezcan primero
-    const itemsConScore = dim.items.map((item: any) => {
-      const scoreAuto = typeof autoResponses[item.id] === 'number' ? autoResponses[item.id] : 0;
-      const scoreJefe = typeof jefeResponses[item.id] === 'number' ? jefeResponses[item.id] : 0;
-      return { item, scoreAuto, scoreJefe };
-    }).sort((a: any, b: any) => a.scoreJefe - b.scoreJefe); // Ordenar de menor a mayor
-
-    itemsConScore.forEach(({ item, scoreAuto, scoreJefe }: any) => {
-      const indicadorCritico = scoreJefe < 3.5 ? ' 🚨' : '';
-      detalleDesempeno += `  - ${item.texto || 'Item sin texto'}${indicadorCritico}\n`;
-      detalleDesempeno += `    Autoevaluación: ${scoreAuto}/5  |  Jefe: ${scoreJefe}/5`;
-      if (Math.abs(scoreAuto - scoreJefe) > 0.5) {
-        detalleDesempeno += `  ⚠️ (Discrepancia significativa)`;
-      }
-      detalleDesempeno += `\n`;
-    });
-
-    if (autoComments[dim.id]) {
-      detalleDesempeno += `  📝 Comentario del colaborador: ${autoComments[dim.id]}\n`;
-    }
-    if (jefeComments[dim.id]) {
-      detalleDesempeno += `  📝 Comentario del jefe: ${jefeComments[dim.id]}\n`;
+  // Consolidar comentarios del colaborador
+  const comentariosColaborador: string[] = [];
+  Object.keys(autoComments).forEach((dimId) => {
+    if (autoComments[dimId]) {
+      const dimNombre = instrumento.dimensionesDesempeno.find((d: any) => d.id === dimId)?.nombre || 'Dimensión';
+      comentariosColaborador.push(`${dimNombre}: ${autoComments[dimId]}`);
     }
   });
 
-  // Construir detalle de potencial
-  let detallePotencial = "";
-  const potencialResponses = evaluacionJefe.evaluacion_potencial?.responses || {};
-  const potencialComments = evaluacionJefe.evaluacion_potencial?.comments || {};
-  
-  if (instrumento.dimensionesPotencial && Array.isArray(instrumento.dimensionesPotencial) && Object.keys(potencialResponses).length > 0) {
-    instrumento.dimensionesPotencial.forEach((dim: any) => {
-      if (!dim.items || !Array.isArray(dim.items)) {
-        console.warn("Dimensión de potencial sin items válidos:", dim);
-        return;
-      }
-
-      const dimScore = dim.items.map((item: any) => {
-        const value = potencialResponses[item.id];
-        return typeof value === 'number' ? value : 0;
-      });
-      const avg = dimScore.length > 0 
-        ? dimScore.reduce((a: number, b: number) => a + b, 0) / dimScore.length 
-        : 0;
-
-      detallePotencial += `\n### ${dim.nombre || 'Dimensión sin nombre'} (Peso: ${((dim.peso || 0) * 100).toFixed(1)}%)\n`;
-      detallePotencial += `Score: ${avg.toFixed(2)}/5.0 (${((avg / 5) * 100).toFixed(1)}%)\n`;
-
-      dim.items.forEach((item: any) => {
-        const score = typeof potencialResponses[item.id] === 'number' ? potencialResponses[item.id] : 0;
-        detallePotencial += `  - ${item.texto || 'Item sin texto'}\n`;
-        detallePotencial += `    Evaluación: ${score}/5\n`;
-      });
-
-      if (potencialComments[dim.id]) {
-        detallePotencial += `  📝 Comentario: ${potencialComments[dim.id]}\n`;
-      }
-    });
-  }
+  // Consolidar comentarios del jefe
+  const comentariosJefe: string[] = [];
+  Object.keys(jefeComments).forEach((dimId) => {
+    if (jefeComments[dimId]) {
+      const dimNombre = instrumento.dimensionesDesempeno.find((d: any) => d.id === dimId)?.nombre || 'Dimensión';
+      comentariosJefe.push(`${dimNombre}: ${jefeComments[dimId]}`);
+    }
+  });
 
   // Identificar dimensiones más débiles (menores scores)
   const dimensionesConScore = instrumento.dimensionesDesempeno
@@ -139,7 +79,8 @@ function buildUserPrompt(data: any): string {
       const avg = dimScoreJefe.length > 0 
         ? dimScoreJefe.reduce((a: number, b: number) => a + b, 0) / dimScoreJefe.length 
         : 0;
-      return { nombre: dim.nombre || 'Dimensión sin nombre', score: avg, peso: dim.peso || 0 };
+      const porcentaje = scoreToPercentage(avg);
+      return { nombre: dim.nombre || 'Dimensión sin nombre', score: avg, porcentaje, peso: dim.peso || 0 };
     })
     .sort((a: any, b: any) => a.score - b.score); // Ordenar de menor a mayor
 
@@ -155,94 +96,115 @@ function buildUserPrompt(data: any): string {
       const scoreJefe = typeof jefeResponses[item.id] === 'number' ? jefeResponses[item.id] : 0;
       const scoreAuto = typeof autoResponses[item.id] === 'number' ? autoResponses[item.id] : 0;
       
-      // Considerar críticos los ítems con score del jefe < 3.5
-      if (scoreJefe < 3.5) {
+      // Considerar críticos los ítems con score del jefe < 70% (equivalente a 3.5/5.0)
+      const porcentajeJefe = scoreToPercentage(scoreJefe);
+      if (porcentajeJefe < 70) {
+        const porcentajeAuto = scoreToPercentage(scoreAuto);
         itemsCriticos.push({
           dimension: dim.nombre || 'Dimensión sin nombre',
           itemTexto: item.texto || 'Item sin texto',
-          scoreJefe: scoreJefe,
-          scoreAuto: scoreAuto,
-          diferencia: scoreAuto - scoreJefe, // Para ver si hay discrepancia
+          porcentajeJefe: porcentajeJefe,
+          porcentajeAuto: porcentajeAuto,
+          diferencia: porcentajeAuto - porcentajeJefe, // Diferencia en porcentaje
         });
       }
     });
   });
 
-  // Ordenar por score del jefe (de menor a mayor) para priorizar los más críticos
-  itemsCriticos.sort((a: any, b: any) => a.scoreJefe - b.scoreJefe);
+  // Ordenar por porcentaje del jefe (de menor a mayor) para priorizar los más críticos
+  itemsCriticos.sort((a: any, b: any) => a.porcentajeJefe - b.porcentajeJefe);
   
   // Tomar los top 10 más críticos
   const topItemsCriticos = itemsCriticos.slice(0, 10);
 
-  // Obtener fecha actual para usar como referencia
+  // Obtener fecha actual y calcular período del plan (6 meses)
   const fechaActual = new Date();
   const añoActual = fechaActual.getFullYear();
-  const mesActual = fechaActual.getMonth() + 1; // getMonth() devuelve 0-11
+  const mesActual = fechaActual.getMonth() + 1;
   const diaActual = fechaActual.getDate();
   const fechaActualFormato = `${añoActual}-${String(mesActual).padStart(2, '0')}-${String(diaActual).padStart(2, '0')}`;
-  const mesActualTexto = fechaActual.toLocaleDateString('es-GT', { month: 'long', year: 'numeric' });
+  
+  // Calcular fecha final del plan (6 meses después)
+  const fechaFinal = new Date(fechaActual);
+  fechaFinal.setMonth(fechaFinal.getMonth() + 6);
+  const añoFinal = fechaFinal.getFullYear();
+  const mesFinal = fechaFinal.getMonth() + 1;
+  const fechaFinalFormato = `${añoFinal}-${String(mesFinal).padStart(2, '0')}`;
+  
+  // Calcular antigüedad
+  let antiguedad = "No registrada";
+  if (colaborador.fecha_ingreso) {
+    const fechaIngreso = new Date(colaborador.fecha_ingreso);
+    const años = fechaActual.getFullYear() - fechaIngreso.getFullYear();
+    const meses = fechaActual.getMonth() - fechaIngreso.getMonth();
+    if (años > 0) {
+      antiguedad = `${años} año${años > 1 ? 's' : ''}`;
+      if (meses > 0) antiguedad += ` ${meses} mes${meses > 1 ? 'es' : ''}`;
+    } else if (meses > 0) {
+      antiguedad = `${meses} mes${meses > 1 ? 'es' : ''}`;
+    } else {
+      antiguedad = "Menos de 1 mes";
+    }
+  }
 
-  return `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📋 INFORMACIÓN DEL COLABORADOR
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  return `COLABORADOR
+Nombre: ${colaborador.nombre} ${colaborador.apellidos}
+Cargo: ${colaborador.cargo}
+Área: ${colaborador.area || "No especificada"}
+Nivel: ${colaborador.nivel}
+Antigüedad: ${antiguedad}
+${colaborador.profesion ? `Profesión: ${colaborador.profesion}` : ''}
 
-👤 Nombre: ${colaborador.nombre} ${colaborador.apellidos}
-💼 Cargo: ${colaborador.cargo}
-📊 Nivel: ${colaborador.nivel}
-🏢 Área: ${colaborador.area || "No especificada"}
-📅 Fecha de ingreso: ${colaborador.fecha_ingreso ? new Date(colaborador.fecha_ingreso).toLocaleDateString('es-GT') : "No registrada"}
-🎓 Profesión: ${colaborador.profesion || "No registrada"}
-${grupos.length > 0 ? `👥 Pertenece a cuadrilla(s): ${grupos.map((g: any) => g.nombre).join(", ")}` : ""}
+⚠️ IMPORTANTE: El CARGO "${colaborador.cargo}" define el tipo de trabajo que realiza este colaborador. Todas las acciones deben ser ESPECÍFICAS a este cargo y reflejar las responsabilidades reales del puesto. NO uses acciones genéricas que podrían aplicarse a cualquier puesto administrativo.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📅 INFORMACIÓN TEMPORAL
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+RESULTADOS
+Desempeño Final: ${scoreToPercentage(resultadoFinal.desempenoFinal)}%
+Evaluación Jefe: ${scoreToPercentage(resultadoFinal.desempenoJefe)}%
+Autoevaluación: ${scoreToPercentage(resultadoFinal.desempenoAuto)}%
+Potencial: ${resultadoFinal.potencial ? `${scoreToPercentage(resultadoFinal.potencial)}%` : "No evaluado"}
+Posición 9-Box: ${resultadoFinal.posicion9Box}
+${npsScore !== undefined && npsScore !== null ? `NPS (Net Promoter Score): ${npsScore}/10 ${npsScore >= 9 ? "(Promotor)" : npsScore >= 7 ? "(Neutro)" : "(Detractor)"}` : ""}
 
-📆 FECHA ACTUAL: ${fechaActualFormato} (${mesActualTexto})
-⚠️ IMPORTANTE: Todas las fechas del plan deben ser POSTERIORES a esta fecha. 
-   - Usa fechas del año ${añoActual} o ${añoActual + 1}
-   - NO uses fechas del 2024 o anteriores
-   - Las acciones deben tener fechas realistas considerando que hoy es ${fechaActualFormato}
+DIMENSIONES MÁS DÉBILES (máximo 3)
+${top3Debiles.map((d: any, i: number) => `${i + 1}. ${d.nombre}: ${d.porcentaje}%`).join('\n')}
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📊 RESULTADOS DE EVALUACIÓN
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-🎯 DESEMPEÑO:
-  - Autoevaluación: ${resultadoFinal.desempenoAuto?.toFixed(2)}/5.0 (${((resultadoFinal.desempenoAuto / 5) * 100).toFixed(1)}%)
-  - Evaluación Jefe: ${resultadoFinal.desempenoJefe?.toFixed(2)}/5.0 (${((resultadoFinal.desempenoJefe / 5) * 100).toFixed(1)}%)
-  - 🏆 Desempeño Final: ${resultadoFinal.desempenoFinal?.toFixed(2)}/5.0 (${((resultadoFinal.desempenoFinal / 5) * 100).toFixed(1)}%)
-
-⭐ POTENCIAL: ${resultadoFinal.potencial ? `${resultadoFinal.potencial.toFixed(2)}/5.0 (${((resultadoFinal.potencial / 5) * 100).toFixed(1)}%)` : "No evaluado"}
-
-📍 Posición 9-Box: ${resultadoFinal.posicion9Box}
-
-🎯 TOP 3 DIMENSIONES QUE REQUIEREN MAYOR ATENCIÓN (según evaluación del jefe):
-${top3Debiles.map((d: any, i: number) => `${i + 1}. ${d.nombre}: ${d.score.toFixed(2)}/5.0 (${((d.score / 5) * 100).toFixed(1)}%)`).join('\n')}
-
-${topItemsCriticos.length > 0 ? `\n🚨 ÍTEMS CRÍTICOS QUE REQUIEREN ATENCIÓN INMEDIATA (puntuación del jefe < 3.5/5.0):
+${topItemsCriticos.length > 0 ? `ÍTEMS CRÍTICOS (jefe calificó menos de 70%)
 ${topItemsCriticos.map((item: any, i: number) => {
-  const indicadorDiscrepancia = Math.abs(item.diferencia) > 0.5 
-    ? ` ⚠️ Discrepancia: Auto=${item.scoreAuto.toFixed(1)} vs Jefe=${item.scoreJefe.toFixed(1)}` 
+  const indicadorDiscrepancia = Math.abs(item.diferencia) > 10 
+    ? ` (Discrepancia: Auto=${item.porcentajeAuto}% vs Jefe=${item.porcentajeJefe}%)` 
     : '';
-  return `${i + 1}. [${item.dimension}] ${item.itemTexto}: ${item.scoreJefe.toFixed(1)}/5.0${indicadorDiscrepancia}`;
+  return `${i + 1}. "${item.itemTexto}" [${item.dimension}]: Jefe=${item.porcentajeJefe}%${indicadorDiscrepancia}`;
 }).join('\n')}
 
-⚠️ IMPORTANTE: Estos ítems específicos dentro de las dimensiones son donde el colaborador tiene mayores dificultades. 
-   El plan de desarrollo debe incluir acciones concretas para mejorar estos puntos específicos, no solo la dimensión general.` : ''}
+IMPORTANTE: Estos ítems específicos (texto literal entre comillas) son donde el colaborador tiene mayores dificultades. El plan debe incluir acciones concretas para mejorar estos puntos específicos mencionados literalmente.` : ''}
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📝 EVALUACIÓN DETALLADA POR DIMENSIÓN (ÍTEM POR ÍTEM)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-${detalleDesempeno}
+${comentariosColaborador.length > 0 ? `COMENTARIOS DEL COLABORADOR
+${comentariosColaborador.join('\n')}` : ''}
 
-${detallePotencial ? `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⭐ EVALUACIÓN DE POTENCIAL
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-${detallePotencial}` : ''}
+${comentariosJefe.length > 0 ? `COMENTARIOS DEL JEFE
+${comentariosJefe.join('\n')}` : ''}
 
-Genera el Plan de Desarrollo basándote en estos datos específicos de la evaluación. 
-⚠️ RECUERDA: Usa fechas del ${añoActual} o ${añoActual + 1}, NO uses fechas del 2024 o anteriores.`;
+${necesidadesDesarrollo && necesidadesDesarrollo.length > 0 ? `NECESIDADES DE DESARROLLO Y RECURSOS (expresadas por el colaborador)
+${necesidadesDesarrollo.map((necesidad: any, i: number) => {
+  const tipoTexto = necesidad.tipo === "capacitacion" ? "Capacitación" : necesidad.tipo === "herramienta" ? "Herramienta/Recurso" : "Otro";
+  return `${i + 1}. [${tipoTexto}] ${necesidad.pregunta}
+   Respuesta: ${necesidad.respuesta}`;
+}).join('\n\n')}
+
+IMPORTANTE: El colaborador ha expresado estas necesidades específicas. DEBES:
+- Enfocar la mayoría de las acciones en las dimensiones débiles e ítems críticos identificados arriba
+- AL MENOS UNA acción debe responder DIRECTAMENTE a estas necesidades expresadas (herramientas o capacitaciones), mostrando que se escucha su perspectiva
+- Las demás acciones pueden integrar estas necesidades cuando sean relevantes a las dimensiones débiles
+- Para herramientas: crear acciones de tipo "experiencia" que incluyan usar, probar o implementar las herramientas específicas mencionadas
+- Para capacitaciones: mencionar los temas específicos que el colaborador pidió (no solo genéricos)
+- Las acciones siempre deben reflejar el CARGO específico del colaborador para que sean relevantes a su puesto
+- La acción que responde directamente a las necesidades debe ser específica al cargo y relevante.` : ''}
+
+PARÁMETROS DEL PLAN
+Fecha actual: ${fechaActualFormato}
+Período del plan: 6 meses (hasta ${fechaFinalFormato})
+Cantidad de acciones esperadas: 5-7 acciones respetando modelo 70-20-10 (mínimo 3-4 experiencia, 1-2 social, máximo 1 formal)
+Todas las fechas deben ser posteriores a ${fechaActualFormato} y dentro del período del plan.`;
 }
 
 Deno.serve(async (req: Request): Promise<Response> => {
@@ -283,7 +245,15 @@ Deno.serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    // Obtener evaluaciones completas
+    // Obtener resultado final calculado desde la BD (tiene los cálculos correctos)
+    const { data: resultadoFinalBD, error: resultadoError } = await supabase
+      .from("final_evaluation_results")
+      .select("*")
+      .eq("colaborador_id", colaborador_id)
+      .eq("periodo_id", periodo_id)
+      .maybeSingle();
+
+    // Obtener evaluaciones completas (incluyendo nps_score)
     const { data: autoevaluacion, error: autoError } = await supabase
       .from("evaluations")
       .select("*")
@@ -302,6 +272,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       .eq("estado", "enviado")
       .single();
 
+
     if (autoError || !autoevaluacion) {
       console.error("Error obteniendo autoevaluación:", autoError);
       return new Response(
@@ -316,6 +287,32 @@ Deno.serve(async (req: Request): Promise<Response> => {
         JSON.stringify({ success: false, error: `Evaluación del jefe no encontrada: ${jefeError?.message || "No encontrada"}` }),
         { status: 404, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
       );
+    }
+
+    // Obtener respuestas a preguntas abiertas (necesidades de capacitación y herramientas)
+    const { data: preguntasAbiertas, error: preguntasError } = await supabase
+      .from("open_question_responses")
+      .select(`
+        respuesta,
+        open_questions (
+          pregunta,
+          tipo
+        )
+      `)
+      .eq("evaluacion_id", autoevaluacion.id);
+
+    // Normalizar preguntas abiertas
+    const necesidadesDesarrollo: Array<{ tipo: string; pregunta: string; respuesta: string }> = [];
+    if (preguntasAbiertas && !preguntasError) {
+      preguntasAbiertas.forEach((item: any) => {
+        if (item.open_questions && item.respuesta) {
+          necesidadesDesarrollo.push({
+            tipo: item.open_questions.tipo || "otro",
+            pregunta: item.open_questions.pregunta || "",
+            respuesta: item.respuesta,
+          });
+        }
+      });
     }
 
     // Obtener instrumento
@@ -360,7 +357,23 @@ Deno.serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    // Calcular resultado final
+    // Usar resultado final de la BD si existe (tiene cálculos correctos), sino calcular
+    let resultadoFinal;
+    if (resultadoFinalBD && resultadoFinalBD.resultado_final) {
+      // Usar datos calculados correctamente desde la BD
+      const resultadoBD = resultadoFinalBD.resultado_final as any;
+      resultadoFinal = {
+        desempenoAuto: resultadoBD.desempenoAuto || 0,
+        desempenoJefe: resultadoBD.desempenoJefe || 0,
+        desempenoFinal: resultadoBD.desempenoFinal || 0,
+        potencial: resultadoBD.potencial || null,
+        posicion9Box: resultadoBD.posicion9Box || "medio-medio",
+      };
+      console.log(`✅ [DevelopmentPlan] Usando resultado final desde BD:`, resultadoFinal);
+    } else {
+      // Fallback: calcular si no existe en BD (caso edge)
+      console.warn(`⚠️ [DevelopmentPlan] No se encontró resultado final en BD, calculando...`);
+      
     const calcularPromedioDesempeno = (responses: any, dimensions: any) => {
       if (!responses || !dimensions || !Array.isArray(dimensions)) {
         console.error("Error en calcularPromedioDesempeno:", { responses, dimensions });
@@ -408,31 +421,21 @@ Deno.serve(async (req: Request): Promise<Response> => {
       return total;
     };
 
-    console.log("Calculando desempeño con:", {
-      autoResponses: autoevaluacion.responses,
-      jefeResponses: evaluacionJefe.responses,
-      dimensionsCount: instrumentConfig.dimensionesDesempeno?.length,
-    });
-
     const desempenoAuto = calcularPromedioDesempeno(autoevaluacion.responses, instrumentConfig.dimensionesDesempeno);
     const desempenoJefe = calcularPromedioDesempeno(evaluacionJefe.responses, instrumentConfig.dimensionesDesempeno);
 
-    // Obtener pesos desde la configuración del instrumento (A1 tiene pesos especiales 45/55)
+      // Obtener pesos desde la configuración del instrumento
     const configCalculo = instrumentConfig.configuracion_calculo || {};
     const pesoAuto = configCalculo.pesoAuto || (instrumentId === "A1" ? 0.45 : 0.30);
     const pesoJefe = configCalculo.pesoJefe || (instrumentId === "A1" ? 0.55 : 0.70);
     const desempenoFinal = desempenoJefe * pesoJefe + desempenoAuto * pesoAuto;
     
-    console.log(`📊 [DevelopmentPlan] Pesos aplicados para ${instrumentId}:`, { pesoJefe, pesoAuto, desempenoFinal });
-
-    // Normalizar evaluacion_potencial (puede venir como evaluacionPotencial o evaluacion_potencial)
     const evaluacionPotencial = evaluacionJefe.evaluacion_potencial || evaluacionJefe.evaluacionPotencial || null;
     const potencial = calcularPromedioPotencial(
       evaluacionPotencial?.responses,
       instrumentConfig.dimensionesPotencial
     );
 
-    // Calcular posición 9-box
     let posicion9Box = "medio-medio";
     if (potencial !== null) {
       const dLevel = desempenoFinal < 3 ? "bajo" : desempenoFinal <= 4 ? "medio" : "alto";
@@ -440,13 +443,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
       posicion9Box = `${dLevel}-${pLevel}`;
     }
 
-    const resultadoFinal = {
+      resultadoFinal = {
       desempenoAuto,
       desempenoJefe,
       desempenoFinal,
       potencial,
       posicion9Box,
     };
+    }
 
     // Normalizar formato de evaluaciones para asegurar compatibilidad
     const autoevaluacionNormalizada = {
@@ -474,6 +478,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
         resultadoFinal,
         instrumento: instrumentConfig,
         grupos,
+        npsScore: autoevaluacion.nps_score,
+        necesidadesDesarrollo: necesidadesDesarrollo,
       });
     } catch (promptError: any) {
       console.error("Error construyendo prompt:", promptError);
@@ -632,7 +638,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     // Guardar plan en base de datos
     // Guardamos toda la estructura del plan en competencias_desarrollar como JSONB
-    // Esto incluye: objetivos, acciones (con responsable, fecha, recursos, indicador, prioridad),
+    // Esto incluye: objetivos, acciones (con tipoAprendizaje, responsable, fecha, indicador, prioridad),
     // dimensionesDebiles, y recomendaciones
     // NOTA: NO guardamos feedback_individual ni feedback_grupal aquí (se generan por separado)
     const planCompleto = {

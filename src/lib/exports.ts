@@ -7,6 +7,77 @@ import { es } from "date-fns/locale";
 import { scoreToPercentage } from "./calculations";
 import React from "react";
 
+/**
+ * Obtiene el nombre completo de la Directora de RRHH desde la base de datos
+ * Busca primero por nombre "Nuria" o "Nury", luego por cargo/área, y finalmente por rol
+ * @returns Nombre completo de la directora o null si no se encuentra
+ */
+export const getDirectoraRRHHNombre = async (): Promise<string | null> => {
+  try {
+    const { supabase } = await import("@/integrations/supabase/client");
+    
+    // Primero buscar por nombre "Nuria" o "Nury" (en nombre o apellidos)
+    let { data: directora } = await supabase
+      .from("users")
+      .select("nombre, apellidos")
+      .or("nombre.ilike.%Nuria%,nombre.ilike.%Nury%,apellidos.ilike.%Nuria%,apellidos.ilike.%Nury%")
+      .eq("estado", "activo")
+      .limit(1)
+      .maybeSingle();
+    
+    // Si no se encuentra por nombre, buscar por cargo "Directora" en área de RRHH
+    if (!directora) {
+      const { data: directoraPorCargo } = await supabase
+        .from("users")
+        .select("nombre, apellidos")
+        .ilike("cargo", "%Directora%")
+        .ilike("area", "%recursos humanos%")
+        .eq("estado", "activo")
+        .limit(1)
+        .maybeSingle();
+      
+      directora = directoraPorCargo || null;
+    }
+    
+    // Si aún no se encuentra, buscar por cargo o área relacionada a RRHH
+    if (!directora) {
+      const { data: directoraPorCargo2 } = await supabase
+        .from("users")
+        .select("nombre, apellidos")
+        .or("cargo.ilike.%recursos humanos%,cargo.ilike.%RRHH%,cargo.ilike.%rrhh%,area.ilike.%recursos humanos%")
+        .eq("estado", "activo")
+        .limit(1)
+        .maybeSingle();
+      
+      directora = directoraPorCargo2 || null;
+    }
+    
+    // Si aún no se encuentra, buscar por rol admin_rrhh o admin_general
+    if (!directora) {
+      const { data: directoraPorRol } = await supabase
+        .from("users")
+        .select("nombre, apellidos")
+        .in("rol", ["admin_rrhh", "admin_general"])
+        .eq("estado", "activo")
+        .limit(1)
+        .maybeSingle();
+      
+      directora = directoraPorRol || null;
+    }
+    
+    if (directora) {
+      return directora.apellidos 
+        ? `${directora.nombre} ${directora.apellidos}` 
+        : directora.nombre;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error("Error obteniendo nombre de Directora RRHH:", error);
+    return null;
+  }
+};
+
 // Tipos para exportación
 export interface ExportData {
   title: string;
@@ -1372,6 +1443,357 @@ export const captureRadarChart = async (): Promise<string | null> => {
     return null;
   }
 };
+/**
+ * Función auxiliar compartida para preparar datos de PDF
+ * Garantiza que tanto la exportación individual como masiva usen exactamente la misma lógica
+ * Cumple con principios DRY (Don't Repeat Yourself) y Single Source of Truth
+ */
+interface PreparePDFDataParams {
+  empleado: {
+    nombre: string;
+    apellidos?: string;
+    dpi?: string;
+    cargo?: string;
+    area?: string;
+    nivel?: string;
+    direccionUnidad?: string;
+    departamentoDependencia?: string;
+    profesion?: string;
+    correo?: string;
+    telefono?: string;
+    jefeNombre?: string;
+    directoraRRHHNombre?: string;
+  };
+  resultadoData: {
+    performancePercentage: number;
+    jefeCompleto: boolean;
+    fortalezas: Array<{
+      dimension: string;
+      nombreCompleto?: string;
+      tuEvaluacion: number;
+      promedioMunicipal?: number;
+    }>;
+    areasOportunidad: Array<{
+      dimension: string;
+      nombreCompleto?: string;
+      tuEvaluacion: number;
+      promedioMunicipal?: number;
+    }>;
+    radarData: Array<{
+      dimension: string;
+      tuEvaluacion: number;
+      promedioMunicipal?: number;
+      dimensionId?: string;
+      descripcion?: string;
+    }>;
+    resultadoConsolidado?: {
+      totalEvaluadores?: number;
+      resultadosPorEvaluador?: Array<{
+        evaluadorNombre?: string;
+        desempenoFinal?: number;
+        potencial?: number;
+        posicion9Box?: string;
+      }>;
+    };
+  };
+}
+
+interface PreparedPDFData {
+  empleado: {
+    nombre: string;
+    apellidos?: string;
+    dpi?: string;
+    cargo?: string;
+    area?: string;
+    nivel?: string;
+    direccionUnidad?: string;
+    departamentoDependencia?: string;
+    profesion?: string;
+    correo?: string;
+    telefono?: string;
+    jefeNombre?: string;
+    jefeCargo?: string;
+    directoraRRHHNombre?: string;
+    directoraRRHHCargo?: string;
+  };
+  resultadoData: {
+    performancePercentage: number;
+    jefeCompleto: boolean;
+    fortalezas: Array<{
+      dimension: string;
+      nombreCompleto?: string;
+      tuEvaluacion: number;
+      promedioMunicipal?: number;
+    }>;
+    areasOportunidad: Array<{
+      dimension: string;
+      nombreCompleto?: string;
+      tuEvaluacion: number;
+      promedioMunicipal?: number;
+    }>;
+    radarData: Array<{
+      dimension: string;
+      tuEvaluacion: number;
+      promedioMunicipal?: number;
+      dimensionId?: string;
+      descripcion?: string;
+      explicacion?: string;
+    }>;
+    resultadoConsolidado?: {
+      totalEvaluadores?: number;
+      resultadosPorEvaluador?: Array<{
+        evaluadorNombre?: string;
+        desempenoFinal?: number;
+        potencial?: number;
+        posicion9Box?: string;
+      }>;
+    };
+  };
+}
+
+const preparePDFData = async (params: PreparePDFDataParams): Promise<PreparedPDFData> => {
+  const { empleado, resultadoData } = params;
+
+  // 1. Obtener nombre del jefe inmediato si no está proporcionado
+  // IMPORTANTE: C1 (Concejo Municipal) no tiene jefe, así que no intentar obtenerlo
+  let nombreJefe = empleado.jefeNombre;
+  if (!nombreJefe && empleado.dpi && empleado.nivel !== 'C1') {
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      
+      // Primero intentar obtener desde user_assignments (relación activa)
+      const { data: assignment } = await supabase
+        .from("user_assignments")
+        .select("jefe_id")
+        .eq("colaborador_id", empleado.dpi)
+        .eq("activo", true)
+        .maybeSingle();
+      
+      let jefeId = null;
+      if (assignment?.jefe_id) {
+        jefeId = assignment.jefe_id;
+      } else {
+        // Si no hay en user_assignments, intentar desde users.jefe_inmediato_id
+        const { data: usuario } = await supabase
+          .from("users")
+          .select("jefe_inmediato_id")
+          .eq("dpi", empleado.dpi)
+          .maybeSingle();
+        
+        jefeId = usuario?.jefe_inmediato_id || null;
+      }
+      
+      if (jefeId) {
+        const { data: jefe } = await supabase
+          .from("users")
+          .select("nombre, apellidos, cargo")
+          .eq("dpi", jefeId)
+          .maybeSingle();
+        
+        if (jefe) {
+          nombreJefe = jefe.apellidos 
+            ? `${jefe.nombre} ${jefe.apellidos}` 
+            : jefe.nombre;
+          // Guardar cargo del jefe si existe
+          if (jefe.cargo && typeof jefe.cargo === 'string' && jefe.cargo.trim() !== '') {
+            empleado.jefeCargo = jefe.cargo.trim();
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error obteniendo nombre del jefe:", error);
+    }
+  }
+  
+  // 2. Obtener nombre y cargo de la Directora de RRHH
+  let nombreDirectoraRRHH = empleado.directoraRRHHNombre;
+  let cargoDirectoraRRHH = empleado.directoraRRHHCargo;
+  
+  if (!nombreDirectoraRRHH || !cargoDirectoraRRHH) {
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      
+      // Buscar por nombre "Nuria" o "Nury"
+      let { data: directora } = await supabase
+        .from("users")
+        .select("nombre, apellidos, cargo")
+        .or("nombre.ilike.%Nuria%,nombre.ilike.%Nury%,apellidos.ilike.%Nuria%,apellidos.ilike.%Nury%")
+        .eq("estado", "activo")
+        .limit(1)
+        .maybeSingle();
+      
+      // Si no se encuentra por nombre, buscar por cargo "Directora" en área de RRHH
+      if (!directora) {
+        const { data: directoraPorCargo } = await supabase
+          .from("users")
+          .select("nombre, apellidos, cargo")
+          .ilike("cargo", "%Directora%")
+          .ilike("area", "%recursos humanos%")
+          .eq("estado", "activo")
+          .limit(1)
+          .maybeSingle();
+        
+        directora = directoraPorCargo || null;
+      }
+      
+      // Si aún no se encuentra, buscar por cargo o área relacionada a RRHH
+      if (!directora) {
+        const { data: directoraPorCargo2 } = await supabase
+          .from("users")
+          .select("nombre, apellidos, cargo")
+          .or("cargo.ilike.%recursos humanos%,cargo.ilike.%RRHH%,cargo.ilike.%rrhh%,area.ilike.%recursos humanos%")
+          .eq("estado", "activo")
+          .limit(1)
+          .maybeSingle();
+        
+        directora = directoraPorCargo2 || null;
+      }
+      
+      // Si aún no se encuentra, buscar por rol admin_rrhh o admin_general
+      if (!directora) {
+        const { data: directoraPorRol } = await supabase
+          .from("users")
+          .select("nombre, apellidos, cargo")
+          .or("rol.eq.admin_rrhh,rol.eq.admin_general")
+          .eq("estado", "activo")
+          .limit(1)
+          .maybeSingle();
+        
+        directora = directoraPorRol || null;
+      }
+      
+      if (directora) {
+        if (!nombreDirectoraRRHH) {
+          nombreDirectoraRRHH = directora.apellidos 
+            ? `${directora.nombre} ${directora.apellidos}` 
+            : directora.nombre;
+        }
+        if (!cargoDirectoraRRHH && directora.cargo && typeof directora.cargo === 'string' && directora.cargo.trim() !== '') {
+          cargoDirectoraRRHH = directora.cargo.trim();
+        }
+      } else {
+        // Fallback: usar función original si no se encuentra
+        if (!nombreDirectoraRRHH) {
+          nombreDirectoraRRHH = await getDirectoraRRHHNombre() || undefined;
+        }
+        if (!cargoDirectoraRRHH) {
+          cargoDirectoraRRHH = 'Directora de Recursos Humanos';
+        }
+      }
+    } catch (error) {
+      console.error("Error obteniendo información de Directora RRHH:", error);
+      if (!nombreDirectoraRRHH) {
+        nombreDirectoraRRHH = await getDirectoraRRHHNombre() || undefined;
+      }
+      if (!cargoDirectoraRRHH) {
+        cargoDirectoraRRHH = 'Directora de Recursos Humanos';
+      }
+    }
+  }
+  
+  // 3. Pre-cargar explicaciones de la base de datos para cada dimensión
+  const { getDimensionExplanation } = await import("@/lib/generateDimensionExplanations");
+  const radarDataWithExplanations = await Promise.all(
+    resultadoData.radarData.map(async (r) => {
+      // Asegurar que todos los valores sean válidos
+      const dimension = r.dimension || `Dimensión ${r.dimensionId || 'desconocida'}`;
+      const tuEvaluacion = typeof r.tuEvaluacion === 'number' && !isNaN(r.tuEvaluacion) ? r.tuEvaluacion : 0;
+      const promedioMunicipal = r.promedioMunicipal !== undefined && typeof r.promedioMunicipal === 'number' && !isNaN(r.promedioMunicipal) ? r.promedioMunicipal : undefined;
+      
+      let explicacion: string | null | undefined = null;
+      if (r.dimensionId && empleado.nivel) {
+        try {
+          const result = await getDimensionExplanation(
+            r.dimensionId,
+            empleado.nivel,
+            tuEvaluacion,
+            promedioMunicipal
+          );
+          // Asegurar que explicacion sea string o undefined, nunca null
+          explicacion = result && typeof result === 'string' && result.trim() !== '' ? result : undefined;
+        } catch (error) {
+          console.warn(`No se pudo obtener explicación para ${r.dimensionId}:`, error);
+          explicacion = undefined;
+        }
+      }
+      return {
+        dimension,
+        tuEvaluacion,
+        promedioMunicipal,
+        dimensionId: r.dimensionId || undefined,
+        descripcion: (r.descripcion && typeof r.descripcion === 'string' && r.descripcion.trim() !== '') ? r.descripcion : undefined,
+        explicacion: explicacion // Ya está validado arriba
+      };
+    })
+  );
+  
+  // 4. Validar y limpiar fortalezas y áreas de oportunidad
+  const fortalezasValidas = (resultadoData.fortalezas || []).map(f => ({
+    dimension: f.dimension || 'Dimensión desconocida',
+    nombreCompleto: f.nombreCompleto || f.dimension || 'Dimensión desconocida',
+    tuEvaluacion: typeof f.tuEvaluacion === 'number' && !isNaN(f.tuEvaluacion) ? f.tuEvaluacion : 0,
+    promedioMunicipal: f.promedioMunicipal !== undefined && typeof f.promedioMunicipal === 'number' && !isNaN(f.promedioMunicipal) ? f.promedioMunicipal : undefined
+  }));
+
+  const areasOportunidadValidas = (resultadoData.areasOportunidad || []).map(a => ({
+    dimension: a.dimension || 'Dimensión desconocida',
+    nombreCompleto: a.nombreCompleto || a.dimension || 'Dimensión desconocida',
+    tuEvaluacion: typeof a.tuEvaluacion === 'number' && !isNaN(a.tuEvaluacion) ? a.tuEvaluacion : 0,
+    promedioMunicipal: a.promedioMunicipal !== undefined && typeof a.promedioMunicipal === 'number' && !isNaN(a.promedioMunicipal) ? a.promedioMunicipal : undefined
+  }));
+  
+  // 5. Crear resultadoData con explicaciones pre-cargadas y datos validados
+  // IMPORTANTE: Para C1 (Concejo Municipal), jefeCompleto siempre es false y no hay resultadoConsolidado
+  const esC1 = empleado.nivel === 'C1';
+  const resultadoDataWithExplanations = {
+    performancePercentage: typeof resultadoData.performancePercentage === 'number' && !isNaN(resultadoData.performancePercentage) 
+      ? resultadoData.performancePercentage 
+      : 0,
+    jefeCompleto: esC1 ? false : (resultadoData.jefeCompleto || false), // C1 nunca tiene evaluación de jefe
+    fortalezas: fortalezasValidas,
+    areasOportunidad: areasOportunidadValidas,
+    radarData: radarDataWithExplanations,
+    resultadoConsolidado: esC1 ? undefined : (resultadoData.resultadoConsolidado || undefined) // C1 no tiene múltiples evaluadores
+  };
+  
+  // 6. Validar datos antes de generar PDF
+  if (!resultadoDataWithExplanations || !resultadoDataWithExplanations.radarData || resultadoDataWithExplanations.radarData.length === 0) {
+    throw new Error("No hay datos de evaluación disponibles para generar el PDF");
+  }
+  
+  // 7. Validar que los datos de radar tengan la estructura correcta
+  resultadoDataWithExplanations.radarData.forEach((r, idx) => {
+    if (typeof r.tuEvaluacion !== 'number' || isNaN(r.tuEvaluacion)) {
+      console.warn(`⚠️ Dimensión ${idx + 1} (${r.dimension}) tiene tuEvaluacion inválido:`, r.tuEvaluacion);
+    }
+    if (r.promedioMunicipal !== undefined && (typeof r.promedioMunicipal !== 'number' || isNaN(r.promedioMunicipal))) {
+      console.warn(`⚠️ Dimensión ${idx + 1} (${r.dimension}) tiene promedioMunicipal inválido:`, r.promedioMunicipal);
+    }
+  });
+  
+  // 8. Validación adicional para C1: asegurar que jefeCompleto sea false y no haya resultadoConsolidado
+  if (esC1) {
+    if (resultadoDataWithExplanations.jefeCompleto !== false) {
+      console.warn('⚠️ [PDF] C1 tiene jefeCompleto diferente de false, corrigiendo...');
+      resultadoDataWithExplanations.jefeCompleto = false;
+    }
+    if (resultadoDataWithExplanations.resultadoConsolidado !== undefined) {
+      console.warn('⚠️ [PDF] C1 tiene resultadoConsolidado, eliminando...');
+      resultadoDataWithExplanations.resultadoConsolidado = undefined;
+    }
+  }
+  
+  return {
+    empleado: {
+      ...empleado,
+      jefeNombre: nombreJefe,
+      jefeCargo: empleado.jefeCargo,
+      directoraRRHHNombre: nombreDirectoraRRHH,
+      directoraRRHHCargo: cargoDirectoraRRHH,
+    },
+    resultadoData: resultadoDataWithExplanations,
+  };
+};
 
 // Exportar evaluación completa usando React-PDF
 export const exportEvaluacionCompletaPDFReact = async (
@@ -1388,7 +1810,9 @@ export const exportEvaluacionCompletaPDFReact = async (
     correo?: string;
     telefono?: string;
     jefeNombre?: string;
+    jefeCargo?: string;
     directoraRRHHNombre?: string;
+    directoraRRHHCargo?: string;
   },
   periodo: string,
   fechaGeneracion: Date,
@@ -1452,239 +1876,23 @@ export const exportEvaluacionCompletaPDFReact = async (
       description: "Por favor espere mientras se genera el documento"
     });
     
-    // Obtener nombre del jefe inmediato si no está proporcionado
-    // IMPORTANTE: C1 (Concejo Municipal) no tiene jefe, así que no intentar obtenerlo
-    let nombreJefe = empleado.jefeNombre;
-    if (!nombreJefe && empleado.dpi && empleado.nivel !== 'C1') {
-      try {
-        const { supabase } = await import("@/integrations/supabase/client");
-        
-        // Primero intentar obtener desde user_assignments (relación activa)
-        const { data: assignment } = await supabase
-          .from("user_assignments")
-          .select("jefe_id")
-          .eq("colaborador_id", empleado.dpi)
-          .eq("activo", true)
-          .maybeSingle();
-        
-        let jefeId = null;
-        if (assignment?.jefe_id) {
-          jefeId = assignment.jefe_id;
-        } else {
-          // Si no hay en user_assignments, intentar desde users.jefe_inmediato_id
-          const { data: usuario } = await supabase
-            .from("users")
-            .select("jefe_inmediato_id")
-            .eq("dpi", empleado.dpi)
-            .maybeSingle();
-          
-          jefeId = usuario?.jefe_inmediato_id || null;
-        }
-        
-        if (jefeId) {
-          const { data: jefe } = await supabase
-            .from("users")
-            .select("nombre, apellidos")
-            .eq("dpi", jefeId)
-            .maybeSingle();
-          
-          if (jefe) {
-            nombreJefe = jefe.apellidos 
-              ? `${jefe.nombre} ${jefe.apellidos}` 
-              : jefe.nombre;
-          }
-        }
-      } catch (error) {
-        console.error("Error obteniendo nombre del jefe:", error);
-      }
-    }
-    
-    // Obtener nombre de la Directora de RRHH (Nuria)
-    let nombreDirectoraRRHH = empleado.directoraRRHHNombre;
-    if (!nombreDirectoraRRHH) {
-      try {
-        const { supabase } = await import("@/integrations/supabase/client");
-        
-        // Primero buscar por nombre "Nuria" o "Nury" (en nombre o apellidos)
-        let { data: directora } = await supabase
-          .from("users")
-          .select("nombre, apellidos")
-          .or("nombre.ilike.%Nuria%,nombre.ilike.%Nury%,apellidos.ilike.%Nuria%,apellidos.ilike.%Nury%")
-          .eq("estado", "activo")
-          .limit(1)
-          .maybeSingle();
-        
-        // Si no se encuentra por nombre, buscar por cargo "Directora" en área de RRHH
-        if (!directora) {
-          const { data: directoraPorCargo } = await supabase
-            .from("users")
-            .select("nombre, apellidos")
-            .ilike("cargo", "%Directora%")
-            .ilike("area", "%recursos humanos%")
-            .eq("estado", "activo")
-            .limit(1)
-            .maybeSingle();
-          
-          directora = directoraPorCargo || null;
-        }
-        
-        // Si aún no se encuentra, buscar por cargo o área relacionada a RRHH
-        if (!directora) {
-          const { data: directoraPorCargo2 } = await supabase
-            .from("users")
-            .select("nombre, apellidos")
-            .or("cargo.ilike.%recursos humanos%,cargo.ilike.%RRHH%,cargo.ilike.%rrhh%,area.ilike.%recursos humanos%")
-            .eq("estado", "activo")
-            .limit(1)
-            .maybeSingle();
-          
-          directora = directoraPorCargo2 || null;
-        }
-        
-        // Si aún no se encuentra, buscar por rol admin_rrhh o admin_general
-        if (!directora) {
-          const { data: directoraPorRol } = await supabase
-            .from("users")
-            .select("nombre, apellidos")
-            .in("rol", ["admin_rrhh", "admin_general"])
-            .eq("estado", "activo")
-            .limit(1)
-            .maybeSingle();
-          
-          directora = directoraPorRol || null;
-        }
-        
-        if (directora) {
-          nombreDirectoraRRHH = directora.apellidos 
-            ? `${directora.nombre} ${directora.apellidos}` 
-            : directora.nombre;
-        }
-      } catch (error) {
-        console.error("Error obteniendo nombre de Directora RRHH:", error);
-      }
-    }
-    
-    // Pre-cargar explicaciones de la base de datos para cada dimensión
-    const { getDimensionExplanation } = await import("@/lib/generateDimensionExplanations");
-    const radarDataWithExplanations = await Promise.all(
-      resultadoData.radarData.map(async (r) => {
-        // Asegurar que todos los valores sean válidos
-        const dimension = r.dimension || `Dimensión ${r.dimensionId || 'desconocida'}`;
-        const tuEvaluacion = typeof r.tuEvaluacion === 'number' && !isNaN(r.tuEvaluacion) ? r.tuEvaluacion : 0;
-        const promedioMunicipal = r.promedioMunicipal !== undefined && typeof r.promedioMunicipal === 'number' && !isNaN(r.promedioMunicipal) ? r.promedioMunicipal : undefined;
-        
-        let explicacion: string | null | undefined = null;
-        if (r.dimensionId && empleado.nivel) {
-          try {
-            const result = await getDimensionExplanation(
-              r.dimensionId,
-              empleado.nivel,
-              tuEvaluacion,
-              promedioMunicipal
-            );
-            // Asegurar que explicacion sea string o undefined, nunca null
-            explicacion = result && typeof result === 'string' && result.trim() !== '' ? result : undefined;
-          } catch (error) {
-            console.warn(`No se pudo obtener explicación para ${r.dimensionId}:`, error);
-            explicacion = undefined;
-          }
-        }
-        return {
-          dimension,
-          tuEvaluacion,
-          promedioMunicipal,
-          dimensionId: r.dimensionId || undefined,
-          descripcion: (r.descripcion && typeof r.descripcion === 'string' && r.descripcion.trim() !== '') ? r.descripcion : undefined,
-          explicacion: explicacion // Ya está validado arriba
-        };
-      })
-    );
-    
-    // Validar y limpiar fortalezas y áreas de oportunidad
-    const fortalezasValidas = (resultadoData.fortalezas || []).map(f => ({
-      dimension: f.dimension || 'Dimensión desconocida',
-      nombreCompleto: f.nombreCompleto || f.dimension || 'Dimensión desconocida',
-      tuEvaluacion: typeof f.tuEvaluacion === 'number' && !isNaN(f.tuEvaluacion) ? f.tuEvaluacion : 0,
-      promedioMunicipal: f.promedioMunicipal !== undefined && typeof f.promedioMunicipal === 'number' && !isNaN(f.promedioMunicipal) ? f.promedioMunicipal : undefined
-    }));
-
-    const areasOportunidadValidas = (resultadoData.areasOportunidad || []).map(a => ({
-      dimension: a.dimension || 'Dimensión desconocida',
-      nombreCompleto: a.nombreCompleto || a.dimension || 'Dimensión desconocida',
-      tuEvaluacion: typeof a.tuEvaluacion === 'number' && !isNaN(a.tuEvaluacion) ? a.tuEvaluacion : 0,
-      promedioMunicipal: a.promedioMunicipal !== undefined && typeof a.promedioMunicipal === 'number' && !isNaN(a.promedioMunicipal) ? a.promedioMunicipal : undefined
-    }));
-    
-    // Crear resultadoData con explicaciones pre-cargadas y datos validados
-    // IMPORTANTE: Para C1 (Concejo Municipal), jefeCompleto siempre es false y no hay resultadoConsolidado
-    const esC1 = empleado.nivel === 'C1';
-    const resultadoDataWithExplanations = {
-      performancePercentage: typeof resultadoData.performancePercentage === 'number' && !isNaN(resultadoData.performancePercentage) 
-        ? resultadoData.performancePercentage 
-        : 0,
-      jefeCompleto: esC1 ? false : (resultadoData.jefeCompleto || false), // C1 nunca tiene evaluación de jefe
-      fortalezas: fortalezasValidas,
-      areasOportunidad: areasOportunidadValidas,
-      radarData: radarDataWithExplanations,
-      resultadoConsolidado: esC1 ? undefined : (resultadoData.resultadoConsolidado || undefined) // C1 no tiene múltiples evaluadores
-    };
-    
-    // Validar datos antes de generar PDF
-    if (!resultadoDataWithExplanations || !resultadoDataWithExplanations.radarData || resultadoDataWithExplanations.radarData.length === 0) {
-      throw new Error("No hay datos de evaluación disponibles para generar el PDF");
-    }
-    
-    // Validar que los datos de radar tengan la estructura correcta
-    resultadoDataWithExplanations.radarData.forEach((r, idx) => {
-      if (typeof r.tuEvaluacion !== 'number' || isNaN(r.tuEvaluacion)) {
-        console.warn(`⚠️ Dimensión ${idx + 1} (${r.dimension}) tiene tuEvaluacion inválido:`, r.tuEvaluacion);
-      }
-      if (r.promedioMunicipal !== undefined && (typeof r.promedioMunicipal !== 'number' || isNaN(r.promedioMunicipal))) {
-        console.warn(`⚠️ Dimensión ${idx + 1} (${r.dimension}) tiene promedioMunicipal inválido:`, r.promedioMunicipal);
-      }
-    });
-    
-    console.log('📄 [PDF] Generando PDF con React-PDF, datos validados:', {
-      empleado: empleado.nombre,
-      nivel: empleado.nivel,
-      esC1: esC1,
-      periodo,
-      radarDataCount: resultadoDataWithExplanations.radarData.length,
-      fortalezasCount: resultadoDataWithExplanations.fortalezas?.length || 0,
-      areasOportunidadCount: resultadoDataWithExplanations.areasOportunidad?.length || 0,
-      jefeCompleto: resultadoDataWithExplanations.jefeCompleto,
-      tieneResultadoConsolidado: !!resultadoDataWithExplanations.resultadoConsolidado,
-      tienePlanDesarrollo: !!planDesarrollo
-    });
-    
-    // Validación adicional para C1: asegurar que jefeCompleto sea false y no haya resultadoConsolidado
-    if (esC1) {
-      if (resultadoDataWithExplanations.jefeCompleto !== false) {
-        console.warn('⚠️ [PDF] C1 tiene jefeCompleto diferente de false, corrigiendo...');
-        resultadoDataWithExplanations.jefeCompleto = false;
-      }
-      if (resultadoDataWithExplanations.resultadoConsolidado !== undefined) {
-        console.warn('⚠️ [PDF] C1 tiene resultadoConsolidado, eliminando...');
-        resultadoDataWithExplanations.resultadoConsolidado = undefined;
-      }
-    }
-    
     // Importar componente PDF y renderer dinámicamente
     const { EvaluacionPDF } = await import("@/components/pdf/EvaluacionPDF");
     const { pdf } = await import("@react-pdf/renderer");
+    const React = await import("react");
+    
+    // Obtener datos completos con preparePDFData para asegurar información correcta
+    const preparedData = await preparePDFData({ empleado, resultadoData });
     
     // Generar PDF usando React.createElement
     // IMPORTANTE: EvaluacionPDF ya retorna un <Document>, no debemos envolverlo en otro Document
+    // Usar datos preparados que incluyen información completa de jefe y directora RRHH
     const blob = await pdf(
       React.createElement(EvaluacionPDF, {
-        empleado: {
-          ...empleado,
-          jefeNombre: nombreJefe,
-          directoraRRHHNombre: nombreDirectoraRRHH,
-        },
+        empleado: preparedData.empleado,
         periodo,
         fechaGeneracion,
-        resultadoData: resultadoDataWithExplanations,
+        resultadoData: preparedData.resultadoData,
         planDesarrollo,
       })
     ).toBlob();
@@ -1734,6 +1942,216 @@ export const exportEvaluacionCompletaPDFReact = async (
     
     // NO hacer fallback automático - el usuario debe saber que hay un problema
     // Si realmente necesita el PDF, puede intentar nuevamente o contactar soporte
+    throw error;
+  }
+};
+
+// Interfaz para datos de colaborador para exportación masiva
+export interface ColaboradorExportData {
+  empleado: {
+    nombre: string;
+    apellidos?: string;
+    dpi?: string;
+    cargo?: string;
+    area?: string;
+    nivel?: string;
+    direccionUnidad?: string;
+    departamentoDependencia?: string;
+    profesion?: string;
+    correo?: string;
+    telefono?: string;
+    jefeNombre?: string;
+    jefeCargo?: string;
+    directoraRRHHNombre?: string;
+    directoraRRHHCargo?: string;
+  };
+  resultadoData: {
+    performancePercentage: number;
+    jefeCompleto: boolean;
+    fortalezas: Array<{
+      dimension: string;
+      nombreCompleto?: string;
+      tuEvaluacion: number;
+      promedioMunicipal?: number;
+    }>;
+    areasOportunidad: Array<{
+      dimension: string;
+      nombreCompleto?: string;
+      tuEvaluacion: number;
+      promedioMunicipal?: number;
+    }>;
+    radarData: Array<{
+      dimension: string;
+      tuEvaluacion: number;
+      promedioMunicipal?: number;
+      dimensionId?: string;
+      descripcion?: string;
+    }>;
+  };
+  planDesarrollo?: {
+    planEstructurado?: {
+      objetivos?: string[];
+      acciones?: Array<{
+        descripcion: string;
+        responsable: string;
+        fecha: string;
+        recursos?: string[];
+        indicador: string;
+        prioridad: 'alta' | 'media' | 'baja';
+      }>;
+      dimensionesDebiles?: Array<{
+        dimension: string;
+        score?: number;
+        accionesEspecificas?: string[];
+      }>;
+    };
+    recomendaciones?: string[];
+  } | null;
+}
+
+// Exportar múltiples PDFs en un archivo ZIP
+export const exportMultiplePDFsToZip = async (
+  colaboradores: ColaboradorExportData[],
+  periodo: string,
+  jefeNombre: string,
+  onProgress?: (current: number, total: number, nombreColaborador: string) => void
+): Promise<void> => {
+  try {
+    const JSZip = (await import("jszip")).default;
+    const zip = new JSZip();
+
+    const toast = (await import("@/hooks/use-toast")).toast;
+
+    toast({
+      title: "Iniciando exportación masiva...",
+      description: `Generando ${colaboradores.length} PDFs. Esto puede tomar unos minutos.`
+    });
+
+    const fechaGeneracion = new Date();
+    const errores: string[] = [];
+    let exitosos = 0;
+
+    // Procesar cada colaborador
+    for (let i = 0; i < colaboradores.length; i++) {
+      const colaborador = colaboradores[i];
+      const nombreCompleto = colaborador.empleado.apellidos
+        ? `${colaborador.empleado.nombre} ${colaborador.empleado.apellidos}`
+        : colaborador.empleado.nombre;
+
+      // Notificar progreso
+      if (onProgress) {
+        onProgress(i + 1, colaboradores.length, nombreCompleto);
+      }
+
+      try {
+        // Importar componentes necesarios
+        const { EvaluacionPDF } = await import("@/components/pdf/EvaluacionPDF");
+        const { pdf } = await import("@react-pdf/renderer");
+        const React = await import("react");
+
+        // Preparar resultadoData con resultadoConsolidado si existe (compatibilidad con ColaboradorExportData)
+        const resultadoDataConConsolidado = {
+          ...colaborador.resultadoData,
+          resultadoConsolidado: (colaborador.resultadoData as any).resultadoConsolidado || undefined,
+        };
+
+        // Obtener datos completos con preparePDFData para asegurar información correcta de jefe y directora RRHH
+        const preparedData = await preparePDFData({ 
+          empleado: colaborador.empleado, 
+          resultadoData: resultadoDataConConsolidado 
+        });
+
+        // Generar PDF usando exactamente la misma lógica que exportEvaluacionCompletaPDFReact
+        // Usar datos preparados que incluyen información completa de jefe y directora RRHH
+        const blob = await pdf(
+          React.createElement(EvaluacionPDF, {
+            empleado: preparedData.empleado,
+            periodo,
+            fechaGeneracion,
+            resultadoData: preparedData.resultadoData,
+            planDesarrollo: colaborador.planDesarrollo,
+          })
+        ).toBlob();
+
+        // Convertir blob a ArrayBuffer
+        const arrayBuffer = await blob.arrayBuffer();
+
+        // Nombre del archivo limpio
+        const nombreArchivo = `evaluacion_${nombreCompleto.replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_áéíóúñÁÉÍÓÚÑ]/g, "")}_${periodo.replace(/\s+/g, "_")}.pdf`;
+
+        // Agregar al ZIP
+        zip.file(nombreArchivo, arrayBuffer);
+        exitosos++;
+
+        console.log(`✅ PDF generado: ${nombreArchivo} (${i + 1}/${colaboradores.length})`);
+
+      } catch (error: any) {
+        console.error(`❌ Error generando PDF para ${nombreCompleto}:`, error);
+        errores.push(`${nombreCompleto}: ${error?.message || 'Error desconocido'}`);
+      }
+
+      // Pequeña pausa para no saturar el navegador
+      if (i % 5 === 4) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+
+    if (exitosos === 0) {
+      toast({
+        title: "Error",
+        description: "No se pudo generar ningún PDF",
+        variant: "destructive"
+      });
+      throw new Error("No se generó ningún PDF");
+    }
+
+    // Generar el archivo ZIP
+    toast({
+      title: "Comprimiendo archivos...",
+      description: `${exitosos} PDFs generados, creando archivo ZIP`
+    });
+
+    const zipBlob = await zip.generateAsync({
+      type: "blob",
+      compression: "DEFLATE",
+      compressionOptions: { level: 6 }
+    });
+
+    // Descargar el ZIP
+    const url = URL.createObjectURL(zipBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    const nombreJefeLimpio = jefeNombre.replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_áéíóúñÁÉÍÓÚÑ]/g, "");
+    link.download = `evaluaciones_equipo_${nombreJefeLimpio}_${periodo.replace(/\s+/g, "_")}_${format(fechaGeneracion, "yyyy-MM-dd")}.zip`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    // Mostrar resultado final
+    if (errores.length > 0) {
+      toast({
+        title: `Exportación completada con errores`,
+        description: `${exitosos} PDFs generados, ${errores.length} fallidos. Revisa la consola para detalles.`,
+        variant: "default",
+        duration: 10000
+      });
+      console.warn("⚠️ Errores durante la exportación:", errores);
+    } else {
+      toast({
+        title: "Exportación completada",
+        description: `${exitosos} PDFs generados exitosamente en un archivo ZIP`
+      });
+    }
+
+  } catch (error: any) {
+    console.error("❌ Error en exportación masiva:", error);
+    const toast = (await import("@/hooks/use-toast")).toast;
+    toast({
+      title: "Error en exportación masiva",
+      description: error?.message || "Error desconocido al generar los PDFs",
+      variant: "destructive"
+    });
     throw error;
   }
 };

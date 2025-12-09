@@ -54,6 +54,13 @@ export interface Result {
   puntajePonderado: number;
 }
 
+export interface DimensionPercentage {
+  id: string;
+  nombre: string;
+  promedio: number;
+  porcentaje: number;
+}
+
 export interface FinalScore {
   desempenoAuto: number;
   desempenoJefe: number;
@@ -62,13 +69,16 @@ export interface FinalScore {
   posicion9Box?: string; // Formato: "alto-alto", "medio-bajo", etc. - Ver nineBoxMetadata.ts para detalles
   desempenoPorcentaje?: number; // Porcentaje de desempeño (0-100)
   potencialPorcentaje?: number; // Porcentaje de potencial (0-100)
+  dimensiones?: DimensionPercentage[]; // Porcentajes por dimensión calculados en el backend (consolidados 70/30)
 }
 
 export interface AccionDesarrollo {
   descripcion: string;
+  dimension?: string; // Dimensión principal que desarrolla esta acción
+  tipoAprendizaje: "experiencia" | "social" | "formal";
   responsable: string;
   fecha: string;
-  recursos: string[];
+  recursos?: string[]; // Opcional, puede no venir de la IA
   indicador: string;
   prioridad: "alta" | "media" | "baja";
 }

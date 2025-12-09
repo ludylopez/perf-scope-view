@@ -31,13 +31,23 @@ export const getJerarquiaInfo = async (usuarioDpi: string): Promise<JerarquiaInf
     const tieneJefeSuperior = usuario?.jefe_inmediato_id != null;
 
     // Verificar si tiene colaboradores directos
-    const { count: totalColaboradores } = await supabase
+    // Buscar en user_assignments (asignaciones formales)
+    const { count: totalColaboradoresAssignments } = await supabase
       .from("user_assignments")
       .select("*", { count: "exact", head: true })
       .eq("jefe_id", usuarioDpi)
       .eq("activo", true);
 
-    const tieneColaboradores = (totalColaboradores || 0) > 0;
+    // También buscar en users por jefe_inmediato_id (jerarquía directa)
+    const { count: totalColaboradoresJerarquia } = await supabase
+      .from("users")
+      .select("*", { count: "exact", head: true })
+      .eq("jefe_inmediato_id", usuarioDpi)
+      .eq("estado", "activo");
+
+    // Tiene colaboradores si tiene en cualquiera de las dos formas
+    const totalColaboradores = (totalColaboradoresAssignments || 0) + (totalColaboradoresJerarquia || 0);
+    const tieneColaboradores = totalColaboradores > 0;
 
     // Verificar si tiene jefes subordinados (que reportan a él)
     const { count: totalJefesSubordinados } = await supabase
@@ -59,7 +69,7 @@ export const getJerarquiaInfo = async (usuarioDpi: string): Promise<JerarquiaInf
       tieneJefesSubordinados,
       esJefeIntermedio: esIntermedio || false,
       esJefeSinJefe: !tieneJefeSuperior && tieneColaboradores,
-      totalColaboradores: totalColaboradores || 0,
+      totalColaboradores: totalColaboradores,
       totalJefesSubordinados: totalJefesSubordinados || 0,
     };
   } catch (error) {

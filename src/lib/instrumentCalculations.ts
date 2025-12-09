@@ -77,8 +77,8 @@ export const INSTRUMENT_CALCULATION_CONFIGS: Record<string, InstrumentCalculatio
     pesoJefe: 0.0, // C1 no tiene evaluación de jefe
     pesoAuto: 1.0, // 100% autoevaluación
     thresholds9Box: {
-      desempeno: { bajo: 3, medio: 4, alto: 4.5 },
-      potencial: { bajo: 3, medio: 4, alto: 4.5 }, // No aplica, pero se mantiene para compatibilidad
+      desempeno: { bajo: 3, medio: 4, alto: 4.0 },
+      potencial: { bajo: 3, medio: 4, alto: 4.0 }, // No aplica, pero se mantiene para compatibilidad
     },
   },
   
@@ -121,8 +121,8 @@ export const INSTRUMENT_CALCULATION_CONFIGS: Record<string, InstrumentCalculatio
     pesoJefe: 0.55, // Pesos especiales para A1
     pesoAuto: 0.45, // Mayor peso a la autoevaluación por ser Alta Dirección
     thresholds9Box: {
-      desempeno: { bajo: 3, medio: 4, alto: 4.5 },
-      potencial: { bajo: 3, medio: 4, alto: 4.5 },
+      desempeno: { bajo: 3, medio: 4, alto: 4.0 },
+      potencial: { bajo: 3, medio: 4, alto: 4.0 },
     },
   },
   
@@ -164,8 +164,8 @@ export const INSTRUMENT_CALCULATION_CONFIGS: Record<string, InstrumentCalculatio
     pesoJefe: 0.7,
     pesoAuto: 0.3,
     thresholds9Box: {
-      desempeno: { bajo: 3, medio: 4, alto: 4.5 },
-      potencial: { bajo: 3, medio: 4, alto: 4.5 },
+      desempeno: { bajo: 3, medio: 4, alto: 4.0 },
+      potencial: { bajo: 3, medio: 4, alto: 4.0 },
     },
   },
 
@@ -208,8 +208,8 @@ export const INSTRUMENT_CALCULATION_CONFIGS: Record<string, InstrumentCalculatio
     pesoJefe: 0.7, // Pesos estándar
     pesoAuto: 0.3,
     thresholds9Box: {
-      desempeno: { bajo: 3, medio: 4, alto: 4.5 },
-      potencial: { bajo: 3, medio: 4, alto: 4.5 },
+      desempeno: { bajo: 3, medio: 4, alto: 4.0 },
+      potencial: { bajo: 3, medio: 4, alto: 4.0 },
     },
   },
 
@@ -252,8 +252,8 @@ export const INSTRUMENT_CALCULATION_CONFIGS: Record<string, InstrumentCalculatio
     pesoJefe: 0.7, // Pesos estándar
     pesoAuto: 0.3,
     thresholds9Box: {
-      desempeno: { bajo: 3, medio: 4, alto: 4.5 },
-      potencial: { bajo: 3, medio: 4, alto: 4.5 },
+      desempeno: { bajo: 3, medio: 4, alto: 4.0 },
+      potencial: { bajo: 3, medio: 4, alto: 4.0 },
     },
   },
 
@@ -296,8 +296,8 @@ export const INSTRUMENT_CALCULATION_CONFIGS: Record<string, InstrumentCalculatio
     pesoJefe: 0.7, // Pesos estándar
     pesoAuto: 0.3,
     thresholds9Box: {
-      desempeno: { bajo: 3, medio: 4, alto: 4.5 },
-      potencial: { bajo: 3, medio: 4, alto: 4.5 },
+      desempeno: { bajo: 3, medio: 4, alto: 4.0 },
+      potencial: { bajo: 3, medio: 4, alto: 4.0 },
     },
   },
 
@@ -340,8 +340,8 @@ export const INSTRUMENT_CALCULATION_CONFIGS: Record<string, InstrumentCalculatio
     pesoJefe: 0.7, // Pesos estándar
     pesoAuto: 0.3,
     thresholds9Box: {
-      desempeno: { bajo: 3, medio: 4, alto: 4.5 },
-      potencial: { bajo: 3, medio: 4, alto: 4.5 },
+      desempeno: { bajo: 3, medio: 4, alto: 4.0 },
+      potencial: { bajo: 3, medio: 4, alto: 4.0 },
     },
   },
 
@@ -384,8 +384,8 @@ export const INSTRUMENT_CALCULATION_CONFIGS: Record<string, InstrumentCalculatio
     pesoJefe: 0.7, // Pesos estándar
     pesoAuto: 0.3,
     thresholds9Box: {
-      desempeno: { bajo: 3, medio: 4, alto: 4.5 },
-      potencial: { bajo: 3, medio: 4, alto: 4.5 },
+      desempeno: { bajo: 3, medio: 4, alto: 4.0 },
+      potencial: { bajo: 3, medio: 4, alto: 4.0 },
     },
   },
 
@@ -428,8 +428,8 @@ export const INSTRUMENT_CALCULATION_CONFIGS: Record<string, InstrumentCalculatio
     pesoJefe: 0.7, // Pesos estándar
     pesoAuto: 0.3,
     thresholds9Box: {
-      desempeno: { bajo: 3, medio: 4, alto: 4.5 },
-      potencial: { bajo: 3, medio: 4, alto: 4.5 },
+      desempeno: { bajo: 3, medio: 4, alto: 4.0 },
+      potencial: { bajo: 3, medio: 4, alto: 4.0 },
     },
   },
 
@@ -472,8 +472,8 @@ export const INSTRUMENT_CALCULATION_CONFIGS: Record<string, InstrumentCalculatio
     pesoJefe: 0.7, // Pesos estándar
     pesoAuto: 0.3,
     thresholds9Box: {
-      desempeno: { bajo: 3, medio: 4, alto: 4.5 },
-      potencial: { bajo: 3, medio: 4, alto: 4.5 },
+      desempeno: { bajo: 3, medio: 4, alto: 4.0 },
+      potencial: { bajo: 3, medio: 4, alto: 4.0 },
     },
   },
 
@@ -516,8 +516,8 @@ export const INSTRUMENT_CALCULATION_CONFIGS: Record<string, InstrumentCalculatio
     pesoJefe: 0.7, // Pesos estándar
     pesoAuto: 0.3,
     thresholds9Box: {
-      desempeno: { bajo: 3, medio: 4, alto: 4.5 },
-      potencial: { bajo: 3, medio: 4, alto: 4.5 },
+      desempeno: { bajo: 3, medio: 4, alto: 4.0 },
+      potencial: { bajo: 3, medio: 4, alto: 4.0 },
     },
   },
 
@@ -560,8 +560,8 @@ export const INSTRUMENT_CALCULATION_CONFIGS: Record<string, InstrumentCalculatio
     pesoJefe: 0.7, // Pesos estándar
     pesoAuto: 0.3,
     thresholds9Box: {
-      desempeno: { bajo: 3, medio: 4, alto: 4.5 },
-      potencial: { bajo: 3, medio: 4, alto: 4.5 },
+      desempeno: { bajo: 3, medio: 4, alto: 4.0 },
+      potencial: { bajo: 3, medio: 4, alto: 4.0 },
     },
   },
 
@@ -635,8 +635,8 @@ export const calculateNineBoxWithInstrument = (
 ): string => {
   const config = getInstrumentCalculationConfig(instrumentId);
   const thresholds = config.thresholds9Box || {
-    desempeno: { bajo: 3, medio: 4, alto: 4.5 },
-    potencial: { bajo: 3, medio: 4, alto: 4.5 },
+    desempeno: { bajo: 3, medio: 4, alto: 4.0 },
+    potencial: { bajo: 3, medio: 4, alto: 4.0 },
   };
   
   if (potencial === undefined) {

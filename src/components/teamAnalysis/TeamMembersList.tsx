@@ -1,0 +1,253 @@
+import { useState, useMemo } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  List,
+  ArrowUpDown,
+} from "lucide-react";
+import { TeamFilters } from "./TeamFilters";
+import { TeamMemberRow } from "./TeamMemberRow";
+import type {
+  TeamAnalysisNode,
+  TeamAnalysisFilters,
+  JefeParaFiltro,
+  GrupoParaFiltro,
+} from "@/types/teamAnalysis";
+import { filtrarJerarquia } from "@/lib/teamAnalysis";
+
+interface TeamMembersListProps {
+  nodes: TeamAnalysisNode[];
+  jefes: JefeParaFiltro[];
+  grupos: GrupoParaFiltro[];
+  onMemberClick?: (node: TeamAnalysisNode) => void;
+}
+
+type SortKey = "nombre" | "area" | "nivel" | "desempeno" | "potencial" | "9box";
+type SortOrder = "asc" | "desc";
+
+const ITEMS_PER_PAGE = 50;
+
+export function TeamMembersList({
+  nodes,
+  jefes,
+  grupos,
+  onMemberClick,
+}: TeamMembersListProps) {
+  const [filters, setFilters] = useState<TeamAnalysisFilters>({});
+  const [currentPage, setCurrentPage] = useState(1);
+  const [sortKey, setSortKey] = useState<SortKey>("nombre");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
+
+  // Filtrar nodos
+  const filteredNodes = useMemo(() => {
+    return filtrarJerarquia(nodes, filters);
+  }, [nodes, filters]);
+
+  // Ordenar nodos
+  const sortedNodes = useMemo(() => {
+    return [...filteredNodes].sort((a, b) => {
+      let comparison = 0;
+
+      switch (sortKey) {
+        case "nombre":
+          comparison = a.nombreCompleto.localeCompare(b.nombreCompleto);
+          break;
+        case "area":
+          comparison = (a.area || "").localeCompare(b.area || "");
+          break;
+        case "nivel":
+          comparison = (a.nivel || "").localeCompare(b.nivel || "");
+          break;
+        case "desempeno":
+          comparison =
+            (a.desempenoPorcentaje || 0) - (b.desempenoPorcentaje || 0);
+          break;
+        case "potencial":
+          comparison =
+            (a.potencialPorcentaje || 0) - (b.potencialPorcentaje || 0);
+          break;
+        case "9box":
+          comparison = (a.posicion9Box || "").localeCompare(
+            b.posicion9Box || ""
+          );
+          break;
+      }
+
+      return sortOrder === "asc" ? comparison : -comparison;
+    });
+  }, [filteredNodes, sortKey, sortOrder]);
+
+  // Paginar
+  const totalPages = Math.ceil(sortedNodes.length / ITEMS_PER_PAGE);
+  const paginatedNodes = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return sortedNodes.slice(start, start + ITEMS_PER_PAGE);
+  }, [sortedNodes, currentPage]);
+
+  // Reset página cuando cambian filtros
+  const handleFiltersChange = (newFilters: TeamAnalysisFilters) => {
+    setFilters(newFilters);
+    setCurrentPage(1);
+  };
+
+  // Manejar ordenamiento
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortKey(key);
+      setSortOrder("asc");
+    }
+  };
+
+  const SortableHeader = ({
+    label,
+    sortKeyName,
+  }: {
+    label: string;
+    sortKeyName: SortKey;
+  }) => (
+    <TableHead
+      className="cursor-pointer hover:bg-muted/50 select-none"
+      onClick={() => handleSort(sortKeyName)}
+    >
+      <div className="flex items-center gap-1">
+        {label}
+        <ArrowUpDown
+          className={`h-3 w-3 ${
+            sortKey === sortKeyName ? "text-primary" : "text-muted-foreground"
+          }`}
+        />
+      </div>
+    </TableHead>
+  );
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between mb-4">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <List className="h-5 w-5" />
+            Lista de Colaboradores
+          </CardTitle>
+          <Badge variant="outline">
+            {filteredNodes.length} de {nodes.length} colaboradores
+          </Badge>
+        </div>
+
+        {/* Filtros */}
+        <TeamFilters
+          jefes={jefes}
+          grupos={grupos}
+          filters={filters}
+          onFiltersChange={handleFiltersChange}
+        />
+      </CardHeader>
+
+      <CardContent>
+        {paginatedNodes.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground">
+            <List className="h-12 w-12 mx-auto mb-4 opacity-30" />
+            <p>No se encontraron colaboradores con los filtros aplicados</p>
+          </div>
+        ) : (
+          <>
+            {/* Tabla */}
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <SortableHeader label="Nombre" sortKeyName="nombre" />
+                    <SortableHeader label="Área" sortKeyName="area" />
+                    <SortableHeader label="Nivel" sortKeyName="nivel" />
+                    <TableHead>Jefe</TableHead>
+                    <SortableHeader label="Desempeño" sortKeyName="desempeno" />
+                    <SortableHeader label="Potencial" sortKeyName="potencial" />
+                    <SortableHeader label="9-Box" sortKeyName="9box" />
+                    <TableHead>Equipo</TableHead>
+                    <TableHead className="w-8"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginatedNodes.map((node) => (
+                    <TeamMemberRow
+                      key={node.dpi}
+                      node={node}
+                      onClick={() => onMemberClick?.(node)}
+                      showJefe={true}
+                    />
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Paginación */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between mt-4">
+                <p className="text-sm text-muted-foreground">
+                  Mostrando {(currentPage - 1) * ITEMS_PER_PAGE + 1} -{" "}
+                  {Math.min(currentPage * ITEMS_PER_PAGE, sortedNodes.length)} de{" "}
+                  {sortedNodes.length}
+                </p>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(1)}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronsLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+
+                  <span className="text-sm px-2">
+                    Página {currentPage} de {totalPages}
+                  </span>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setCurrentPage((p) => Math.min(totalPages, p + 1))
+                    }
+                    disabled={currentPage === totalPages}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={currentPage === totalPages}
+                  >
+                    <ChevronsRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}

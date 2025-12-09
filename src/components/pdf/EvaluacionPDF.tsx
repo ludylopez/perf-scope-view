@@ -5,6 +5,7 @@ import { CompetenciasCardsPDF } from './CompetenciasCardsPDF';
 import { PlanDesarrolloPDF } from './PlanDesarrolloPDF';
 import { FirmasPDF } from './FirmasPDF';
 import { pdfStyles } from './styles';
+import { getDimensionFromAction, getDimensionColor, getUsedDimensions, formatDateForPDF } from '@/lib/dimensionUtils';
 
 interface EvaluacionPDFProps {
   empleado: {
@@ -20,7 +21,9 @@ interface EvaluacionPDFProps {
     correo?: string;
     telefono?: string;
     jefeNombre?: string;
+    jefeCargo?: string;
     directoraRRHHNombre?: string;
+    directoraRRHHCargo?: string;
   };
   periodo: string;
   fechaGeneracion: Date;
@@ -106,6 +109,27 @@ export const EvaluacionPDF = ({
     typeof r === 'string' && r.trim() !== ''
   );
 
+  // Calcular texto del resultado para el header
+  const percentage = typeof resultadoData.performancePercentage === 'number' && !isNaN(resultadoData.performancePercentage) 
+    ? resultadoData.performancePercentage 
+    : 0;
+  
+  let resultadoLabel = 'Regular';
+  if (percentage >= 90) {
+    resultadoLabel = 'Excelente';
+  } else if (percentage >= 75) {
+    resultadoLabel = 'Bueno';
+  } else if (percentage >= 60) {
+    resultadoLabel = 'Regular';
+  } else {
+    resultadoLabel = 'Necesita mejorar';
+  }
+  
+  const resultadoText = `Tu desempeño es ${resultadoLabel}`;
+  const resultadoDescription = percentage >= 75
+    ? 'Estás cumpliendo satisfactoriamente con las expectativas del cargo.'
+    : 'Hay áreas importantes que requieren atención y mejora.';
+
   return (
     <Document>
       {/* PÁGINA 1 */}
@@ -116,11 +140,9 @@ export const EvaluacionPDF = ({
           periodo={periodo}
           fechaGeneracion={fechaGeneracion}
           jefeCompleto={resultadoData.jefeCompleto}
-        />
-
-        {/* Resultado General */}
-        <ResultadoSectionPDF 
           performancePercentage={resultadoData.performancePercentage}
+          resultadoText={resultadoText}
+          resultadoDescription={resultadoDescription}
         />
 
         {/* Información de múltiples evaluadores */}
@@ -146,9 +168,18 @@ export const EvaluacionPDF = ({
         {/* Footer */}
         <Text
           style={pdfStyles.footer}
-          render={({ pageNumber, totalPages }) =>
-            `Página ${pageNumber} de ${totalPages}`
-          }
+          render={({ pageNumber, totalPages }) => {
+            const fechaFormateada = fechaGeneracion 
+              ? new Date(fechaGeneracion).toLocaleDateString('es-ES', { 
+                  year: 'numeric', 
+                  month: 'long', 
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })
+              : '';
+            return `${fechaFormateada ? `${fechaFormateada} | ` : ''}Página ${pageNumber} de ${totalPages}`;
+          }}
           fixed
         />
       </Page>
@@ -181,8 +212,29 @@ export const EvaluacionPDF = ({
               <View>
                 <Text style={pdfStyles.planSubtitle}>PLAN DE ACCIÓN DETALLADO</Text>
                 <Text style={pdfStyles.planSubtitleDescription}>
-                  Acciones concretas con responsables, fechas e indicadores
+                  Acciones concretas con responsables, fechas e indicadores. El color del borde izquierdo indica la dimensión que desarrolla cada acción.
                 </Text>
+                
+                {/* Leyenda de dimensiones - Solo las usadas */}
+                {(() => {
+                  const usedDimensions = getUsedDimensions(acciones, dimensionesDebiles);
+                  
+                  if (usedDimensions.length === 0) return null;
+                  
+                  return (
+                    <View style={pdfStyles.dimensionLegend}>
+                      <Text style={pdfStyles.dimensionLegendTitle}>Leyenda de Dimensiones:</Text>
+                      <View style={pdfStyles.dimensionLegendGrid}>
+                        {usedDimensions.map((dim, idx) => (
+                          <View key={idx} style={pdfStyles.dimensionLegendItem}>
+                            <View style={[pdfStyles.dimensionLegendColor, { backgroundColor: dim.color }]} />
+                            <Text style={pdfStyles.dimensionLegendText}>{dim.name}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  );
+                })()}
                 
                 <View style={pdfStyles.table}>
                   {/* Encabezado de tabla */}
@@ -221,8 +273,19 @@ export const EvaluacionPDF = ({
                         default: return p || 'Media';
                       }
                     };
+                    
+                    // Obtener dimensión de la acción usando función centralizada
+                    const dimension = getDimensionFromAction(accion, dimensionesDebiles);
+                    const dimensionColor = getDimensionColor(dimension || undefined);
+                    
                     return (
-                      <View key={idx} style={pdfStyles.tableRow}>
+                      <View 
+                        key={idx} 
+                        style={[
+                          pdfStyles.tableRow,
+                          { borderLeftWidth: dimension ? 4 : 0, borderLeftColor: dimensionColor }
+                        ]}
+                      >
                         <Text style={[pdfStyles.tableCell, pdfStyles.tableCellNumber]}>
                           {idx + 1}
                         </Text>
@@ -238,7 +301,7 @@ export const EvaluacionPDF = ({
                           {accion.responsable || ''}
                         </Text>
                         <Text style={[pdfStyles.tableCell, pdfStyles.tableCellFecha]}>
-                          {accion.fecha || ''}
+                          {formatDateForPDF(accion.fecha || '')}
                         </Text>
                         <Text style={[pdfStyles.tableCell, pdfStyles.tableCellIndicador]}>
                           {accion.indicador || ''}
@@ -251,53 +314,8 @@ export const EvaluacionPDF = ({
             )}
           </View>
 
-                  {/* Dimensiones Débiles */}
-          {dimensionesDebiles.length > 0 && (
-            <View style={{ marginBottom: 8 }}>
-              <Text style={pdfStyles.sectionTitle}>DIMENSIONES QUE REQUIEREN ATENCIÓN</Text>
-              {dimensionesDebiles
-                .filter((dim) => dim && dim.dimension && dim.dimension.trim() !== '')
-                .map((dim, idx) => (
-                  <View key={idx} style={pdfStyles.dimensionDebilCard}>
-                    <View style={pdfStyles.dimensionDebilHeader}>
-                      <Text style={pdfStyles.dimensionDebilTitle}>{dim.dimension}</Text>
-                      {dim.score !== undefined && typeof dim.score === 'number' && !isNaN(dim.score) && (
-                        <Text style={pdfStyles.dimensionDebilScore}>
-                          Score: {dim.score.toFixed(2)}/5.0 ({(dim.score / 5 * 100).toFixed(0)}%)
-                        </Text>
-                      )}
-                    </View>
-                    {dim.accionesEspecificas && Array.isArray(dim.accionesEspecificas) && dim.accionesEspecificas.length > 0 && (
-                      <View>
-                        {dim.accionesEspecificas
-                          .filter((accion): accion is string => typeof accion === 'string' && accion.trim() !== '')
-                          .map((accion, i) => (
-                            <Text key={i} style={pdfStyles.dimensionDebilActions}>
-                              • {accion}
-                            </Text>
-                          ))}
-                      </View>
-                    )}
-                  </View>
-                ))}
-            </View>
-          )}
-
-                  {/* Recomendaciones */}
-          {recomendaciones.length > 0 && (
-            <View style={{ marginBottom: 20 }}>
-              <Text style={pdfStyles.sectionTitle}>RECOMENDACIONES GENERALES</Text>
-              <View style={pdfStyles.recomendacionesList}>
-                {recomendaciones
-                  .filter((rec) => rec && rec.trim() !== '')
-                  .map((rec, idx) => (
-                    <Text key={idx} style={pdfStyles.recomendacionItem}>
-                      • {rec}
-                    </Text>
-                  ))}
-              </View>
-            </View>
-          )}
+                  {/* Secciones eliminadas: Dimensiones Débiles y Recomendaciones */}
+          {/* La información ahora se muestra en la tabla de acciones con indicador visual por dimensión */}
 
           {/* Espacio adicional antes de las firmas */}
           <View style={{ marginTop: 10, marginBottom: 10 }} />
@@ -305,17 +323,29 @@ export const EvaluacionPDF = ({
           {/* Firmas */}
           <FirmasPDF 
             nombreEmpleado={nombreCompleto}
+            cargoEmpleado={empleado.cargo}
             nombreJefe={empleado.jefeNombre}
+            cargoJefe={empleado.jefeCargo}
             nombreDirectoraRRHH={empleado.directoraRRHHNombre}
+            cargoDirectoraRRHH={empleado.directoraRRHHCargo}
             esC1={empleado.nivel === 'C1'}
           />
 
           {/* Footer */}
           <Text
             style={pdfStyles.footer}
-            render={({ pageNumber, totalPages }) =>
-              `Página ${pageNumber} de ${totalPages}`
-            }
+            render={({ pageNumber, totalPages }) => {
+              const fechaFormateada = fechaGeneracion 
+                ? new Date(fechaGeneracion).toLocaleDateString('es-ES', { 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })
+                : '';
+              return `${fechaFormateada ? `${fechaFormateada} | ` : ''}Página ${pageNumber} de ${totalPages}`;
+            }}
             fixed
           />
         </Page>
