@@ -79,3 +79,15 @@ ACLARACION_DISCREPANCIA.md
 # Archivos CSV con datos
 public/temp/*.csv
 dist/temp/*.csv
+
+# Vista de análisis (solo para uso local, no subir a GitHub)
+src/pages/analisis/
+
+# Archivos SQL con DPIs y datos personales específicos
+cleanup-plans.sql
+supabase/migrations/20251118000000_fix_alberto_peralta_role.sql
+supabase/migrations/20251117235745_afc576e5-92c1-44e0-ab82-5c17d4e2cb44.sql
+supabase/migrations/20251117235135_e93d3d0b-f5e9-4cbf-a156-f058de3cbc8a.sql
+
+# Archivos de prueba con datos específicos
+test_d1_cargos.js

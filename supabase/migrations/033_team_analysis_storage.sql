@@ -30,3 +30,5 @@ CREATE TRIGGER update_team_analysis_updated_at BEFORE UPDATE ON team_analysis
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 
+
+

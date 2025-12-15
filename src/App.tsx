@@ -47,6 +47,30 @@ import PopulateExplanations from "./pages/PopulateExplanations";
 import DashboardPersonal from "./pages/DashboardPersonal";
 import CambioContrasena from "./pages/CambioContrasena";
 import AnalisisEstadisticoEvaluaciones from "./pages/AnalisisEstadisticoEvaluaciones";
+// Componentes de análisis
+import AnalisisIndex from "./pages/analisis/index";
+import InformeFinal from "./pages/analisis/InformeFinal";
+import ResumenEjecutivo from "./pages/analisis/ResumenEjecutivo";
+import ResultadosGlobales from "./pages/analisis/ResultadosGlobales";
+import AnalisisPorDimension from "./pages/analisis/AnalisisPorDimension";
+import AnalisisPorNivel from "./pages/analisis/AnalisisPorNivel";
+import AnalisisPorDireccion from "./pages/analisis/AnalisisPorDireccion";
+import AnalisisCapacitacion from "./pages/analisis/AnalisisCapacitacion";
+import AnalisisPlanesDesarrollo from "./pages/analisis/AnalisisPlanesDesarrollo";
+import AnalisisCorrelaciones from "./pages/analisis/AnalisisCorrelaciones";
+import AnalisisEquidad from "./pages/analisis/AnalisisEquidad";
+import AnalisisPorRenglon from "./pages/analisis/AnalisisPorRenglon";
+import AnalisisDemografico from "./pages/analisis/AnalisisDemografico";
+import AnalisisPotencial from "./pages/analisis/AnalisisPotencial";
+import AnalisisBrechasDimension from "./pages/analisis/AnalisisBrechasDimension";
+import AnalisisBrechasAutoJefe from "./pages/analisis/AnalisisBrechasAutoJefe";
+import ComparativaAutoJefe from "./pages/analisis/ComparativaAutoJefe";
+import AnalisisOutliers from "./pages/analisis/AnalisisOutliers";
+import AnalisisLiderazgoCascada from "./pages/analisis/AnalisisLiderazgoCascada";
+import AnalisisPerfiles from "./pages/analisis/AnalisisPerfiles";
+import AnalisisRiesgoRotacion from "./pages/analisis/AnalisisRiesgoRotacion";
+import AnalisisConsistencia from "./pages/analisis/AnalisisConsistencia";
+import AnalisisBenchmarking from "./pages/analisis/AnalisisBenchmarking";
 
 const queryClient = new QueryClient();
 
@@ -355,6 +379,191 @@ const App = () => (
             <Route
               path="/analisis-estadistico"
               element={<AnalisisEstadisticoEvaluaciones />}
+            />
+            {/* Rutas de análisis */}
+            <Route
+              path="/analisis"
+              element={
+                <ProtectedRoute>
+                  <AnalisisIndex />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/analisis/informe-final"
+              element={
+                <ProtectedRoute>
+                  <InformeFinal />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/analisis/resumen-ejecutivo"
+              element={
+                <ProtectedRoute>
+                  <ResumenEjecutivo />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/analisis/resultados-globales"
+              element={
+                <ProtectedRoute>
+                  <ResultadosGlobales />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/analisis/por-dimension"
+              element={
+                <ProtectedRoute>
+                  <AnalisisPorDimension />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/analisis/por-nivel"
+              element={
+                <ProtectedRoute>
+                  <AnalisisPorNivel />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/analisis/por-direccion"
+              element={
+                <ProtectedRoute>
+                  <AnalisisPorDireccion />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/analisis/capacitacion"
+              element={
+                <ProtectedRoute>
+                  <AnalisisCapacitacion />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/analisis/planes-desarrollo"
+              element={
+                <ProtectedRoute>
+                  <AnalisisPlanesDesarrollo />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/analisis/correlaciones"
+              element={
+                <ProtectedRoute>
+                  <AnalisisCorrelaciones />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/analisis/equidad"
+              element={
+                <ProtectedRoute>
+                  <AnalisisEquidad />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/analisis/por-renglon"
+              element={
+                <ProtectedRoute>
+                  <AnalisisPorRenglon />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/analisis/demografico"
+              element={
+                <ProtectedRoute>
+                  <AnalisisDemografico />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/analisis/potencial"
+              element={
+                <ProtectedRoute>
+                  <AnalisisPotencial />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/analisis/brechas-dimension"
+              element={
+                <ProtectedRoute>
+                  <AnalisisBrechasDimension />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/analisis/brechas-auto-jefe"
+              element={
+                <ProtectedRoute>
+                  <AnalisisBrechasAutoJefe />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/analisis/comparativa-auto-jefe"
+              element={
+                <ProtectedRoute>
+                  <ComparativaAutoJefe />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/analisis/outliers"
+              element={
+                <ProtectedRoute>
+                  <AnalisisOutliers />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/analisis/liderazgo-cascada"
+              element={
+                <ProtectedRoute>
+                  <AnalisisLiderazgoCascada />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/analisis/perfiles"
+              element={
+                <ProtectedRoute>
+                  <AnalisisPerfiles />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/analisis/riesgo-rotacion"
+              element={
+                <ProtectedRoute>
+                  <AnalisisRiesgoRotacion />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/analisis/consistencia"
+              element={
+                <ProtectedRoute>
+                  <AnalisisConsistencia />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/analisis/benchmarking"
+              element={
+                <ProtectedRoute>
+                  <AnalisisBenchmarking />
+                </ProtectedRoute>
+              }
             />
             <Route path="*" element={<NotFound />} />
           </Routes>

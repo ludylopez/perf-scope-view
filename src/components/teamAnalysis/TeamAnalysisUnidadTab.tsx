@@ -21,6 +21,7 @@ import {
   Filter,
   FileDown,
   Loader2,
+  GraduationCap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -29,6 +30,7 @@ import { TeamAnalysisSummary } from "./TeamAnalysisSummary";
 import { TeamMembersListCascada } from "./TeamMembersListCascada";
 import { TeamNineBoxView } from "./TeamNineBoxView";
 import { TeamMemberDetailModal } from "./TeamMemberDetailModal";
+import { TrainingPlanContent } from "@/components/trainingPlan/TrainingPlanContent";
 
 import {
   getEquipoCascadaCompleto,
@@ -418,7 +420,7 @@ export function TeamAnalysisUnidadTab({ usuarioDpi, periodoId }: TeamAnalysisTab
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="resumen" className="flex items-center gap-2">
             <LayoutDashboard className="h-4 w-4" />
             <span className="hidden sm:inline">Resumen</span>
@@ -430,6 +432,10 @@ export function TeamAnalysisUnidadTab({ usuarioDpi, periodoId }: TeamAnalysisTab
           <TabsTrigger value="9box" className="flex items-center gap-2">
             <Grid3X3 className="h-4 w-4" />
             <span className="hidden sm:inline">9-Box</span>
+          </TabsTrigger>
+          <TabsTrigger value="capacitacion" className="flex items-center gap-2">
+            <GraduationCap className="h-4 w-4" />
+            <span className="hidden sm:inline">Plan Capacitación</span>
           </TabsTrigger>
         </TabsList>
 
@@ -493,6 +499,13 @@ export function TeamAnalysisUnidadTab({ usuarioDpi, periodoId }: TeamAnalysisTab
             onMemberClick={handleMemberClick}
             periodoId={periodoId}
             jefeContexto={usuarioDpi}
+          />
+        </TabsContent>
+
+        <TabsContent value="capacitacion" className="mt-6">
+          <TrainingPlanContent
+            jefeDpi={usuarioDpi}
+            periodoId={periodoId}
           />
         </TabsContent>
       </Tabs>

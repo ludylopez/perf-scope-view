@@ -21,3 +21,5 @@ CREATE INDEX IF NOT EXISTS idx_team_analysis_tipo ON team_analysis(tipo);
 -- Actualizar comentario de la tabla
 COMMENT ON COLUMN team_analysis.tipo IS 'Tipo de análisis: directo (solo colaboradores directos) o cascada (toda la unidad incluyendo subordinados)';
 
+
+
