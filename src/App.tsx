@@ -47,30 +47,30 @@ import PopulateExplanations from "./pages/PopulateExplanations";
 import DashboardPersonal from "./pages/DashboardPersonal";
 import CambioContrasena from "./pages/CambioContrasena";
 import AnalisisEstadisticoEvaluaciones from "./pages/AnalisisEstadisticoEvaluaciones";
-// Componentes de análisis
-import AnalisisIndex from "./pages/analisis/index";
-import InformeFinal from "./pages/analisis/InformeFinal";
-import ResumenEjecutivo from "./pages/analisis/ResumenEjecutivo";
-import ResultadosGlobales from "./pages/analisis/ResultadosGlobales";
-import AnalisisPorDimension from "./pages/analisis/AnalisisPorDimension";
-import AnalisisPorNivel from "./pages/analisis/AnalisisPorNivel";
-import AnalisisPorDireccion from "./pages/analisis/AnalisisPorDireccion";
-import AnalisisCapacitacion from "./pages/analisis/AnalisisCapacitacion";
-import AnalisisPlanesDesarrollo from "./pages/analisis/AnalisisPlanesDesarrollo";
-import AnalisisCorrelaciones from "./pages/analisis/AnalisisCorrelaciones";
-import AnalisisEquidad from "./pages/analisis/AnalisisEquidad";
-import AnalisisPorRenglon from "./pages/analisis/AnalisisPorRenglon";
-import AnalisisDemografico from "./pages/analisis/AnalisisDemografico";
-import AnalisisPotencial from "./pages/analisis/AnalisisPotencial";
-import AnalisisBrechasDimension from "./pages/analisis/AnalisisBrechasDimension";
-import AnalisisBrechasAutoJefe from "./pages/analisis/AnalisisBrechasAutoJefe";
-import ComparativaAutoJefe from "./pages/analisis/ComparativaAutoJefe";
-import AnalisisOutliers from "./pages/analisis/AnalisisOutliers";
-import AnalisisLiderazgoCascada from "./pages/analisis/AnalisisLiderazgoCascada";
-import AnalisisPerfiles from "./pages/analisis/AnalisisPerfiles";
-import AnalisisRiesgoRotacion from "./pages/analisis/AnalisisRiesgoRotacion";
-import AnalisisConsistencia from "./pages/analisis/AnalisisConsistencia";
-import AnalisisBenchmarking from "./pages/analisis/AnalisisBenchmarking";
+// Componentes de análisis - Comentados temporalmente porque los archivos no existen
+// import AnalisisIndex from "./pages/analisis/index";
+// import InformeFinal from "./pages/analisis/InformeFinal";
+// import ResumenEjecutivo from "./pages/analisis/ResumenEjecutivo";
+// import ResultadosGlobales from "./pages/analisis/ResultadosGlobales";
+// import AnalisisPorDimension from "./pages/analisis/AnalisisPorDimension";
+// import AnalisisPorNivel from "./pages/analisis/AnalisisPorNivel";
+// import AnalisisPorDireccion from "./pages/analisis/AnalisisPorDireccion";
+// import AnalisisCapacitacion from "./pages/analisis/AnalisisCapacitacion";
+// import AnalisisPlanesDesarrollo from "./pages/analisis/AnalisisPlanesDesarrollo";
+// import AnalisisCorrelaciones from "./pages/analisis/AnalisisCorrelaciones";
+// import AnalisisEquidad from "./pages/analisis/AnalisisEquidad";
+// import AnalisisPorRenglon from "./pages/analisis/AnalisisPorRenglon";
+// import AnalisisDemografico from "./pages/analisis/AnalisisDemografico";
+// import AnalisisPotencial from "./pages/analisis/AnalisisPotencial";
+// import AnalisisBrechasDimension from "./pages/analisis/AnalisisBrechasDimension";
+// import AnalisisBrechasAutoJefe from "./pages/analisis/AnalisisBrechasAutoJefe";
+// import ComparativaAutoJefe from "./pages/analisis/ComparativaAutoJefe";
+// import AnalisisOutliers from "./pages/analisis/AnalisisOutliers";
+// import AnalisisLiderazgoCascada from "./pages/analisis/AnalisisLiderazgoCascada";
+// import AnalisisPerfiles from "./pages/analisis/AnalisisPerfiles";
+// import AnalisisRiesgoRotacion from "./pages/analisis/AnalisisRiesgoRotacion";
+// import AnalisisConsistencia from "./pages/analisis/AnalisisConsistencia";
+// import AnalisisBenchmarking from "./pages/analisis/AnalisisBenchmarking";
 
 const queryClient = new QueryClient();
 
@@ -380,8 +380,8 @@ const App = () => (
               path="/analisis-estadistico"
               element={<AnalisisEstadisticoEvaluaciones />}
             />
-            {/* Rutas de análisis */}
-            <Route
+            {/* Rutas de análisis - Comentadas temporalmente porque los componentes no existen */}
+            {/* <Route
               path="/analisis"
               element={
                 <ProtectedRoute>
@@ -564,7 +564,7 @@ const App = () => (
                   <AnalisisBenchmarking />
                 </ProtectedRoute>
               }
-            />
+            /> */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

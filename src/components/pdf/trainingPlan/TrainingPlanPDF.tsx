@@ -1,8 +1,10 @@
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
-import type { PlanCapacitacionUnidad } from '@/types/trainingPlan';
+import type { PlanCapacitacionEstructurado } from '@/types/trainingPlan';
 
 interface TrainingPlanPDFProps {
-  plan: PlanCapacitacionUnidad;
+  planEstructurado: PlanCapacitacionEstructurado;
+  directorNombre?: string;
+  totalColaboradores?: number;
 }
 
 const trainingPlanStyles = StyleSheet.create({
@@ -235,98 +237,163 @@ const getPrioridadText = (prioridad: string) => {
   return map[prioridad] || prioridad;
 };
 
-export const TrainingPlanPDF = ({ plan }: TrainingPlanPDFProps) => {
-  const fechaGeneracion = new Date(plan.metadata.fechaGeneracion);
-  const fechaFormateada = fechaGeneracion.toLocaleDateString('es-GT', {
+export const TrainingPlanPDF = ({ planEstructurado, directorNombre, totalColaboradores }: TrainingPlanPDFProps) => {
+  const fechaActual = new Date();
+  const fechaFormateada = fechaActual.toLocaleDateString('es-GT', {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
   });
+
+  const areaDepartamento = planEstructurado.informacionGeneral?.areaDepartamento || "Unidad Organizacional";
+  const periodo = planEstructurado.informacionGeneral?.periodo || "Enero - Diciembre 2026";
+  const responsable = planEstructurado.informacionGeneral?.responsable || "Gerencia de Recursos Humanos";
+  const totalColab = planEstructurado.informacionGeneral?.totalColaboradores || totalColaboradores || 0;
+  const tematicas = planEstructurado.tematicas || [];
+
+  // Calcular total de horas
+  const totalHoras = tematicas.reduce((acc, tematica) => {
+    return acc + (tematica.actividades?.reduce((hAcc, actividad) => {
+      const horasMatch = actividad.duracion?.match(/(\d+)\s*hora/i);
+      return hAcc + (horasMatch ? parseInt(horasMatch[1]) : 0);
+    }, 0) || 0);
+  }, 0);
 
   return (
     <Document>
-      {/* PÁGINA 1: Header + Contexto + Resumen Ejecutivo */}
+      {/* PÁGINA 1: Header + Información del Departamento + Programa */}
       <Page size="A4" style={trainingPlanStyles.page}>
-        <View style={trainingPlanStyles.header}>
-          <Text style={trainingPlanStyles.headerTitle}>📚 Plan de Capacitación Consolidado</Text>
-          <Text style={trainingPlanStyles.headerSubtitle}>
-            Análisis Estadístico de Necesidades de Capacitación
+        {/* Header centrado - igual que la vista */}
+        <View style={{ marginBottom: 20, paddingBottom: 15, borderBottomWidth: 1, borderBottomColor: '#e5e7eb', textAlign: 'center' }}>
+          <Text style={{ fontSize: 9, color: '#6b7280', marginBottom: 4 }}>
+            MUNICIPALIDAD DE ESQUIPULAS
           </Text>
-          <Text style={trainingPlanStyles.headerInfo}>
-            Período: {plan.metadata.periodoNombre} | Generado: {fechaFormateada}
+          <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#1f2937', marginBottom: 8 }}>
+            {areaDepartamento}
+          </Text>
+          <Text style={{ fontSize: 12, color: '#4b5563', marginBottom: 4 }}>
+            Plan de Capacitación Anual
+          </Text>
+          <Text style={{ fontSize: 9, color: '#6b7280', marginTop: 4 }}>
+            Período: {periodo}
           </Text>
         </View>
 
-        {/* Contexto */}
-        <View style={trainingPlanStyles.section}>
-          <Text style={trainingPlanStyles.sectionTitle}>📊 Contexto</Text>
-          <View style={trainingPlanStyles.grid}>
-            <View style={trainingPlanStyles.gridItem}>
-              <Text style={trainingPlanStyles.cardTitle}>Total Colaboradores</Text>
-              <Text style={trainingPlanStyles.cardContent}>{plan.contexto.totalColaboradores}</Text>
+        {/* Información del Departamento - igual que la vista */}
+        <View style={{ marginBottom: 25, paddingBottom: 15, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' }}>
+          <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#1f2937', marginBottom: 10, textTransform: 'uppercase' }}>
+            INFORMACIÓN DEL DEPARTAMENTO
+          </Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+            <View style={{ width: '48%', marginBottom: 8 }}>
+              <Text style={{ fontSize: 8, color: '#6b7280', marginBottom: 2 }}>DIRECTOR</Text>
+              <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#1f2937' }}>{directorNombre || "N/A"}</Text>
             </View>
-            <View style={trainingPlanStyles.gridItem}>
-              <Text style={trainingPlanStyles.cardTitle}>Evaluaciones Completadas</Text>
-              <Text style={trainingPlanStyles.cardContent}>
-                {plan.contexto.evaluacionesCompletadas}
-              </Text>
+            <View style={{ width: '48%', marginBottom: 8 }}>
+              <Text style={{ fontSize: 8, color: '#6b7280', marginBottom: 2 }}>TOTAL COLABORADORES</Text>
+              <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#1f2937' }}>{totalColab} personas</Text>
             </View>
-            <View style={trainingPlanStyles.gridItem}>
-              <Text style={trainingPlanStyles.cardTitle}>Tasa de Completitud</Text>
-              <Text style={trainingPlanStyles.cardContent}>
-                {plan.contexto.tasaCompletitud.toFixed(1)}%
-              </Text>
+            <View style={{ width: '48%', marginBottom: 8 }}>
+              <Text style={{ fontSize: 8, color: '#6b7280', marginBottom: 2 }}>HORAS DE CAPACITACIÓN</Text>
+              <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#1f2937' }}>{totalHoras} horas</Text>
             </View>
-            <View style={trainingPlanStyles.gridItem}>
-              <Text style={trainingPlanStyles.cardTitle}>Promedio Unidad</Text>
-              <Text style={trainingPlanStyles.cardContent}>
-                {plan.contexto.promedioDesempenoUnidad.toFixed(1)}%
-              </Text>
-            </View>
-            <View style={trainingPlanStyles.gridItem}>
-              <Text style={trainingPlanStyles.cardTitle}>Promedio Organización</Text>
-              <Text style={trainingPlanStyles.cardContent}>
-                {plan.contexto.promedioDesempenoOrg.toFixed(1)}%
-              </Text>
+            <View style={{ width: '48%', marginBottom: 8 }}>
+              <Text style={{ fontSize: 8, color: '#6b7280', marginBottom: 2 }}>COORDINACIÓN</Text>
+              <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#1f2937' }}>{responsable}</Text>
             </View>
           </View>
         </View>
 
-        {/* Resumen Ejecutivo */}
-        <View style={trainingPlanStyles.section}>
-          <Text style={trainingPlanStyles.sectionTitle}>📋 Resumen Ejecutivo</Text>
-          <View style={trainingPlanStyles.card}>
-            <Text style={trainingPlanStyles.cardTitle}>Situación General</Text>
-            <Text style={trainingPlanStyles.cardContent}>
-              {plan.resumenEjecutivo.situacionGeneral}
-            </Text>
-          </View>
-          {plan.resumenEjecutivo.dimensionMasCritica && (
-            <View style={trainingPlanStyles.card}>
-              <Text style={trainingPlanStyles.cardTitle}>Dimensión Más Crítica</Text>
-              <Text style={trainingPlanStyles.cardContent}>
-                {plan.resumenEjecutivo.dimensionMasCritica}
-              </Text>
-            </View>
-          )}
-          {plan.resumenEjecutivo.capacitacionesPrioritarias.length > 0 && (
-            <View style={trainingPlanStyles.card}>
-              <Text style={trainingPlanStyles.cardTitle}>Capacitaciones Prioritarias</Text>
-              {plan.resumenEjecutivo.capacitacionesPrioritarias.map((cap, idx) => (
-                <Text key={idx} style={trainingPlanStyles.listItem}>
-                  • {cap}
-                </Text>
-              ))}
-            </View>
-          )}
-          <View style={trainingPlanStyles.card}>
-            <Text style={trainingPlanStyles.cardTitle}>Recomendación General</Text>
-            <Text style={trainingPlanStyles.cardContent}>
-              {plan.resumenEjecutivo.recomendacionGeneral}
-            </Text>
-          </View>
+        {/* Programa de Capacitación - igual que la vista compacta */}
+        <View>
+          <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#1f2937', marginBottom: 15, textTransform: 'uppercase' }}>
+            PROGRAMA DE CAPACITACIÓN
+          </Text>
+          
+          {tematicas.map((tematica, tIdx) => {
+            const actividades = tematica.actividades || [];
+            const duracionTotal = actividades.reduce((acc, actividad) => {
+              const horasMatch = actividad.duracion?.match(/(\d+)\s*hora/i);
+              return acc + (horasMatch ? parseInt(horasMatch[1]) : 0);
+            }, 0);
+
+            return (
+              <View key={tIdx} style={{ marginBottom: 20, padding: 12, backgroundColor: '#f9fafb', borderRadius: 6, borderLeftWidth: 4, borderLeftColor: '#3b82f6' }}>
+                {/* Participantes arriba del título - igual que la vista */}
+                {tematica.participantesRecomendados && (
+                  <View style={{ marginBottom: 10, padding: 6, backgroundColor: '#dbeafe', borderRadius: 4, borderWidth: 1, borderColor: '#93c5fd' }}>
+                    <Text style={{ fontSize: 8, color: '#1e40af', fontWeight: 'bold' }}>
+                      👥 {tematica.participantesRecomendados}
+                    </Text>
+                  </View>
+                )}
+                
+                {/* Título y descripción - igual que la vista */}
+                <View style={{ marginBottom: 10 }}>
+                  <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#1f2937', marginBottom: 4 }}>
+                    {tematica.nombre}
+                  </Text>
+                  <Text style={{ fontSize: 10, color: '#4b5563', lineHeight: 1.4 }}>
+                    {tematica.descripcion}
+                  </Text>
+                  <Text style={{ fontSize: 8, color: '#6b7280', marginTop: 4 }}>
+                    ⏱️ Duración total: {duracionTotal} horas
+                  </Text>
+                </View>
+
+                {/* Tabla de Actividades - igual que la vista */}
+                {actividades.length > 0 && (
+                  <View style={{ marginTop: 10, borderWidth: 1, borderColor: '#d1d5db', borderRadius: 4 }}>
+                    <View style={{ flexDirection: 'row', backgroundColor: '#1e40af', padding: 6 }}>
+                      <Text style={{ width: '35%', fontSize: 7, fontWeight: 'bold', color: '#ffffff' }}>ACTIVIDAD</Text>
+                      <Text style={{ width: '15%', fontSize: 7, fontWeight: 'bold', color: '#ffffff' }}>TIPO</Text>
+                      <Text style={{ width: '12%', fontSize: 7, fontWeight: 'bold', color: '#ffffff', textAlign: 'center' }}>HORAS</Text>
+                      <Text style={{ width: '18%', fontSize: 7, fontWeight: 'bold', color: '#ffffff' }}>MODALIDAD</Text>
+                      <Text style={{ width: '20%', fontSize: 7, fontWeight: 'bold', color: '#ffffff' }}>COMPETENCIAS</Text>
+                    </View>
+                    {actividades.map((actividad, aIdx) => {
+                      const horasMatch = actividad.duracion?.match(/(\d+)\s*hora/i);
+                      const horas = horasMatch ? horasMatch[1] : actividad.duracion || "N/A";
+                      const competencias = actividad.dimensionRelacionada 
+                        ? [actividad.dimensionRelacionada]
+                        : tematica.dimensionesRelacionadas || [];
+
+                      return (
+                        <View key={aIdx} style={{ flexDirection: 'row', padding: 6, backgroundColor: aIdx % 2 === 1 ? '#f9fafb' : '#ffffff', borderBottomWidth: 0.5, borderBottomColor: '#e5e7eb' }}>
+                          <View style={{ width: '35%' }}>
+                            <Text style={{ fontSize: 7.5, fontWeight: 'bold', color: '#1f2937' }}>
+                              {actividad.topico}
+                            </Text>
+                            {actividad.descripcion && (
+                              <Text style={{ fontSize: 6.5, color: '#6b7280', marginTop: 2 }}>
+                                {actividad.descripcion}
+                              </Text>
+                            )}
+                          </View>
+                          <Text style={{ width: '15%', fontSize: 7, color: '#4b5563' }}>
+                            {actividad.tipo?.replace('_', ' ') || 'Curso'}
+                          </Text>
+                          <Text style={{ width: '12%', fontSize: 7, color: '#4b5563', textAlign: 'center' }}>
+                            {horas} hrs
+                          </Text>
+                          <Text style={{ width: '18%', fontSize: 7, color: '#4b5563', textTransform: 'capitalize' }}>
+                            {actividad.modalidad || 'Presencial'}
+                          </Text>
+                          <View style={{ width: '20%' }}>
+                            {competencias.slice(0, 2).map((comp, cIdx) => (
+                              <Text key={cIdx} style={{ fontSize: 6, color: '#1e40af' }}>
+                                {comp}
+                              </Text>
+                            ))}
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
+              </View>
+            );
+          })}
         </View>
 
         <Text
@@ -337,269 +404,6 @@ export const TrainingPlanPDF = ({ plan }: TrainingPlanPDFProps) => {
           fixed
         />
       </Page>
-
-      {/* PÁGINA 2: Brechas por Dimensión */}
-      {plan.brechasDimensiones.length > 0 && (
-        <Page size="A4" style={trainingPlanStyles.page}>
-          <Text style={trainingPlanStyles.sectionTitle}>🎯 Brechas por Dimensión</Text>
-          <View style={trainingPlanStyles.table}>
-            <View style={trainingPlanStyles.tableHeader}>
-              <Text style={[trainingPlanStyles.tableCell, trainingPlanStyles.tableCellHeader, trainingPlanStyles.tableCellDimension]}>
-                Dimensión
-              </Text>
-              <Text style={[trainingPlanStyles.tableCell, trainingPlanStyles.tableCellHeader, trainingPlanStyles.tableCellScore]}>
-                Prom. Unidad
-              </Text>
-              <Text style={[trainingPlanStyles.tableCell, trainingPlanStyles.tableCellHeader, trainingPlanStyles.tableCellScore]}>
-                Prom. Org
-              </Text>
-              <Text style={[trainingPlanStyles.tableCell, trainingPlanStyles.tableCellHeader, trainingPlanStyles.tableCellZScore]}>
-                Z-Score
-              </Text>
-              <Text style={[trainingPlanStyles.tableCell, trainingPlanStyles.tableCellHeader, trainingPlanStyles.tableCellPrioridad]}>
-                Prioridad
-              </Text>
-              <Text style={[trainingPlanStyles.tableCell, trainingPlanStyles.tableCellHeader, trainingPlanStyles.tableCellColaboradores]}>
-                Colab. Débiles
-              </Text>
-              <Text style={[trainingPlanStyles.tableCell, trainingPlanStyles.tableCellHeader, trainingPlanStyles.tableCellPorcentaje]}>
-                %
-              </Text>
-            </View>
-            {plan.brechasDimensiones.map((brecha, idx) => (
-              <View
-                key={idx}
-                style={[
-                  trainingPlanStyles.tableRow,
-                  idx % 2 === 1 && trainingPlanStyles.tableRowAlt,
-                ]}
-              >
-                <Text style={[trainingPlanStyles.tableCell, trainingPlanStyles.tableCellDimension]}>
-                  {brecha.dimensionNombre}
-                </Text>
-                <Text style={[trainingPlanStyles.tableCell, trainingPlanStyles.tableCellScore]}>
-                  {brecha.promedioUnidad.toFixed(1)}%
-                </Text>
-                <Text style={[trainingPlanStyles.tableCell, trainingPlanStyles.tableCellScore]}>
-                  {brecha.promedioOrg.toFixed(1)}%
-                </Text>
-                <Text style={[trainingPlanStyles.tableCell, trainingPlanStyles.tableCellZScore]}>
-                  {brecha.zScore.toFixed(2)}
-                </Text>
-                <View style={[trainingPlanStyles.tableCell, trainingPlanStyles.tableCellPrioridad]}>
-                  <Text style={[trainingPlanStyles.badge, getPrioridadBadgeStyle(brecha.prioridad)]}>
-                    {getPrioridadText(brecha.prioridad)}
-                  </Text>
-                </View>
-                <Text style={[trainingPlanStyles.tableCell, trainingPlanStyles.tableCellColaboradores]}>
-                  {brecha.colaboradoresDebiles}
-                </Text>
-                <Text style={[trainingPlanStyles.tableCell, trainingPlanStyles.tableCellPorcentaje]}>
-                  {brecha.porcentajeDebiles.toFixed(1)}%
-                </Text>
-              </View>
-            ))}
-          </View>
-
-          <Text
-            style={trainingPlanStyles.footer}
-            render={({ pageNumber, totalPages }) =>
-              `${fechaFormateada} | Página ${pageNumber} de ${totalPages}`
-            }
-            fixed
-          />
-        </Page>
-      )}
-
-      {/* PÁGINA 3: Capacitaciones Prioritarias */}
-      {plan.capacitaciones.length > 0 && (
-        <Page size="A4" style={trainingPlanStyles.page}>
-          <Text style={trainingPlanStyles.sectionTitle}>🎓 Capacitaciones Prioritarias</Text>
-          <View style={trainingPlanStyles.table}>
-            <View style={trainingPlanStyles.tableHeader}>
-              <Text style={[trainingPlanStyles.tableCell, trainingPlanStyles.tableCellHeader, { width: '30%' }]}>
-                Tópico
-              </Text>
-              <Text style={[trainingPlanStyles.tableCell, trainingPlanStyles.tableCellHeader, { width: '15%' }]}>
-                Categoría
-              </Text>
-              <Text style={[trainingPlanStyles.tableCell, trainingPlanStyles.tableCellHeader, { width: '12%', textAlign: 'center' }]}>
-                Frecuencia
-              </Text>
-              <Text style={[trainingPlanStyles.tableCell, trainingPlanStyles.tableCellHeader, { width: '12%', textAlign: 'center' }]}>
-                %
-              </Text>
-              <Text style={[trainingPlanStyles.tableCell, trainingPlanStyles.tableCellHeader, { width: '15%', textAlign: 'center' }]}>
-                Prioridad
-              </Text>
-              <Text style={[trainingPlanStyles.tableCell, trainingPlanStyles.tableCellHeader, { width: '16%' }]}>
-                Dimensiones
-              </Text>
-            </View>
-            {plan.capacitaciones.map((cap, idx) => (
-              <View
-                key={idx}
-                style={[
-                  trainingPlanStyles.tableRow,
-                  idx % 2 === 1 && trainingPlanStyles.tableRowAlt,
-                ]}
-              >
-                <Text style={[trainingPlanStyles.tableCell, { width: '30%' }]}>
-                  {cap.topico}
-                </Text>
-                <Text style={[trainingPlanStyles.tableCell, { width: '15%' }]}>
-                  {cap.categoria}
-                </Text>
-                <Text style={[trainingPlanStyles.tableCell, { width: '12%', textAlign: 'center' }]}>
-                  {cap.frecuenciaAbsoluta}
-                </Text>
-                <Text style={[trainingPlanStyles.tableCell, { width: '12%', textAlign: 'center' }]}>
-                  {cap.frecuenciaPorcentual.toFixed(1)}%
-                </Text>
-                <View style={[trainingPlanStyles.tableCell, { width: '15%', textAlign: 'center' }]}>
-                  <Text style={[trainingPlanStyles.badge, getPrioridadBadgeStyle(cap.prioridad)]}>
-                    {getPrioridadText(cap.prioridad)}
-                  </Text>
-                </View>
-                <Text style={[trainingPlanStyles.tableCell, { width: '16%', fontSize: 7 }]}>
-                  {cap.dimensionesRelacionadas.join(', ')}
-                </Text>
-              </View>
-            ))}
-          </View>
-
-          <Text
-            style={trainingPlanStyles.footer}
-            render={({ pageNumber, totalPages }) =>
-              `${fechaFormateada} | Página ${pageNumber} de ${totalPages}`
-            }
-            fixed
-          />
-        </Page>
-      )}
-
-      {/* PÁGINA 4: Distribución 9-Box */}
-      {plan.distribucion9Box.length > 0 && (
-        <Page size="A4" style={trainingPlanStyles.page}>
-          <Text style={trainingPlanStyles.sectionTitle}>📊 Distribución 9-Box</Text>
-          <View style={trainingPlanStyles.nineBoxGrid}>
-            {plan.distribucion9Box.map((item, idx) => (
-              <View
-                key={idx}
-                style={[
-                  trainingPlanStyles.nineBoxCard,
-                  {
-                    backgroundColor: idx % 2 === 0 ? '#f9fafb' : '#ffffff',
-                    borderColor: '#d1d5db',
-                  },
-                ]}
-              >
-                <Text style={trainingPlanStyles.nineBoxCardTitle}>
-                  {item.posicion} ({item.cantidad})
-                </Text>
-                <Text style={trainingPlanStyles.nineBoxCardContent}>
-                  {item.porcentaje.toFixed(1)}% del total
-                </Text>
-                <Text style={[trainingPlanStyles.nineBoxCardContent, { marginTop: 4, fontSize: 7 }]}>
-                  Factor Urgencia: {item.factorUrgencia.toFixed(2)}
-                </Text>
-                <Text style={[trainingPlanStyles.nineBoxCardContent, { marginTop: 4, fontSize: 7, fontStyle: 'italic' }]}>
-                  {item.accionRecomendada}
-                </Text>
-              </View>
-            ))}
-          </View>
-
-          <Text
-            style={trainingPlanStyles.footer}
-            render={({ pageNumber, totalPages }) =>
-              `${fechaFormateada} | Página ${pageNumber} de ${totalPages}`
-            }
-            fixed
-          />
-        </Page>
-      )}
-
-      {/* PÁGINAS ADICIONALES: Plan Estructurado (si existe) */}
-      {plan.planEstructurado && (
-        <Page size="A4" style={trainingPlanStyles.page}>
-          <Text style={trainingPlanStyles.sectionTitle}>✨ Plan Estructurado (Generado por IA)</Text>
-
-          {plan.planEstructurado.objetivos && plan.planEstructurado.objetivos.length > 0 && (
-            <View style={trainingPlanStyles.card}>
-              <Text style={trainingPlanStyles.cardTitle}>Objetivos</Text>
-              {plan.planEstructurado.objetivos.map((objetivo, idx) => (
-                <Text key={idx} style={trainingPlanStyles.listItem}>
-                  • {objetivo}
-                </Text>
-              ))}
-            </View>
-          )}
-
-          {plan.planEstructurado.actividades && plan.planEstructurado.actividades.length > 0 && (
-            <View style={trainingPlanStyles.card}>
-              <Text style={trainingPlanStyles.cardTitle}>Actividades de Capacitación</Text>
-              {plan.planEstructurado.actividades.map((actividad, idx) => (
-                <View key={idx} style={{ marginBottom: 8, paddingLeft: 4 }}>
-                  <Text style={[trainingPlanStyles.cardContent, { fontWeight: 'bold' }]}>
-                    {idx + 1}. {actividad.topico}
-                  </Text>
-                  <Text style={[trainingPlanStyles.cardContent, { fontSize: 7.5, marginTop: 2 }]}>
-                    Tipo: {actividad.tipo} | Duración: {actividad.duracion} | Modalidad:{' '}
-                    {actividad.modalidad}
-                  </Text>
-                  <Text style={[trainingPlanStyles.cardContent, { fontSize: 7.5, marginTop: 2 }]}>
-                    {actividad.descripcion}
-                  </Text>
-                  {actividad.responsable && (
-                    <Text style={[trainingPlanStyles.cardContent, { fontSize: 7, marginTop: 2, fontStyle: 'italic' }]}>
-                      Responsable: {actividad.responsable}
-                    </Text>
-                  )}
-                </View>
-              ))}
-            </View>
-          )}
-
-          {plan.planEstructurado.metricasExito && plan.planEstructurado.metricasExito.length > 0 && (
-            <View style={trainingPlanStyles.card}>
-              <Text style={trainingPlanStyles.cardTitle}>Métricas de Éxito</Text>
-              {plan.planEstructurado.metricasExito.map((metrica, idx) => (
-                <View key={idx} style={{ marginBottom: 6, paddingLeft: 4 }}>
-                  <Text style={[trainingPlanStyles.cardContent, { fontWeight: 'bold' }]}>
-                    {metrica.nombre}
-                  </Text>
-                  <Text style={[trainingPlanStyles.cardContent, { fontSize: 7.5, marginTop: 2 }]}>
-                    {metrica.metodoMedicion} | Plazo: {metrica.plazo}
-                  </Text>
-                  {metrica.valorObjetivo && (
-                    <Text style={[trainingPlanStyles.cardContent, { fontSize: 7.5, marginTop: 2 }]}>
-                      Objetivo: {metrica.valorObjetivo}
-                    </Text>
-                  )}
-                </View>
-              ))}
-            </View>
-          )}
-
-          {plan.planEstructurado.estrategiaImplementacion && (
-            <View style={trainingPlanStyles.card}>
-              <Text style={trainingPlanStyles.cardTitle}>Estrategia de Implementación</Text>
-              <Text style={trainingPlanStyles.cardContent}>
-                {plan.planEstructurado.estrategiaImplementacion}
-              </Text>
-            </View>
-          )}
-
-          <Text
-            style={trainingPlanStyles.footer}
-            render={({ pageNumber, totalPages }) =>
-              `${fechaFormateada} | Página ${pageNumber} de ${totalPages}`
-            }
-            fixed
-          />
-        </Page>
-      )}
     </Document>
   );
 };

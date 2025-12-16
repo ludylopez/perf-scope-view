@@ -48,13 +48,21 @@ El sistema de generación de planes de capacitación es una funcionalidad que:
 │  • getPlanCapacitacionUnidad()                                  │
 │    - Obtiene equipo en cascada                                   │
 │    - Consulta training_topics                                    │
+│    - Captura IDs de colaboradores por tópico (NUEVO)            │
 │    - Calcula brechas de dimensiones                             │
 │    - Genera resumen ejecutivo                                   │
 │    - Consolida tópicos con información de participantes         │
 │                                                                  │
+│  • preAgruparTopicos() (NUEVO)                                  │
+│    - Agrupa tópicos similares                                    │
+│    - Calcula colaboradores únicos por temática                  │
+│    - Genera descripción de participantes                        │
+│                                                                  │
 │  • generateTrainingPlanWithAI()                                  │
 │    - Prepara datos para IA                                      │
+│    - Pre-agrupa tópicos (NUEVO)                                 │
 │    - Invoca Edge Function                                        │
+│    - Valida respuesta (NUEVO)                                    │
 │    - Parsea respuesta                                            │
 └───────────────────────┬─────────────────────────────────────────┘
                         │
@@ -64,9 +72,9 @@ El sistema de generación de planes de capacitación es una funcionalidad que:
 │                    SUPABASE EDGE FUNCTION                        │
 │      supabase/functions/generate-training-plan/index.ts          │
 │                                                                  │
-│  • Recibe planData consolidado                                   │
-│  • Construye system prompt                                       │
-│  • Construye user prompt con datos específicos                   │
+│  • Recibe planData con temáticas pre-agrupadas (NUEVO)         │
+│  • Construye system prompt (optimizado)                         │
+│  • Construye user prompt con temáticas pre-agrupadas (NUEVO)   │
 │  • Llama a OpenAI API                                           │
 │  • Parsea respuesta JSON                                        │
 │  • Retorna plan estructurado                                    │
@@ -78,11 +86,23 @@ El sistema de generación de planes de capacitación es una funcionalidad que:
 │                      OPENAI GPT-4o-mini                          │
 │                                                                  │
 │  • Recibe system prompt (instrucciones generales)                │
-│  • Recibe user prompt (datos específicos del equipo)             │
+│  • Recibe user prompt (temáticas pre-agrupadas + tópicos)        │
 │  • Genera plan de capacitación estructurado en JSON             │
 └───────────────────────┬─────────────────────────────────────────┘
                         │
                         │ 4. Retorna plan estructurado
+                        ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    VALIDACIÓN POST-GENERACIÓN (NUEVO)            │
+│              src/lib/trainingPlanService.ts                      │
+│                                                                  │
+│  • validarPlanGenerado()                                        │
+│    - Verifica completitud                                       │
+│    - Verifica especificidad de participantes                    │
+│    - Verifica consistencia con temáticas pre-agrupadas         │
+└───────────────────────┬─────────────────────────────────────────┘
+                        │
+                        │ 5. Plan validado
                         ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                    FRONTEND - VISUALIZACIÓN                      │
@@ -187,9 +207,24 @@ topicosTraining?.forEach((tt: any) => {
 
 **Qué hace:**
 - Toma el `PlanCapacitacionUnidad` consolidado
-- Extrae todos los tópicos con su información completa
+- Extrae todos los tópicos con su información completa (incluyendo colaboradoresIds y colaboradoresInfo)
 - Calcula estadísticas (total, urgentes, altos, categorías, dimensiones)
 - NO procesa ni agrupa - solo prepara los datos para enviar a la IA
+
+### Paso 2.5: Pre-agrupamiento Inteligente (NUEVO)
+
+**Archivo**: `src/lib/trainingPlanService.ts` - Función `preAgruparTopicos()`
+
+**Qué hace:**
+- Analiza tópicos similares por similitud semántica, categorías, niveles/cargos compartidos
+- Calcula colaboradores únicos por grupo (no suma frecuencias)
+- Calcula frecuencia combinada real
+- Genera descripción específica de participantes para cada temática
+- Separa tópicos que no pueden agruparse naturalmente
+
+**Resultado:**
+- Temáticas pre-agrupadas con participantes calculados
+- Tópicos individuales restantes para que la IA los procese
 
 **Estructura enviada:**
 
@@ -228,7 +263,8 @@ topicosTraining?.forEach((tt: any) => {
 **Archivo**: `src/lib/trainingPlanService.ts` - Función `generateTrainingPlanWithAI()`
 
 **Qué hace:**
-- Prepara el payload completo con metadata, contexto, brechas, tópicos y resumen ejecutivo
+- Pre-agrupa tópicos similares usando `preAgruparTopicos()`
+- Prepara el payload completo con metadata, contexto, brechas, temáticas pre-agrupadas, tópicos individuales y resumen ejecutivo
 - Invoca la Edge Function de Supabase: `generate-training-plan`
 - Maneja errores y retorna el plan estructurado
 
@@ -385,6 +421,21 @@ OBJETIVO: [Resumen de objetivos]
 4. Valida que tenga `tematicas` o `actividades`
 5. Asegura que cada temática tenga `nivelesAplicables` y `participantesRecomendados`
 
+### Paso 7: Validación Post-Generación (NUEVO)
+
+**Archivo**: `src/lib/trainingPlanService.ts` - Función `validarPlanGenerado()`
+
+**Qué hace:**
+1. **Completitud**: Verifica que todos los tópicos urgentes estén incluidos
+2. **Especificidad de participantes**: 
+   - Verifica que no se use "Todo el equipo" cuando frecuencia < 80%
+   - Verifica que participantes sean específicos (niveles/cargos)
+3. **Consistencia**: Verifica que participantes de temáticas pre-agrupadas no fueron cambiados
+4. **Estructura**: Verifica que el plan tenga todas las secciones requeridas
+
+**Resultado:**
+- Reporte de errores y advertencias (no bloquea la generación, solo alerta)
+
 **Estructura de respuesta:**
 
 ```typescript
@@ -473,7 +524,7 @@ OBJETIVO: [Resumen de objetivos]
 }
 ```
 
-### Paso 7: Visualización en Frontend
+### Paso 8: Visualización en Frontend
 
 **Archivos principales:**
 - `src/components/trainingPlan/TrainingPlanContent.tsx` - Contenedor principal

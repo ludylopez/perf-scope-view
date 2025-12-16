@@ -37,6 +37,8 @@ Colaborador C (DPI: 789) → Plan Individual → Tópico: "Gestión de Proyectos
 - Consulta todos los tópicos de `training_topics` para el equipo
 - Agrupa tópicos similares (mismo nombre y categoría)
 - Calcula frecuencia absoluta y porcentual
+- **NUEVO:** Captura IDs de colaboradores específicos por tópico
+- **NUEVO:** Almacena información detallada de cada colaborador (nivel, cargo, categoría de puesto)
 - Identifica qué niveles y cargos específicos tienen cada tópico
 
 **Ejemplo de consolidación:**
@@ -46,6 +48,11 @@ Colaborador C (DPI: 789) → Plan Individual → Tópico: "Gestión de Proyectos
   topico: "Normativa y Seguridad",
   frecuencia: 2,  // 2 colaboradores lo necesitan
   frecuenciaPorcentual: 66.7,  // 2 de 3 = 66.7%
+  colaboradoresIds: ["123", "456"],  // NUEVO: IDs específicos
+  colaboradoresInfo: [  // NUEVO: Información detallada
+    { id: "123", nivel: "A1", cargo: "Analista", categoriaPuesto: "Administrativo" },
+    { id: "456", nivel: "A2", cargo: "Coordinador", categoriaPuesto: "Administrativo" }
+  ],
   niveles: [
     { nivel: "A1", cantidad: 1, cargos: ["Analista"] },
     { nivel: "A2", cantidad: 1, cargos: ["Coordinador"] }
@@ -54,94 +61,112 @@ Colaborador C (DPI: 789) → Plan Individual → Tópico: "Gestión de Proyectos
 }
 ```
 
-### 3. ENVÍO A LA IA
+### 3. PRE-AGRUPAMIENTO INTELIGENTE (NUEVO - Sistema - TypeScript)
+**Cuándo:** Antes de enviar datos a la IA
+
+**Qué hace (`preAgruparTopicos` en `trainingPlanService.ts`):**
+- Analiza tópicos similares por:
+  - Similitud semántica (nombres similares)
+  - Categorías relacionadas
+  - Niveles/cargos compartidos (al menos 50% overlap)
+  - Prioridad similar
+- **Calcula colaboradores únicos** por grupo (no suma frecuencias)
+- **Calcula frecuencia combinada real** basándose en colaboradores únicos
+- Genera descripción específica de participantes para cada temática pre-agrupada
+- Separa tópicos que no pueden agruparse naturalmente
+
+**Ejemplo de pre-agrupamiento:**
+```typescript
+// Tópicos individuales:
+- "Normativa Municipal" (colaboradores: ["123", "456"])
+- "Seguridad Vial" (colaboradores: ["123", "789"])
+
+// Temática pre-agrupada resultante:
+{
+  nombre: "Normativa Municipal y Seguridad Vial",
+  topicosIncluidos: ["Normativa Municipal", "Seguridad Vial"],
+  colaboradoresUnicos: ["123", "456", "789"],  // 3 colaboradores únicos (no 4)
+  frecuenciaCombinada: 3,
+  frecuenciaPorcentual: 30.0,  // 3 de 10 = 30%
+  participantesDescripcion: "Analistas de nivel A1 y Coordinadores de nivel A2 (3 personas)"
+}
+```
+
+### 4. ENVÍO A LA IA
 **Qué se envía:**
-- Lista de tópicos consolidados con su información de frecuencia, niveles y cargos
-- Instrucciones sobre cómo usar esta información
+- **Temáticas pre-agrupadas** con participantes ya calculados (NO deben ser modificados por la IA)
+- **Tópicos individuales restantes** para que la IA los agrupe o incluya individualmente
+- Instrucciones claras sobre cómo usar esta información
 
 **Ejemplo de datos enviados:**
 ```json
 {
+  "tematicasPreAgrupadas": [
+    {
+      "nombre": "Normativa Municipal y Seguridad Vial",
+      "topicosIncluidos": ["Normativa Municipal", "Seguridad Vial"],
+      "colaboradoresUnicos": ["123", "456", "789"],
+      "frecuenciaCombinada": 3,
+      "frecuenciaPorcentual": 30.0,
+      "participantesDescripcion": "Analistas de nivel A1 y Coordinadores de nivel A2 (3 personas)"
+    }
+  ],
   "todosLosTopicos": [
     {
-      "topico": "Normativa y Seguridad",
-      "frecuenciaAbsoluta": 2,
-      "frecuenciaPorcentual": 66.7,
+      "topico": "Gestión de Proyectos",
+      "frecuenciaAbsoluta": 1,
+      "frecuenciaPorcentual": 10.0,
+      "colaboradoresIds": ["789"],
       "niveles": [
-        { "nivel": "A1", "cantidad": 1, "cargos": ["Analista"] },
-        { "nivel": "A2", "cantidad": 1, "cargos": ["Coordinador"] }
-      ],
-      "categoriasPuesto": ["Administrativo"]
+        { "nivel": "B1", "cantidad": 1, "cargos": ["Supervisor"] }
+      ]
     }
   ]
 }
 ```
 
-### 4. PROCESAMIENTO POR LA IA
+### 5. PROCESAMIENTO POR LA IA
 **Qué hace la IA:**
-1. **Agrupa tópicos similares** en temáticas consolidadas
-   - Ejemplo: "Normativa y Seguridad" + "Seguridad Vial" → Temática: "Normativa y Seguridad"
-   
-2. **Determina cómo describir participantes** basándose en:
-   - La frecuencia porcentual de los tópicos agrupados
+1. **Incluye temáticas pre-agrupadas** TAL CUAL (sin cambiar participantes)
+2. **Agrupa tópicos individuales restantes** en temáticas consolidadas cuando sea posible
+3. **Determina participantes** para tópicos individuales basándose en:
+   - La frecuencia porcentual
    - Los niveles y cargos específicos proporcionados
    - Las instrucciones del prompt
 
-**Problema potencial identificado:**
-Cuando la IA agrupa múltiples tópicos en una temática consolidada, podría estar mezclando tópicos que tienen diferentes grupos de participantes. Por ejemplo:
+### 6. VALIDACIÓN POST-GENERACIÓN (NUEVO - Sistema - TypeScript)
+**Cuándo:** Después de recibir respuesta de la IA
 
-```
-Temática consolidada: "Normativa y Seguridad"
-  - Tópico 1: "Normativa y Seguridad" (2 personas, 66.7%)
-  - Tópico 2: "Seguridad Vial" (1 persona, 33.3%)
-  
-Total: 3 personas diferentes, pero si el equipo tiene 10 personas totales,
-la frecuencia combinada sería 30%, no 100%.
-```
+**Qué hace (`validarPlanGenerado` en `trainingPlanService.ts`):**
+- **Completitud**: Verifica que todos los tópicos urgentes estén incluidos
+- **Especificidad de participantes**: 
+  - Verifica que no se use "Todo el equipo" cuando frecuencia < 80%
+  - Verifica que participantes sean específicos (niveles/cargos)
+- **Consistencia**: Verifica que participantes de temáticas pre-agrupadas no fueron cambiados
+- **Estructura**: Verifica que el plan tenga todas las secciones requeridas
 
-Si la IA no maneja esto correctamente, podría decir "Todo el equipo" cuando en realidad solo 3 personas necesitan la temática.
-
-## Mejora Necesaria
-
-### Opción 1: Calcular frecuencia combinada al agrupar (Recomendado)
-
-Cuando la IA agrupa tópicos en temáticas, debería:
-1. Identificar el conjunto único de colaboradores que necesitan CUALQUIERA de los tópicos agrupados
-2. Calcular la frecuencia combinada basándose en colaboradores únicos, no en suma de frecuencias
-3. Combinar los niveles y cargos de todos los tópicos agrupados
-
-**Implementación sugerida:**
-- Agregar información de `colaboradoresIds` a cada tópico antes de enviar a la IA
-- Instruir a la IA para que calcule la frecuencia combinada al agrupar
-- O mejor: calcular esto en TypeScript antes de enviar a la IA
-
-### Opción 2: Calcular frecuencia de temáticas en TypeScript
-
-Antes de enviar a la IA, calcular:
-- Qué colaboradores únicos necesitan cada posible agrupación de tópicos
-- La frecuencia combinada real
-- Los niveles y cargos combinados
-
-Esto requeriría pre-agrupar los tópicos en TypeScript antes de enviar a la IA.
-
-## Estado Actual
+## Estado Actual (Actualizado)
 
 ✅ **Lo que funciona bien:**
 - La detección inicial de qué colaborador necesita qué tópico
 - El cálculo de frecuencia por tópico individual
 - La identificación de niveles y cargos por tópico
+- **NUEVO:** Pre-agrupamiento inteligente con cálculo de colaboradores únicos
+- **NUEVO:** Validación post-generación para verificar especificidad
 
-⚠️ **Lo que podría mejorar:**
-- Cuando la IA agrupa tópicos en temáticas, la frecuencia combinada podría no ser precisa
-- La IA podría necesitar más instrucciones sobre cómo calcular frecuencia combinada al agrupar
+✅ **Mejoras implementadas:**
+- Pre-agrupamiento en TypeScript antes de enviar a la IA
+- Cálculo preciso de colaboradores únicos por temática
+- Validación automática de especificidad de participantes
+- Optimización del prompt (reduce tamaño en ~30%)
 
-## Recomendación
+## Beneficios de la Nueva Implementación
 
-**Opción A (Más simple):** Mejorar las instrucciones del prompt para que la IA calcule correctamente la frecuencia combinada al agrupar tópicos.
-
-**Opción B (Más robusta):** Pre-calcular posibles agrupaciones en TypeScript y enviar información de frecuencia combinada a la IA.
-
-**Opción C (Híbrida):** Enviar información de colaboradores únicos por tópico y instruir a la IA para que calcule la frecuencia combinada correctamente.
+1. **Precisión**: Los colaboradores únicos se calculan correctamente antes de enviar a la IA
+2. **Especificidad**: Los participantes son específicos, no genéricos ("todos")
+3. **Optimización**: El prompt es más pequeño y eficiente
+4. **Validación**: Se detectan problemas automáticamente después de la generación
+5. **Consistencia**: Las temáticas pre-agrupadas mantienen sus participantes calculados
 
 
 

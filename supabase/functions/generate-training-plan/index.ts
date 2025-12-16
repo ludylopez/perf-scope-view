@@ -7,9 +7,10 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Methods": "POST, OPTIONS, GET",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Max-Age": "86400",
 };
 
 interface GenerateTrainingPlanRequest {
@@ -47,6 +48,31 @@ interface GenerateTrainingPlanRequest {
       dimensionesRelacionadas: string[];
       fuentes: string[];
       scorePrioridad: number;
+      niveles?: Array<{ nivel: string; cantidad: number; cargos: string[] }>;
+      categoriasPuesto?: string[];
+      colaboradoresIds?: string[];
+      colaboradoresInfo?: Array<{ 
+        id: string; 
+        nivel: string; 
+        cargo: string; 
+        categoriaPuesto: string;
+        nombre?: string;
+        area?: string;
+        departamento?: string;
+      }>;
+    }>;
+    tematicasPreAgrupadas?: Array<{
+      nombre: string;
+      topicosIncluidos: string[];
+      colaboradoresUnicos: string[];
+      frecuenciaCombinada: number;
+      frecuenciaPorcentual: number;
+      niveles: Array<{ nivel: string; cantidad: number; cargos: string[] }>;
+      categoriasPuesto: string[];
+      prioridad: string;
+      categoria: string;
+      dimensionesRelacionadas?: string[];
+      participantesDescripcion: string;
     }>;
     estadisticas?: {
       totalTopicos: number;
@@ -75,7 +101,32 @@ interface TrainingPlanResponse {
  * Construye el system prompt para generar el plan de capacitación
  */
 function getSystemPrompt(): string {
-  return `Eres un EXPERTO CONSULTOR en Diseño de Planes de Capacitación Organizacional del sector público guatemalteco, especializado en la gestión municipal. Tu tarea es generar un PLAN DE CAPACITACIÓN ESTRUCTURADO, COMPLETO, PROFESIONAL y ACCIONABLE en formato TABLA para una unidad organizacional de la Municipalidad de Esquipulas, Chiquimula.
+  return `⚠️⚠️⚠️ REGLA CRÍTICA ABSOLUTA ⚠️⚠️⚠️
+NUNCA uses "Todo el equipo completo", "Todos", "Todo el personal" o variaciones similares 
+a menos que la frecuencia porcentual sea >= 95% del total de colaboradores.
+
+Si la frecuencia es menor al 95%, DEBES especificar participantes exactos usando:
+- Niveles (ej: "Nivel A4")
+- Cargos (ej: "Técnicos de Planificación")
+- Nombres de colaboradores si están disponibles
+- Cantidad exacta de personas
+
+Ejemplos CORRECTOS cuando frecuencia < 95%:
+✅ "Técnicos de Planificación (3 personas: Ari García, Juan Carlos Rodríguez, Cristian Portillo)"
+✅ "Auxiliar y Asistente (2 personas: Ana Elisa Guerra, Ana Karen Barrios)"
+✅ "Coordinador de COCODES (1 persona: José Angel Chacón)"
+
+Ejemplos INCORRECTOS (PROHIBIDOS cuando frecuencia < 95%):
+❌ "Todo el equipo completo"
+❌ "Todos"
+❌ "Todo el personal"
+❌ "Todos los colaboradores"
+
+Esta regla es ABSOLUTA y NO tiene excepciones.
+
+═══════════════════════════════════════════════════════════════
+
+Eres un EXPERTO CONSULTOR en Diseño de Planes de Capacitación Organizacional del sector público guatemalteco, especializado en la gestión municipal. Tu tarea es generar un PLAN DE CAPACITACIÓN ESTRUCTURADO, COMPLETO, PROFESIONAL y ACCIONABLE en formato TABLA para una unidad organizacional de la Municipalidad de Esquipulas, Chiquimula.
 
 CONTEXTO: Municipalidad de Esquipulas, Chiquimula, Guatemala
 - Presupuesto municipal limitado
@@ -92,26 +143,47 @@ ENFOQUE DEL PLAN:
 - Formato: TABLA ESTRUCTURADA con temáticas consolidadas
 - Priorizar recursos internos, mentorías, prácticas guiadas y autoaprendizaje
 
-AGRUPMIENTO INTELIGENTE PARA EJECUTABILIDAD (BALANCEADO CON COMPLETITUD):
+ANÁLISIS Y AGRUPAMIENTO INTELIGENTE (LIBERTAD TOTAL PARA LA IA):
+- Tienes TODA la información de cada tópico: frecuencia, niveles, cargos, colaboradores, prioridad, categorías
+- Analiza LIBREMENTE todos los tópicos y decide cómo agruparlos estratégicamente
 - PRIORIDAD #1: COMPLETITUD - Incluye TODOS los tópicos importantes, especialmente urgentes y de alta prioridad
-- PRIORIDAD #2: EJECUTABILIDAD - Agrupa inteligentemente cuando sea posible para crear capacitaciones grupales
-- PRIORIZA agrupar tópicos que comparten niveles y cargos similares para crear grupos ejecutables
-- Si un tópico tiene pocos participantes (< 3), INTENTA agruparlo con tópicos similares que compartan niveles/cargos
-- PERO: Si un tópico importante no puede agruparse naturalmente, inclúyelo como temática separada antes que dejarlo fuera
-- NO hay límite rígido de temáticas - el objetivo es completitud primero, agrupamiento segundo
-- Si es necesario tener más temáticas para incluir todos los tópicos importantes, hazlo
+- PRIORIDAD #2: EJECUTABILIDAD - Agrupa inteligentemente cuando tenga sentido (tópicos relacionados, participantes similares)
+- Usa tu criterio experto para identificar relaciones semánticas, sinergias y patrones entre tópicos
+- Puedes agrupar tópicos que comparten niveles/cargos similares, o tópicos temáticamente relacionados
+- Si un tópico es único o muy específico, créale una temática separada
+- NO hay límite rígido de temáticas - el objetivo es un plan completo y ejecutable
+- Confía en tu análisis profesional para crear el mejor plan posible
 
-DETERMINACIÓN DE PARTICIPANTES (CRÍTICO):
-- Analiza la información de frecuencia, niveles y cargos proporcionada para CADA tópico
-- Si frecuenciaPorcentual >= 80%: Puedes considerar "Todo el equipo completo" o ser más específico según los datos
-- Si frecuenciaPorcentual < 80%: DEBES especificar participantes exactos usando niveles y cargos proporcionados
-- Ejemplos de participantes específicos:
-  * "Analistas de nivel A1 (3 personas)"
-  * "Personal de nivel A1 y A2 con cargo Asistente (5 personas)"
-  * "Personal de categoría Administrativo (8 personas)"
-  * "Coordinadores y Supervisores (4 personas)"
-- NUNCA uses "Todo el equipo completo" si la frecuencia es menor al 80% a menos que los datos específicos indiquen que realmente aplica a todos
-- El campo "participantes" debe reflejar exactamente quién necesita la capacitación basándote en los datos proporcionados
+DETERMINACIÓN DE PARTICIPANTES (CRÍTICO - REGLAS ESTRICTAS):
+⚠️ REGLA ABSOLUTA: Si frecuenciaPorcentual < 95%, NUNCA uses "Todo el equipo completo". DEBES especificar participantes exactos.
+
+- Analiza la información completa proporcionada para CADA tópico: frecuencia, niveles, cargos, colaboradores específicos
+- CRÍTICO: Si la frecuencia es < 95%, el tópico NO aplica a todo el equipo. Usa la información de colaboradores específicos proporcionada
+- Si frecuenciaPorcentual >= 95% Y los niveles/cargos indican que realmente aplica a todos: Puedes usar "Todo el equipo completo"
+- Si frecuenciaPorcentual < 95%: OBLIGATORIO especificar participantes exactos usando:
+  * Los niveles mencionados (ej: "Nivel A4")
+  * Los cargos mencionados (ej: "Técnicos de Planificación")
+  * Los nombres de colaboradores si están disponibles
+  * La cantidad exacta de personas
+- Si un tópico es específico (ej: "Revit" para técnicos, "Código Municipal" para coordinadores), especifica exactamente quién lo necesita
+- Al agrupar tópicos en una temática, identifica el conjunto ÚNICO de colaboradores que necesitan CUALQUIERA de los tópicos agrupados
+- Ejemplos CORRECTOS de descripción de participantes:
+  * "Técnicos de Planificación (3 personas: Ari García, Juan Carlos Rodríguez, Cristian Portillo)"
+  * "Auxiliar y Asistente (2 personas: Ana Elisa Guerra, Ana Karen Barrios)"
+  * "Coordinador de COCODES (1 persona: José Angel Chacón)"
+  * "Personal de nivel A4 con cargo Técnico (3 personas)"
+- Ejemplos INCORRECTOS (PROHIBIDOS cuando frecuencia < 95%):
+  * ❌ "Todo el equipo completo" (si frecuencia < 95%)
+  * ❌ "Todo el personal" (si frecuencia < 95%)
+  * ❌ "Todos los colaboradores" (si frecuencia < 95%)
+- El campo "participantes" DEBE reflejar QUIÉN realmente necesita la capacitación basándote en los datos proporcionados
+- Sé específico y preciso - evita generalizaciones innecesarias
+- RECUERDA: Si la frecuencia es 37.5%, 25%, 12.5%, etc., significa que SOLO esa cantidad de personas lo necesita, NO todo el equipo
+
+TEMÁTICAS PRE-AGRUPADAS (OPCIONAL):
+- Si recibes temáticas pre-agrupadas, puedes usarlas como referencia o re-analizarlas según tu criterio profesional
+- Tienes libertad para ajustar, re-agrupar o crear nuevas temáticas basándote en tu análisis experto
+- Lo importante es que el plan final sea completo, coherente y ejecutable
 
 ESTRUCTURA DE RESPUESTA (JSON) - FORMATO PLAN PROFESIONAL ESTRUCTURADO:
 {
@@ -119,7 +191,7 @@ ESTRUCTURA DE RESPUESTA (JSON) - FORMATO PLAN PROFESIONAL ESTRUCTURADO:
     "areaDepartamento": "Nombre del área o departamento",
     "responsable": "Nombre del responsable del área",
     "totalColaboradores": 12,
-    "periodo": "Enero - Diciembre 2025",
+    "periodo": "Enero - Diciembre 2026",
     "fechaElaboracion": "10 de diciembre de 2024"
   },
   "justificacion": "Texto de 2-3 párrafos explicando la necesidad del plan, basado en las brechas identificadas y los objetivos estratégicos",
@@ -195,7 +267,7 @@ ESTRUCTURA DE RESPUESTA (JSON) - FORMATO PLAN PROFESIONAL ESTRUCTURADO:
           "duracion": "4 horas",
           "modalidad": "presencial" | "virtual" | "hibrida",
           "prioridad": "urgente" | "alta" | "media" | "baja",
-          "responsable": "Quién coordina",
+      "responsable": "Quién coordina",
           "recursosNecesarios": ["Recurso 1"]
         }
       ]
@@ -208,6 +280,9 @@ ESTRUCTURA DE RESPUESTA (JSON) - FORMATO PLAN PROFESIONAL ESTRUCTURADO:
       "fechaFin": "2025-03",
       "estado": "planificado"
     }
+    // IMPORTANTE: El cronograma debe incluir TODAS las capacitaciones del programaCapacitacion
+    // Distribuye las fechas a lo largo del año (Enero-Diciembre)
+    // NO omitas esta sección - es obligatoria
   ],
   "recursos": [
     {
@@ -241,23 +316,27 @@ INSTRUCCIONES CRÍTICAS PARA GENERAR UN PLAN PROFESIONAL:
    - Menciona la evaluación de desempeño y necesidades detectadas
    - Conecta con los objetivos estratégicos organizacionales
 
-3. OBJETIVOS:
-   - Objetivo General: Una oración clara que englobe todo el plan
-   - Objetivos Específicos: 4-6 objetivos medibles y alcanzables
+3. OBJETIVOS (OBLIGATORIO - NO OMITIR):
+   - Objetivo General: Una oración clara que englobe todo el plan (OBLIGATORIO)
+   - Objetivos Específicos: 4-6 objetivos medibles y alcanzables (OBLIGATORIO - mínimo 4)
    - Deben estar alineados con los tópicos identificados
+   - NO omitas esta sección - es crítica para el plan
 
 4. DETECCIÓN DE NECESIDADES:
    - Lista 4-6 fuentes de identificación de necesidades
    - Incluye evaluación de desempeño, encuestas, entrevistas, análisis de brechas, normativas
 
-5. PROGRAMA DE CAPACITACIÓN (TABLA PRINCIPAL):
-   - Genera una tabla con TODAS las capacitaciones identificadas
-   - Agrupa tópicos similares en capacitaciones consolidadas
-   - Cada capacitación debe tener: nombre, objetivo, participantes, modalidad, duración, fecha, instructor
-   - Las fechas deben distribuirse a lo largo del año (Enero-Diciembre)
+5. PROGRAMA DE CAPACITACIÓN (TABLA PRINCIPAL - CRÍTICO):
+   - Genera una tabla con TODAS las capacitaciones identificadas (NO solo 2-3, debe incluir todas las necesarias)
+   - Agrupa tópicos similares en capacitaciones consolidadas cuando sea posible
+   - Cada capacitación debe tener: nombre, objetivo, participantes (ESPECÍFICOS), modalidad, duración, fecha, instructor
+   - Las fechas deben distribuirse a lo largo del año (Enero-Diciembre) - NO todas en el mismo mes
    - Para instructor, usa "RRHH Interno" o "Solicitar capacitación a RRHH" para recursos internos
-   - INCLUYE TODOS los tópicos urgentes y de alta prioridad
+   - INCLUYE TODOS los tópicos urgentes y de alta prioridad (100% de completitud)
+   - INCLUYE la mayoría de tópicos de media prioridad (mínimo 80%)
    - El campo "temas" debe listar los tópicos específicos incluidos en cada capacitación
+   - El campo "participantes" DEBE ser específico (niveles/cargos) a menos que realmente sea >= 95% del equipo
+   - NO generes solo 2-3 capacitaciones - el plan debe ser completo y cubrir todo el año
 
 6. METODOLOGÍA:
    - Describe las modalidades: presencial, virtual, mixta
@@ -301,18 +380,46 @@ function buildUserPrompt(planData: GenerateTrainingPlanRequest["planData"]): str
   prompt += `PROMEDIO DESEMPEÑO ORGANIZACIONAL: ${contexto.promedioDesempenoOrg || 0}%\n\n`;
   
   prompt += `IMPORTANTE: El equipo tiene ${contexto.totalColaboradores || 0} colaboradores en total. `;
-  prompt += `Cuando determines los participantes para cada capacitación, usa la información de frecuencia, niveles y cargos proporcionada para cada tópico. `;
-  prompt += `Solo usa "Todo el equipo completo" si la frecuencia es >= 80% del total. `;
-  prompt += `Si la frecuencia es menor, especifica exactamente quién necesita la capacitación usando niveles y cargos.\n\n`;
+  prompt += `Esta unidad organizacional puede tener DIFERENTES ÁREAS y DEPARTAMENTOS con necesidades distintas. `;
+  prompt += `Analiza la información completa de cada tópico (frecuencia, niveles, cargos, colaboradores específicos, áreas) para determinar quién realmente necesita cada capacitación. `;
+  prompt += `Sé específico y preciso - usa "Todo el equipo completo" solo cuando realmente aplica a casi todos (>= 95%). `;
+  prompt += `Si la frecuencia es menor, especifica exactamente quién necesita la capacitación usando niveles, cargos y áreas mencionadas en los datos.\n\n`;
+  
+  // Agregar información sobre estructura organizacional si está disponible
+  // Esto se puede calcular desde los tópicos agrupando por área
+  const areasUnicas = new Set<string>();
+  const departamentosUnicos = new Set<string>();
+  if (Array.isArray(planData.todosLosTopicos)) {
+    planData.todosLosTopicos.forEach((topico: any) => {
+      if (Array.isArray(topico.colaboradoresInfo)) {
+        topico.colaboradoresInfo.forEach((colab: any) => {
+          if (colab.area) areasUnicas.add(colab.area);
+          if (colab.departamento) departamentosUnicos.add(colab.departamento);
+        });
+      }
+    });
+  }
+  
+  if (areasUnicas.size > 0 || departamentosUnicos.size > 0) {
+    prompt += `ESTRUCTURA ORGANIZACIONAL DE LA UNIDAD:\n`;
+    if (areasUnicas.size > 0) {
+      prompt += `- Áreas identificadas: ${Array.from(areasUnicas).join(", ")}\n`;
+    }
+    if (departamentosUnicos.size > 0) {
+      prompt += `- Departamentos identificados: ${Array.from(departamentosUnicos).join(", ")}\n`;
+    }
+    prompt += `IMPORTANTE: Considera que diferentes áreas/departamentos pueden tener necesidades diferentes. `;
+    prompt += `No asumas que todos necesitan las mismas capacitaciones. Analiza los colaboradores específicos por área.\n\n`;
+  }
 
 
   // RESUMEN EJECUTIVO (prioritario)
   prompt += "RESUMEN EJECUTIVO:\n";
   if (planData.resumenEjecutivo) {
     prompt += `${planData.resumenEjecutivo.situacionGeneral || 'Situación general no especificada'}\n`;
-    if (planData.resumenEjecutivo.dimensionMasCritica) {
-      prompt += `Dimensión más crítica: ${planData.resumenEjecutivo.dimensionMasCritica}\n`;
-    }
+  if (planData.resumenEjecutivo.dimensionMasCritica) {
+    prompt += `Dimensión más crítica: ${planData.resumenEjecutivo.dimensionMasCritica}\n`;
+  }
     prompt += `Recomendación: ${planData.resumenEjecutivo.recomendacionGeneral || 'Recomendación no especificada'}\n\n`;
   } else {
     prompt += "Resumen ejecutivo no disponible.\n\n";
@@ -337,21 +444,101 @@ function buildUserPrompt(planData: GenerateTrainingPlanRequest["planData"]): str
     prompt += "\n";
   }
 
-  // TODOS LOS TÓPICOS INDIVIDUALES - La IA debe agruparlos inteligentemente
+  // TEMÁTICAS PRE-AGRUPADAS (con participantes ya calculados)
+  const tematicasPreAgrupadas = Array.isArray(planData.tematicasPreAgrupadas) && planData.tematicasPreAgrupadas.length > 0
+    ? planData.tematicasPreAgrupadas
+    : [];
+  
+  if (tematicasPreAgrupadas.length > 0) {
+    prompt += "═══════════════════════════════════════════════════════════════\n";
+    prompt += "TEMÁTICAS PRE-AGRUPADAS (REFERENCIA OPCIONAL)\n";
+    prompt += "═══════════════════════════════════════════════════════════════\n\n";
+    
+    prompt += `NOTA: Se te están enviando ${tematicasPreAgrupadas.length} temáticas que fueron pre-agrupadas como referencia.\n`;
+    prompt += `Puedes usarlas como guía o re-analizarlas según tu criterio profesional.\n`;
+    prompt += `Tienes libertad para ajustar, re-agrupar o crear nuevas temáticas basándote en tu análisis experto.\n\n`;
+    
+    tematicasPreAgrupadas.forEach((tematica, idx) => {
+      if (!tematica || typeof tematica !== 'object') return;
+      prompt += `${idx + 1}. ${tematica.nombre || 'Sin nombre'}\n`;
+      prompt += `   - Tópicos incluidos: ${Array.isArray(tematica.topicosIncluidos) ? tematica.topicosIncluidos.join(", ") : 'N/A'}\n`;
+      prompt += `   - Participantes sugeridos: ${tematica.participantesDescripcion || 'N/A'} (puedes ajustar según tu análisis)\n`;
+      prompt += `   - Frecuencia: ${tematica.frecuenciaCombinada || 0} colaboradores (${tematica.frecuenciaPorcentual || 0}% del equipo)\n`;
+      prompt += `   - Prioridad: ${tematica.prioridad || 'media'}\n`;
+      prompt += `   - Categoría: ${tematica.categoria || 'Sin categoría'}\n`;
+      if (Array.isArray(tematica.niveles) && tematica.niveles.length > 0) {
+        prompt += `   - Niveles: `;
+        const nivelesStr = tematica.niveles.map(n => `${n.nivel} (${n.cantidad})`).join(", ");
+        prompt += `${nivelesStr}\n`;
+      }
+      if (Array.isArray(tematica.dimensionesRelacionadas) && tematica.dimensionesRelacionadas.length > 0) {
+        prompt += `   - Dimensiones: ${tematica.dimensionesRelacionadas.join(", ")}\n`;
+      }
+      prompt += "\n";
+    });
+    
+    prompt += "\n";
+  }
+
+  // TÓPICOS INDIVIDUALES - Agrupar por área para mejor presentación
   const topicosParaProcesar = Array.isArray(planData.todosLosTopicos) && planData.todosLosTopicos.length > 0
     ? planData.todosLosTopicos
     : [];
   
   if (topicosParaProcesar.length > 0) {
+    // Agrupar tópicos por área para mejor organización
+    const topicosPorArea = new Map<string, any[]>();
+    topicosParaProcesar.forEach((topico: any) => {
+      // Obtener áreas de los colaboradores de este tópico
+      const areasDelTopico = new Set<string>();
+      if (Array.isArray(topico.colaboradoresInfo)) {
+        topico.colaboradoresInfo.forEach((colab: any) => {
+          if (colab.area) areasDelTopico.add(colab.area);
+          if (colab.departamento) areasDelTopico.add(colab.departamento);
+        });
+      }
+      
+      // Si tiene áreas específicas, agrupar por la primera área
+      // Si no tiene áreas o tiene múltiples, poner en "General"
+      const areaPrincipal = areasDelTopico.size > 0 
+        ? Array.from(areasDelTopico)[0] 
+        : 'General';
+      
+      if (!topicosPorArea.has(areaPrincipal)) {
+        topicosPorArea.set(areaPrincipal, []);
+      }
+      topicosPorArea.get(areaPrincipal)!.push(topico);
+    });
+    
     prompt += "═══════════════════════════════════════════════════════════════\n";
-    prompt += "TODOS LOS TÓPICOS DE CAPACITACIÓN (BASE DE DATOS COMPLETA)\n";
+    prompt += "TÓPICOS DE CAPACITACIÓN (ORGANIZADOS POR ÁREA)\n";
     prompt += "═══════════════════════════════════════════════════════════════\n\n";
     
-    prompt += `IMPORTANTE: Se te están enviando ${topicosParaProcesar.length} tópicos individuales de capacitación.\n`;
-    prompt += `TU TAREA es analizar TODOS estos tópicos y agruparlos estratégicamente en temáticas consolidadas.\n`;
-    prompt += `NO DEJES NINGÚN TÓPICO FUERA del plan, especialmente los urgentes y de alta prioridad.\n\n`;
+    prompt += `IMPORTANTE: Se te están enviando ${topicosParaProcesar.length} tópicos de capacitación con TODA su información.\n`;
+    prompt += `Los tópicos están organizados por área para ayudarte a entender la estructura organizacional.\n`;
+    prompt += `TU TAREA es analizar LIBREMENTE todos estos tópicos y crear un plan completo y profesional:\n`;
+    prompt += `  - Analiza las relaciones, sinergias y patrones entre tópicos\n`;
+    prompt += `  - Considera que diferentes áreas pueden tener necesidades diferentes\n`;
+    prompt += `  - Agrupa estratégicamente cuando tenga sentido o créalos individuales si son únicos\n`;
+    prompt += `  - Determina los participantes basándote en la información de frecuencia, niveles, cargos Y ÁREAS\n`;
+    prompt += `  - NO DEJES NINGÚN TÓPICO FUERA del plan, especialmente los urgentes y de alta prioridad\n`;
+    prompt += `  - Usa tu criterio profesional para crear el mejor plan posible\n\n`;
     
     if (planData.estadisticas) {
+      // Calcular estadísticas por categoría
+      const topicosPorCategoria = new Map<string, { total: number; urgentes: number; altos: number }>();
+      topicosParaProcesar.forEach((t: any) => {
+        if (!t || !t.topico) return;
+        const categoria = t.categoria || 'Sin categoría';
+        if (!topicosPorCategoria.has(categoria)) {
+          topicosPorCategoria.set(categoria, { total: 0, urgentes: 0, altos: 0 });
+        }
+        const stats = topicosPorCategoria.get(categoria)!;
+        stats.total++;
+        if (t.prioridad === 'urgente') stats.urgentes++;
+        if (t.prioridad === 'alta') stats.altos++;
+      });
+      
       prompt += `CONTEXTO ESTADÍSTICO:\n`;
       prompt += `- Total de tópicos: ${planData.estadisticas.totalTopicos || 0}\n`;
       prompt += `- Tópicos urgentes: ${planData.estadisticas.topicosUrgentes || 0}\n`;
@@ -362,32 +549,44 @@ function buildUserPrompt(planData: GenerateTrainingPlanRequest["planData"]): str
       if (Array.isArray(planData.estadisticas.dimensionesUnicas) && planData.estadisticas.dimensionesUnicas.length > 0) {
         prompt += `- Dimensiones relacionadas: ${planData.estadisticas.dimensionesUnicas.join(", ")}\n`;
       }
+      
+      // Agregar estadísticas por categoría
+      if (topicosPorCategoria.size > 0) {
+        prompt += `\nESTADÍSTICAS POR CATEGORÍA (IMPORTANTE - DEBES INCLUIR TÓPICOS DE TODAS LAS CATEGORÍAS):\n`;
+        topicosPorCategoria.forEach((stats, categoria) => {
+          prompt += `- ${categoria}: ${stats.total} tópicos (${stats.urgentes} urgentes, ${stats.altos} alta prioridad)\n`;
+        });
+        prompt += `⚠️ CRÍTICO: El plan debe incluir tópicos de TODAS estas categorías. NO omitas categorías completas.\n`;
+        prompt += `Si hay tópicos técnicos, normativos o específicos urgentes/alta prioridad, DEBEN aparecer en el plan.\n`;
+      }
+      
       prompt += "\n";
     }
     
-    prompt += "LISTADO COMPLETO DE TÓPICOS (ANALIZAR Y AGRUPAR TODOS):\n\n";
-    
-    // Agrupar por prioridad para mejor visualización
-    const porPrioridad: Record<string, any[]> = {
-      urgente: [],
-      alta: [],
-      media: [],
-      baja: [],
-    };
-    
-    // Procesar tópicos (ya validados arriba) - validar cada tópico antes de procesarlo
-    if (Array.isArray(topicosParaProcesar)) {
-      topicosParaProcesar.forEach((t: any) => {
-        if (!t || typeof t !== 'object') return; // Saltar elementos inválidos
+    // Presentar tópicos agrupados por área
+    topicosPorArea.forEach((topicosArea, area) => {
+      prompt += `\n═══════════════════════════════════════════════════════════════\n`;
+      prompt += `ÁREA: ${area} (${topicosArea.length} tópico${topicosArea.length > 1 ? 's' : ''})\n`;
+      prompt += `═══════════════════════════════════════════════════════════════\n\n`;
+      
+      // Agrupar por prioridad dentro de cada área
+      const porPrioridad: Record<string, any[]> = {
+        urgente: [],
+        alta: [],
+        media: [],
+        baja: [],
+      };
+      
+      topicosArea.forEach((t: any) => {
+        if (!t || typeof t !== 'object') return;
         const prioridad = (t.prioridad || 'media').toLowerCase();
         if (porPrioridad[prioridad]) {
           porPrioridad[prioridad].push(t);
         }
       });
-    }
-    
-    ['urgente', 'alta', 'media', 'baja'].forEach(prioridad => {
-      if (Array.isArray(porPrioridad[prioridad]) && porPrioridad[prioridad].length > 0) {
+      
+      ['urgente', 'alta', 'media', 'baja'].forEach(prioridad => {
+        if (Array.isArray(porPrioridad[prioridad]) && porPrioridad[prioridad].length > 0) {
         prompt += `\n${prioridad.toUpperCase()} PRIORIDAD (${porPrioridad[prioridad].length} tópicos):\n`;
         porPrioridad[prioridad].forEach((topico, idx) => {
           if (!topico || typeof topico !== 'object') return; // Saltar elementos inválidos
@@ -413,13 +612,39 @@ function buildUserPrompt(planData: GenerateTrainingPlanRequest["planData"]): str
             prompt += `   - Categorías de puesto: ${topico.categoriasPuesto.join(", ")}\n`;
           }
           
-          // Instrucción específica sobre participantes
+          // Información detallada de colaboradores específicos (NUEVO)
+          if (Array.isArray(topico.colaboradoresInfo) && topico.colaboradoresInfo.length > 0) {
+            prompt += `   - Colaboradores específicos que necesitan este tópico:\n`;
+            
+            // Agrupar por área/departamento para mejor visualización
+            const porArea = new Map<string, Array<{ nombre?: string; nivel: string; cargo: string; area?: string; departamento?: string }>>();
+            topico.colaboradoresInfo.forEach((colab: any) => {
+              const area = colab.area || colab.departamento || 'Sin área específica';
+              if (!porArea.has(area)) {
+                porArea.set(area, []);
+              }
+              porArea.get(area)!.push(colab);
+            });
+            
+            porArea.forEach((colaboradores, area) => {
+              prompt += `     * Área/Departamento: ${area} (${colaboradores.length} persona${colaboradores.length > 1 ? 's' : ''}):\n`;
+              colaboradores.forEach((colab: any) => {
+                const nombre = colab.nombre || `ID: ${colab.id}`;
+                prompt += `       - ${nombre} (${colab.nivel}, ${colab.cargo})\n`;
+              });
+            });
+          }
+          
+          // Instrucción específica sobre participantes (REFORZADA)
           const frecuenciaPorcentual = typeof topico.frecuenciaPorcentual === 'number' ? topico.frecuenciaPorcentual : 0;
-          prompt += `   - INSTRUCCIÓN PARTICIPANTES: `;
-          if (frecuenciaPorcentual >= 80) {
-            prompt += `Este tópico aplica a la mayoría del equipo (${frecuenciaPorcentual}%). Puedes usar "Todo el equipo completo" o ser más específico según los niveles/cargos mencionados.\n`;
+          prompt += `   - ⚠️ INSTRUCCIÓN PARTICIPANTES (CRÍTICO): `;
+          if (frecuenciaPorcentual >= 95) {
+            prompt += `Este tópico aplica a casi todo el equipo (${frecuenciaPorcentual}%). Puedes usar "Todo el equipo completo" o ser más específico según los niveles/cargos mencionados.\n`;
           } else {
-            prompt += `Este tópico NO aplica a todo el equipo (solo ${frecuenciaPorcentual}%). DEBES especificar los participantes exactos usando los niveles y cargos mencionados arriba. NO uses "Todo el equipo completo".\n`;
+            prompt += `❌❌❌ ESTE TÓPICO NO APLICA A TODO EL EQUIPO (solo ${frecuenciaPorcentual}%). `;
+            prompt += `DEBES especificar los participantes EXACTOS usando los niveles, cargos y nombres mencionados arriba. `;
+            prompt += `NUNCA uses "Todo el equipo completo" para este tópico. `;
+            prompt += `Ejemplo correcto: "Técnicos de Planificación (3 personas: [nombres])" o "Auxiliar y Asistente (2 personas: [nombres])".\n`;
           }
           
           if (typeof topico.scorePrioridad === 'number') {
@@ -434,6 +659,9 @@ function buildUserPrompt(planData: GenerateTrainingPlanRequest["planData"]): str
           prompt += "\n";
         });
       }
+      });
+      
+      prompt += "\n";
     });
     
     prompt += "\n";
@@ -447,44 +675,109 @@ function buildUserPrompt(planData: GenerateTrainingPlanRequest["planData"]): str
   
   prompt += "CRÍTICO: Debes generar un PLAN ESTRUCTURADO EN FORMATO TABLA, COMPLETO y PROFESIONAL.\n\n";
   
+  prompt += "⚠️ ERRORES COMUNES A EVITAR (CRÍTICO):\n";
+  prompt += "   - ❌ NO generar solo 2-3 capacitaciones - esto es INADECUADO para un plan anual completo\n";
+  prompt += "   - ❌❌❌ CRÍTICO: NO usar 'Todo el equipo completo' cuando la frecuencia es < 95%. Si la frecuencia es 37.5%, 25%, 12.5%, etc., DEBES especificar los participantes exactos usando los niveles, cargos y nombres proporcionados\n";
+  prompt += "   - ❌ NO usar 'Todo el equipo completo' para capacitaciones técnicas específicas (ej: Revit para técnicos, Código Municipal para coordinadores)\n";
+  prompt += "   - ❌ NO omitir objetivos (objetivoGeneral y objetivosEspecificos son OBLIGATORIOS)\n";
+  prompt += "   - ❌ NO omitir cronograma (debe incluir todas las capacitaciones distribuidas en los 12 meses)\n";
+  prompt += "   - ❌ NO generar planes incompletos - debe cubrir todos los tópicos urgentes y de alta prioridad\n";
+  prompt += "   - ❌ NO ignorar que una unidad puede tener diferentes áreas con necesidades diferentes\n";
+  prompt += "   - ❌ NO ignorar las instrucciones específicas de participantes que se proporcionan para cada tópico\n\n";
+  
+  prompt += "✅ REQUISITOS MÍNIMOS DE CALIDAD:\n";
+  prompt += "   - Para 20-30 personas: MÍNIMO 8-12 temáticas con 15-25 actividades distribuidas en el año\n";
+  prompt += "   - Cada temática debe tener 2-5 actividades específicas\n";
+  prompt += "   - Las capacitaciones deben distribuirse a lo largo de los 12 meses (no todas en el mismo mes)\n";
+  prompt += "   - ⚠️ CRÍTICO: Los participantes deben ser ESPECÍFICOS (niveles, cargos, áreas, nombres) a menos que realmente sea >= 95% del equipo\n";
+  prompt += "   - Si la frecuencia es < 95%, OBLIGATORIO usar la información de colaboradores específicos proporcionada para cada tópico\n";
+  prompt += "   - NO uses 'Todo el equipo completo' como default - solo úsalo cuando realmente aplica a casi todos (>= 95%)\n\n";
+  
   prompt += "REQUISITOS CRÍTICOS:\n\n";
   
-  prompt += "1. ANÁLISIS Y AGRUPAMIENTO INTELIGENTE (COMPLETITUD PRIMERO, EJECUTABILIDAD SEGUNDO):\n";
-  prompt += "   - PRIORIDAD ABSOLUTA: Analiza TODOS los tópicos del listado (no dejes ninguno fuera, especialmente urgentes y de alta prioridad)\n";
+  prompt += "1. ANÁLISIS Y AGRUPAMIENTO INTELIGENTE (LIBERTAD TOTAL):\n";
+  prompt += "   - Tienes TODA la información de cada tópico: frecuencia, niveles, cargos, colaboradores, prioridad, categorías\n";
+  prompt += "   - Analiza LIBREMENTE todos los tópicos y decide cómo agruparlos estratégicamente\n";
   prompt += "   - Identifica relaciones semánticas, sinergias y patrones entre tópicos\n";
-  prompt += "   - Agrupa estratégicamente en temáticas consolidadas de ALTO NIVEL (idealmente 5-10, pero puede ser más si es necesario para completitud)\n";
-  prompt += "   - Cada temática debe agrupar tópicos relacionados por significado, no solo por categoría\n";
-  prompt += "   - OBJETIVO DUAL:\n";
-  prompt += "     a) COMPLETITUD: Incluir TODOS los tópicos importantes (especialmente urgentes y de alta prioridad)\n";
-  prompt += "     b) EJECUTABILIDAD: Agrupar cuando sea posible para crear capacitaciones grupales ejecutables\n";
-  prompt += "   - PRIORIZA agrupar tópicos que comparten niveles/cargos similares para facilitar la ejecución grupal\n";
-  prompt += "   - PERO: Si un tópico importante no puede agruparse naturalmente, créale una temática específica antes que dejarlo fuera\n";
-  prompt += "   - El campo 'temas' de cada temática DEBE listar los nombres exactos de los tópicos del input que agrupaste\n";
-  prompt += "   - IMPORTANTE: Al agrupar tópicos, calcula la frecuencia combinada basándote en colaboradores ÚNICOS, no sumes frecuencias\n";
-  prompt += "     Ejemplo: Si 'Normativa' tiene 2 personas y 'Seguridad Vial' tiene 1 persona, y son las mismas 2 personas,\n";
-  prompt += "     la frecuencia combinada es 2 (no 3). Si son personas diferentes, la frecuencia combinada es 3.\n\n";
+  prompt += "   - Agrupa cuando tenga sentido (tópicos relacionados, participantes similares) o créalos individuales si son únicos\n";
+  prompt += "   - Al agrupar tópicos, calcula la frecuencia combinada basándote en colaboradores ÚNICOS, no sumes frecuencias\n";
+  prompt += "   - Usa tu criterio profesional para crear el mejor plan posible\n\n";
   
-  prompt += "2. COMPLETITUD ABSOLUTA (CRÍTICO - NO COMPROMETAS ESTO):\n";
-  prompt += "   - INCLUYE TODOS los tópicos urgentes (100% - NO DEJES NINGUNO FUERA)\n";
-  prompt += "   - INCLUYE TODOS los tópicos de alta prioridad (100% - NO DEJES NINGUNO FUERA)\n";
-  prompt += "   - INCLUYE la mayoría de tópicos de media prioridad (mínimo 80%, idealmente todos)\n";
-  prompt += "   - Si un tópico importante no encaja perfectamente en una temática existente, créale una temática específica antes que dejarlo fuera\n";
-  prompt += "   - NO limites el número de temáticas si eso significa dejar fuera tópicos importantes\n";
-  prompt += "   - El plan debe ser COMPLETO, no parcial ni resumido\n";
-  prompt += "   - MEJOR tener más temáticas completas que menos temáticas incompletas\n\n";
+  prompt += "2. COMPLETITUD Y MEJORAMIENTO DE LA UNIDAD (OBJETIVO PRINCIPAL):\n";
+  prompt += "   - ⚠️⚠️⚠️ ESTE PLAN ES PARA MEJORAMIENTO DE LA UNIDAD - si omites tópicos importantes, el plan falla en su objetivo\n";
+  prompt += "   - Analiza TODOS los tópicos proporcionados y determina cómo incluirlos TODOS en el plan\n";
+  prompt += "   - OBLIGATORIO incluir:\n";
+  prompt += "     * TODOS los tópicos urgentes (100% - sin excepciones)\n";
+  prompt += "     * TODOS los tópicos de alta prioridad (100% - sin excepciones)\n";
+  prompt += "     * La mayoría de tópicos de media prioridad (mínimo 80%)\n";
+  prompt += "   - ⚠️⚠️⚠️ BALANCE DE CATEGORÍAS (CRÍTICO):\n";
+  prompt += "     * Los tópicos técnicos, normativos y específicos son TAN IMPORTANTES como las habilidades blandas\n";
+  prompt += "     * Técnicos: Revit, Excel avanzado, herramientas específicas, software, estación total, etc.\n";
+  prompt += "     * Normativos: Código Municipal, Ley de Tránsito, normativas sectoriales, procedimientos, etc.\n";
+  prompt += "     * Específicos: manejo de sonido, piano, estación total, etc.\n";
+  prompt += "     * Herramientas: Excel, software de diseño, sistemas de gestión, etc.\n";
+  prompt += "     * Soft Skills: comunicación, trabajo en equipo, atención al cliente, etc.\n";
+  prompt += "     * NO priorices solo habilidades blandas - un plan completo debe cubrir TODAS las áreas de competencia\n";
+  prompt += "     * Si hay tópicos técnicos urgentes/alta prioridad, DEBEN aparecer en el plan\n";
+  prompt += "     * Si hay tópicos normativos urgentes/alta prioridad, DEBEN aparecer en el plan\n";
+  prompt += "     * Si hay tópicos específicos urgentes/alta prioridad, DEBEN aparecer en el plan\n";
+  prompt += "   - ⚠️⚠️⚠️ REGLA CRÍTICA DE AGRUPAMIENTO - EVITA DUPLICACIÓN:\n";
+  prompt += "     * ANTES de crear una nueva temática, REVISA si ya existe una temática con:\n";
+  prompt += "       - Participantes compartidos (mismo colaborador o cargo)\n";
+  prompt += "       - Tópicos relacionados o similares\n";
+  prompt += "     * Si encuentras solapamiento, AGRUPA en la temática existente en lugar de crear una nueva\n";
+  prompt += "     * NUNCA dupliques un tópico en múltiples temáticas - cada tópico debe aparecer SOLO UNA VEZ\n";
+  prompt += "     * Si un colaborador necesita múltiples tópicos relacionados, inclúyelos TODOS en la misma temática\n";
+  prompt += "     * Ejemplo CORRECTO: Si 'Encargado de Transporte' necesita 'Ley de Tránsito', 'Seguridad Vial' y 'Normativa Municipal', créalos TODOS en UNA sola temática\n";
+  prompt += "     * Ejemplo INCORRECTO: Crear 'Normativa Municipal y Ley de Tránsito' para Transporte, y luego 'Seguridad Vial y Ley de Tránsito' para el mismo Transporte (duplica 'Ley de Tránsito')\n";
+  prompt += "   - Si un tópico es urgente/alta prioridad pero muy específico (1-2 participantes), créale una temática específica\n";
+  prompt += "     Ejemplo: Si 'piano' es urgente para 1 persona, créale una temática 'Capacitación en Piano' para esa persona\n";
+  prompt += "   - El agrupamiento inteligente es para:\n";
+  prompt += "     * Facilitar la ejecución (mismo grupo, misma fecha)\n";
+  prompt += "     * Evitar duplicación (mismo tópico, mismo colaborador)\n";
+  prompt += "     * NO para ocultar o filtrar tópicos importantes\n";
+  prompt += "   - Para un equipo de 20-30 personas, genera 8-20 temáticas que cubran TODOS los tópicos importantes\n";
+  prompt += "   - El plan debe ser COMPLETO (todos los tópicos importantes) Y EJECUTABLE (agrupado inteligentemente)\n";
+  prompt += "   - Considera que diferentes áreas dentro de la unidad tienen necesidades diferentes - agrupa por área cuando sea relevante\n";
+  prompt += "   - ⚠️ NO generes solo 2-3 capacitaciones - esto es INADECUADO para un plan anual completo\n";
+  prompt += "   - ⚠️ El programaCapacitacion debe tener MÚLTIPLES entradas distribuidas a lo largo de los 12 meses del año\n";
+  prompt += "   - ⚠️ Considera que una unidad organizacional tiene DIFERENTES ÁREAS y ROLES - no todos necesitan las mismas capacitaciones\n";
+  prompt += "   - ⚠️ Si hay directores de diferentes áreas, NO uses 'Todo el equipo completo' para capacitaciones técnicas específicas\n\n";
   
   prompt += "3. ESTRUCTURACIÓN PROFESIONAL Y EJECUTABLE:\n";
   prompt += "   - Temáticas estratégicas y de alto nivel (ej: 'Liderazgo y Gestión', 'Competencias Técnicas', etc.)\n";
   prompt += "   - Cada temática con objetivo específico y medible\n";
   prompt += "   - 2-5 actividades concretas por temática priorizada\n";
-  prompt += "   - PARTICIPANTES (BALANCE ENTRE EJECUTABILIDAD Y COMPLETITUD):\n";
+  prompt += "   - DISTRIBUYE las capacitaciones a lo largo de los 12 meses del año (no todas en el mismo mes)\n";
+  prompt += "   - ⚠️⚠️⚠️ VALIDACIÓN FINAL ANTES DE CREAR CADA TEMÁTICA:\n";
+  prompt += "     * ANTES de crear una nueva temática, verifica:\n";
+  prompt += "       1. ¿Ya existe una temática con participantes similares o compartidos?\n";
+  prompt += "       2. ¿Los tópicos que quieres incluir son relacionados a tópicos ya incluidos en otra temática?\n";
+  prompt += "       3. ¿Hay solapamiento significativo de participantes (mismo colaborador o cargo)?\n";
+  prompt += "     * Si la respuesta es SÍ a cualquiera de estas preguntas, AGRUPA en la temática existente\n";
+  prompt += "     * NO crees temáticas separadas para el mismo colaborador con tópicos relacionados\n";
+  prompt += "     * Ejemplo: Si 'Encargado de Transporte' necesita 'Ley de Tránsito', 'Seguridad Vial' y 'Normativa Municipal', créalos TODOS en UNA temática\n";
+  prompt += "     * Ejemplo INCORRECTO: Crear 'Normativa Municipal y Ley de Tránsito' para Transporte, y luego 'Seguridad Vial y Ley de Tránsito' para el mismo Transporte\n";
+  prompt += "   - Considera que diferentes áreas dentro de la unidad pueden tener necesidades diferentes\n";
+  prompt += "   - Si hay capacitaciones técnicas específicas (ej: manejo de sonido, herramientas específicas), solo inclúyelas para quienes realmente las necesitan\n";
+  prompt += "   - PARTICIPANTES (OBLIGATORIO - NUNCA DEJES VACÍO):\n";
+  prompt += "     * ⚠️ CRÍTICO: CADA temática DEBE tener el campo 'participantesRecomendados' especificado - NUNCA lo dejes vacío\n";
   prompt += "     * Al agrupar tópicos en una temática, identifica el conjunto ÚNICO de colaboradores que necesitan CUALQUIERA de los tópicos agrupados\n";
   prompt += "     * Calcula la frecuencia combinada basándote en colaboradores únicos, no en suma de frecuencias individuales\n";
-  prompt += "     * Usa la información de niveles y cargos de TODOS los tópicos agrupados para describir los participantes\n";
-  prompt += "     * Ejemplos de descripción de participantes:\n";
-  prompt += "       - 'Analistas y Asistentes de nivel A1 (5 personas)' - cuando agrupas tópicos que comparten niveles/cargos\n";
+  prompt += "     * Usa la información de niveles, cargos Y NOMBRES de TODOS los tópicos agrupados para describir los participantes\n";
+  prompt += "     * ⚠️ IMPORTANTE: Si un colaborador aparece en múltiples tópicos relacionados, inclúyelos TODOS en la misma temática\n";
+  prompt += "     * Ejemplos CORRECTOS de descripción de participantes:\n";
+  prompt += "       - 'Analistas y Asistentes de nivel A1 (5 personas: [nombres])' - cuando agrupas tópicos que comparten niveles/cargos\n";
   prompt += "       - 'Personal de nivel A1 y A2 con cargo Administrativo (8 personas)' - cuando agrupas por categoría de puesto\n";
-  prompt += "       - 'Todo el equipo completo (12 personas)' - SOLO si la frecuencia combinada es >= 80% del equipo total\n";
+  prompt += "       - 'Técnico de Sonido (1 persona: [nombre])' - para tópicos muy específicos con 1-2 participantes\n";
+  prompt += "       - 'Encargado de Transporte, Piloto (2 personas: [nombres])' - cuando agrupas tópicos relacionados para estos cargos\n";
+  prompt += "       - 'Todo el equipo completo (12 personas)' - SOLO si la frecuencia combinada es >= 95% del equipo total\n";
+  prompt += "     * Ejemplos INCORRECTOS (PROHIBIDOS):\n";
+  prompt += "       - ❌ Dejar el campo vacío\n";
+  prompt += "       - ❌ Usar 'Todos' cuando frecuencia < 95%\n";
+  prompt += "       - ❌ Usar descripciones genéricas sin especificar quién\n";
+  prompt += "       - ❌ Crear múltiples temáticas con el mismo colaborador y tópicos relacionados\n";
+  prompt += "       - ❌ Duplicar un tópico en múltiples temáticas (ej: 'Ley de Tránsito' en dos temáticas diferentes)\n";
   prompt += "     * PREFIERE agrupar tópicos con pocos participantes (< 3) con tópicos relacionados que compartan niveles/cargos similares\n";
   prompt += "     * PERO: Si un tópico importante no puede agruparse naturalmente, inclúyelo como temática separada (aunque tenga 1-2 participantes) antes que dejarlo fuera\n";
   prompt += "     * La completitud es más importante que tener grupos perfectamente grandes - mejor incluir todos los tópicos importantes\n";
@@ -505,11 +798,17 @@ function buildUserPrompt(planData: GenerateTrainingPlanRequest["planData"]): str
 }
 
 Deno.serve(async (req: Request): Promise<Response> => {
-  // Manejar CORS preflight
+  // Manejar CORS preflight - DEBE ser lo primero y responder inmediatamente
   if (req.method === "OPTIONS") {
+    console.log("📡 OPTIONS request recibida - respondiendo con CORS headers");
     return new Response(null, {
       status: 204,
-      headers: corsHeaders,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS, GET",
+        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+        "Access-Control-Max-Age": "86400",
+      },
     });
   }
 
@@ -748,16 +1047,17 @@ Deno.serve(async (req: Request): Promise<Response> => {
       if (!planEstructurado.informacionGeneral) {
         const fechaActual = new Date();
         const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
-        const año = fechaActual.getFullYear();
+        const año = 2026; // Año fijo para el plan de capacitación
         const mesActual = meses[fechaActual.getMonth()];
         const diaActual = fechaActual.getDate();
+        const añoActual = fechaActual.getFullYear();
         
         planEstructurado.informacionGeneral = {
           areaDepartamento: planData.metadata?.periodoNombre || "Unidad Organizacional",
           responsable: "Gerencia de Recursos Humanos",
           totalColaboradores: planData.contexto?.totalColaboradores || 0,
           periodo: `Enero - Diciembre ${año}`,
-          fechaElaboracion: `${diaActual} de ${mesActual} de ${año}`
+          fechaElaboracion: `${diaActual} de ${mesActual} de ${añoActual}`
         };
       }
       
@@ -771,12 +1071,166 @@ Deno.serve(async (req: Request): Promise<Response> => {
       }
       
       // Si tiene temáticas, asegurar que cada temática tenga nivelesAplicables
+      // PERO NO hardcodear "Todo el equipo completo" - debe venir de la IA o de temáticas pre-agrupadas
+      // ADEMÁS: Validar y corregir participantes incorrectos automáticamente
+      // Y: Agregar participantes si están vacíos
       if (planEstructurado.tematicas) {
-        planEstructurado.tematicas = planEstructurado.tematicas.map((tematica: any) => ({
-          ...tematica,
-          nivelesAplicables: tematica.nivelesAplicables || ["Todos"],
-          participantesRecomendados: tematica.participantesRecomendados || "Todo el equipo completo",
-        }));
+        planEstructurado.tematicas = planEstructurado.tematicas.map((tematica: any) => {
+          // Validar y corregir participantes incorrectos O agregar si están vacíos
+          const participantesActual = tematica.participantesRecomendados || "";
+          const participantesLower = participantesActual.toLowerCase();
+          const esTodoElEquipo = participantesLower.includes("todo el equipo") || 
+                                participantesLower.includes("todos") ||
+                                participantesLower.includes("todo el personal") ||
+                                participantesLower.includes("todos los colaboradores");
+          const estaVacio = !participantesActual || participantesActual.trim().length === 0;
+          
+          // Si está vacío O es "Todo el equipo" incorrecto, buscar y construir participantes
+          if (estaVacio || esTodoElEquipo) {
+            // Buscar en los tópicos individuales para calcular frecuencia real
+            const topicosRelacionados = planData.todosLosTopicos?.filter((t: any) => {
+              if (!t || !t.topico) return false;
+              return tematica.temas?.some((tema: string) => {
+                const topicoLower = (t.topico || "").toLowerCase();
+                const temaLower = (tema || "").toLowerCase();
+                return topicoLower.includes(temaLower) || temaLower.includes(topicoLower);
+              });
+            }) || [];
+            
+            if (topicosRelacionados.length > 0) {
+              // Calcular frecuencia máxima de los tópicos relacionados
+              const maxFrecuencia = Math.max(...topicosRelacionados.map((t: any) => {
+                return typeof t.frecuenciaPorcentual === 'number' ? t.frecuenciaPorcentual : 0;
+              }));
+              
+              if (maxFrecuencia < 95 || estaVacio) {
+                // Construir descripción específica basada en los tópicos
+                const colaboradoresUnicos = new Set<string>();
+                const nivelesSet = new Set<string>();
+                const cargosSet = new Set<string>();
+                const nombresSet = new Set<string>();
+                
+                topicosRelacionados.forEach((t: any) => {
+                  if (Array.isArray(t.colaboradoresInfo)) {
+                    t.colaboradoresInfo.forEach((colab: any) => {
+                      if (colab.id) colaboradoresUnicos.add(colab.id);
+                      if (colab.nombre) nombresSet.add(colab.nombre);
+                      if (colab.nivel) nivelesSet.add(colab.nivel);
+                      if (colab.cargo) cargosSet.add(colab.cargo);
+                    });
+                  }
+                });
+                
+                const totalUnicos = colaboradoresUnicos.size > 0 ? colaboradoresUnicos.size : nombresSet.size;
+                const niveles = Array.from(nivelesSet);
+                const cargos = Array.from(cargosSet);
+                const nombres = Array.from(nombresSet);
+                
+                // Construir descripción específica
+                let descripcion = "";
+                if (cargos.length > 0 && totalUnicos > 0) {
+                  if (nombres.length > 0 && nombres.length <= 5) {
+                    descripcion = `${cargos.join(", ")} (${totalUnicos} persona${totalUnicos > 1 ? 's' : ''}: ${nombres.slice(0, 5).join(", ")})`;
+                  } else {
+                    descripcion = `${cargos.join(", ")} (${totalUnicos} persona${totalUnicos > 1 ? 's' : ''})`;
+                  }
+                } else if (niveles.length > 0 && totalUnicos > 0) {
+                  descripcion = `Personal de nivel ${niveles.join(", ")} (${totalUnicos} persona${totalUnicos > 1 ? 's' : ''})`;
+                } else if (totalUnicos > 0) {
+                  descripcion = `${totalUnicos} persona${totalUnicos > 1 ? 's' : ''}`;
+                } else {
+                  // Si no hay información, usar la frecuencia porcentual
+                  descripcion = `Personal específico (${maxFrecuencia.toFixed(1)}% del equipo)`;
+                }
+                
+                if (estaVacio) {
+                  console.log(`⚠️ AGREGANDO PARTICIPANTES: Temática "${tematica.nombre}" no tenía participantes. Agregando: "${descripcion}"`);
+                } else {
+                  console.log(`⚠️ CORRECCIÓN AUTOMÁTICA: Temática "${tematica.nombre}" tenía "Todo el equipo completo" pero frecuencia es ${maxFrecuencia.toFixed(1)}%. Corrigiendo a: "${descripcion}"`);
+                }
+                tematica.participantesRecomendados = descripcion;
+              }
+            } else if (estaVacio) {
+              // Si no se encontraron tópicos relacionados pero está vacío, usar un mensaje genérico
+              console.log(`⚠️ ADVERTENCIA: Temática "${tematica.nombre}" no tiene participantes y no se encontraron tópicos relacionados para calcularlos`);
+              tematica.participantesRecomendados = "Participantes a determinar según necesidades específicas";
+            }
+          } else if (estaVacio) {
+            // Si está vacío pero no es "Todo el equipo", intentar buscar tópicos relacionados
+            const topicosRelacionados = planData.todosLosTopicos?.filter((t: any) => {
+              if (!t || !t.topico) return false;
+              return tematica.temas?.some((tema: string) => {
+                const topicoLower = (t.topico || "").toLowerCase();
+                const temaLower = (tema || "").toLowerCase();
+                return topicoLower.includes(temaLower) || temaLower.includes(topicoLower);
+              });
+            }) || [];
+            
+            if (topicosRelacionados.length > 0) {
+              const colaboradoresUnicos = new Set<string>();
+              const nivelesSet = new Set<string>();
+              const cargosSet = new Set<string>();
+              const nombresSet = new Set<string>();
+              
+              topicosRelacionados.forEach((t: any) => {
+                if (Array.isArray(t.colaboradoresInfo)) {
+                  t.colaboradoresInfo.forEach((colab: any) => {
+                    if (colab.id) colaboradoresUnicos.add(colab.id);
+                    if (colab.nombre) nombresSet.add(colab.nombre);
+                    if (colab.nivel) nivelesSet.add(colab.nivel);
+                    if (colab.cargo) cargosSet.add(colab.cargo);
+                  });
+                }
+              });
+              
+              const totalUnicos = colaboradoresUnicos.size > 0 ? colaboradoresUnicos.size : nombresSet.size;
+              const niveles = Array.from(nivelesSet);
+              const cargos = Array.from(cargosSet);
+              const nombres = Array.from(nombresSet);
+              
+              let descripcion = "";
+              if (cargos.length > 0 && totalUnicos > 0) {
+                if (nombres.length > 0 && nombres.length <= 5) {
+                  descripcion = `${cargos.join(", ")} (${totalUnicos} persona${totalUnicos > 1 ? 's' : ''}: ${nombres.slice(0, 5).join(", ")})`;
+                } else {
+                  descripcion = `${cargos.join(", ")} (${totalUnicos} persona${totalUnicos > 1 ? 's' : ''})`;
+                }
+              } else if (niveles.length > 0 && totalUnicos > 0) {
+                descripcion = `Personal de nivel ${niveles.join(", ")} (${totalUnicos} persona${totalUnicos > 1 ? 's' : ''})`;
+              } else if (totalUnicos > 0) {
+                descripcion = `${totalUnicos} persona${totalUnicos > 1 ? 's' : ''}`;
+              }
+              
+              if (descripcion) {
+                console.log(`⚠️ AGREGANDO PARTICIPANTES: Temática "${tematica.nombre}" no tenía participantes. Agregando: "${descripcion}"`);
+                tematica.participantesRecomendados = descripcion;
+              }
+            }
+          }
+          
+          return {
+            ...tematica,
+            nivelesAplicables: tematica.nivelesAplicables || [],
+            participantesRecomendados: tematica.participantesRecomendados,
+          };
+        });
+      }
+      
+      // Validar que tenga programaCapacitacion o tematicas
+      if (!planEstructurado.programaCapacitacion || planEstructurado.programaCapacitacion.length === 0) {
+        if (!planEstructurado.tematicas || planEstructurado.tematicas.length === 0) {
+          console.warn("⚠️ El plan generado no tiene programaCapacitacion ni tematicas");
+        }
+      }
+      
+      // Validar que tenga objetivos
+      if (!planEstructurado.objetivoGeneral && (!planEstructurado.objetivosEspecificos || planEstructurado.objetivosEspecificos.length === 0)) {
+        console.warn("⚠️ El plan generado no tiene objetivos definidos");
+      }
+      
+      // Validar que tenga cronograma
+      if (!planEstructurado.cronograma || planEstructurado.cronograma.length === 0) {
+        console.warn("⚠️ El plan generado no tiene cronograma");
       }
     } catch (parseError) {
       console.error("Error parseando respuesta de OpenAI:", parseError);

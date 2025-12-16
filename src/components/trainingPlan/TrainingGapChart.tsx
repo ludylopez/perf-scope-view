@@ -188,3 +188,4 @@ export function TrainingGapChart({ brechas }: TrainingGapChartProps) {
 }
 
 
+

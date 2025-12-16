@@ -24,6 +24,18 @@ export interface TopicoCapacitacion {
   prioridad: 'urgente' | 'alta' | 'media' | 'baja';
   dimensionesRelacionadas: string[];
   fuentes: ('plan' | 'comentario_jefe' | 'solicitud_colaborador')[];
+  colaboradoresIds?: string[]; // IDs de colaboradores que necesitan este tópico
+  colaboradoresInfo?: Array<{
+    id: string;
+    nivel: string;
+    cargo: string;
+    categoriaPuesto: string;
+    nombre?: string;
+    area?: string;
+    departamento?: string;
+  }>;
+  niveles?: Array<{ nivel: string; cantidad: number; cargos: string[] }>;
+  categoriasPuesto?: string[];
 }
 
 export interface Distribucion9Box {
@@ -165,6 +177,21 @@ export interface PlanCapacitacionEstructurado {
   metricasExito?: MetricaExito[]; // Cómo medir el éxito
   estrategiaImplementacion?: string; // Estrategia general (texto descriptivo)
   fechaGeneracion: string; // ISO string
+}
+
+// Temática pre-agrupada antes de enviar a IA
+export interface TematicaPreAgrupada {
+  nombre: string;
+  topicosIncluidos: string[]; // Nombres de tópicos agrupados
+  colaboradoresUnicos: string[]; // IDs únicos de colaboradores
+  frecuenciaCombinada: number;
+  frecuenciaPorcentual: number;
+  niveles: Array<{ nivel: string; cantidad: number; cargos: string[] }>;
+  categoriasPuesto: string[];
+  prioridad: 'urgente' | 'alta' | 'media' | 'baja';
+  categoria: string;
+  dimensionesRelacionadas?: string[];
+  participantesDescripcion: string; // Descripción calculada de participantes
 }
 
 

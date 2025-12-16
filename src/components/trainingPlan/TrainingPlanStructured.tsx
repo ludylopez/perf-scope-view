@@ -6,9 +6,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
+import { TrainingPlanCompactView } from "./TrainingPlanCompactView";
 
 interface TrainingPlanStructuredProps {
   planEstructurado: PlanCapacitacionEstructurado;
+  viewMode?: 'compact' | 'detailed';
+  totalColaboradores?: number;
+  directorNombre?: string;
 }
 
 // Funciones auxiliares compartidas
@@ -63,7 +67,23 @@ const getRecursoTipoColor = (tipo: string) => {
   }
 };
 
-export function TrainingPlanStructured({ planEstructurado }: TrainingPlanStructuredProps) {
+export function TrainingPlanStructured({ 
+  planEstructurado, 
+  viewMode = 'compact',
+  totalColaboradores,
+  directorNombre 
+}: TrainingPlanStructuredProps) {
+  // Si el modo es compacto, usar la vista compacta
+  if (viewMode === 'compact') {
+    return (
+      <TrainingPlanCompactView 
+        planEstructurado={planEstructurado}
+        totalColaboradores={totalColaboradores}
+        directorNombre={directorNombre}
+      />
+    );
+  }
+
   // Verificar si tiene la nueva estructura profesional
   const tieneEstructuraProfesional = planEstructurado.informacionGeneral || planEstructurado.programaCapacitacion;
 

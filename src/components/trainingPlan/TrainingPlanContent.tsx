@@ -27,12 +27,36 @@ export function TrainingPlanContent({
   const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("resumen");
+  const [directorNombre, setDirectorNombre] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     if (jefeDpi && periodoId) {
       loadPlan();
+      loadDirectorNombre();
     }
   }, [jefeDpi, periodoId]);
+
+  const loadDirectorNombre = async () => {
+    if (!jefeDpi) return;
+    
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { data: jefeData } = await supabase
+        .from("users")
+        .select("nombre, apellidos")
+        .eq("dpi", jefeDpi)
+        .maybeSingle();
+      
+      if (jefeData) {
+        const nombreCompleto = jefeData.apellidos 
+          ? `${jefeData.nombre} ${jefeData.apellidos}`.trim()
+          : jefeData.nombre;
+        setDirectorNombre(nombreCompleto);
+      }
+    } catch (error) {
+      console.error("Error obteniendo nombre del director:", error);
+    }
+  };
 
   const loadPlan = async () => {
     setIsLoading(true);
@@ -45,6 +69,10 @@ export function TrainingPlanContent({
         console.error('Error detallado:', planError);
       } else if (data) {
         setPlan(data);
+        // Si el plan ya tiene planEstructurado, cambiar automáticamente al tab "Plan IA"
+        if (data.planEstructurado) {
+          setActiveTab("plan-estructurado");
+        }
       } else {
         setError("No se pudo generar el plan de capacitación. Verifica que haya evaluaciones completadas.");
       }
@@ -74,11 +102,17 @@ export function TrainingPlanContent({
         }
         console.error('Error detallado:', planError);
       } else if (planEstructurado) {
+        // Actualizar el plan con el plan estructurado generado
         setPlan({
           ...plan,
           planEstructurado
         });
         setActiveTab("plan-estructurado");
+        
+        // Recargar el plan completo desde la BD para asegurar que se guardó correctamente
+        setTimeout(async () => {
+          await loadPlan();
+        }, 500);
       }
     } catch (err: any) {
       console.error("Error generando plan estructurado:", err);
@@ -162,27 +196,29 @@ export function TrainingPlanContent({
             </Button>
           )}
         </div>
-        <PDFDownloadLink
-          document={<TrainingPlanPDF plan={plan} />}
-          fileName={`plan-capacitacion-${plan.metadata.periodoNombre.replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`}
-          className="inline-block"
-        >
-          {({ loading }) => (
-            <Button variant="outline" size="sm" disabled={loading} className="gap-2">
-              {loading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Generando PDF...
-                </>
-              ) : (
-                <>
-                  <FileDown className="h-4 w-4" />
-                  Exportar PDF
-                </>
-              )}
-            </Button>
-          )}
-        </PDFDownloadLink>
+         {plan.planEstructurado && (
+           <PDFDownloadLink
+             document={<TrainingPlanPDF planEstructurado={plan.planEstructurado} directorNombre={directorNombre} totalColaboradores={plan.contexto.totalColaboradores} />}
+             fileName={`plan-capacitacion-${plan.metadata.periodoNombre.replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`}
+             className="inline-block"
+           >
+             {({ loading }) => (
+               <Button variant="outline" size="sm" disabled={loading} className="gap-2">
+                 {loading ? (
+                   <>
+                     <Loader2 className="h-4 w-4 animate-spin" />
+                     Generando PDF...
+                   </>
+                 ) : (
+                   <>
+                     <FileDown className="h-4 w-4" />
+                     Exportar PDF
+                   </>
+                 )}
+               </Button>
+             )}
+           </PDFDownloadLink>
+         )}
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">
@@ -268,7 +304,12 @@ export function TrainingPlanContent({
         {/* Tab: Plan Estructurado (Generado por IA) */}
         {plan.planEstructurado && (
           <TabsContent value="plan-estructurado" className="mt-6">
-            <TrainingPlanStructured planEstructurado={plan.planEstructurado} />
+            <TrainingPlanStructured 
+              planEstructurado={plan.planEstructurado}
+              viewMode="compact"
+              totalColaboradores={plan.contexto.totalColaboradores}
+              directorNombre={directorNombre}
+            />
           </TabsContent>
         )}
       </Tabs>

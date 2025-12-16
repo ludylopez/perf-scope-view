@@ -95,3 +95,4 @@ perf-scope-view/
 - Verifica que tengas conexión a internet
 - Revisa los logs de la Edge Function en Supabase Dashboard
 
+
