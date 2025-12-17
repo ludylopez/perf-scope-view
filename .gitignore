@@ -80,8 +80,8 @@ ACLARACION_DISCREPANCIA.md
 public/temp/*.csv
 dist/temp/*.csv
 
-# Vista de análisis (solo para uso local, no subir a GitHub)
-src/pages/analisis/
+# Vista de análisis - Ahora se sube a GitHub para que funcione en Lovable.dev
+# src/pages/analisis/
 
 # Archivos SQL con DPIs y datos personales específicos
 cleanup-plans.sql
