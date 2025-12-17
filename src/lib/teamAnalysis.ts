@@ -1085,7 +1085,7 @@ export const getTeamDataForAIAnalysis = async (
       // Obtener autoevaluación
       const { data: autoevaluacion } = await supabase
         .from("evaluations")
-        .select("comments")
+        .select("id, comments")
         .eq("tipo", "auto")
         .eq("usuario_id", colaborador.dpi)
         .eq("periodo_id", periodoId)

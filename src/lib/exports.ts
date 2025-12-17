@@ -1600,7 +1600,7 @@ const preparePDFData = async (params: PreparePDFDataParams): Promise<PreparedPDF
             : jefe.nombre;
           // Guardar cargo del jefe si existe
           if (jefe.cargo && typeof jefe.cargo === 'string' && jefe.cargo.trim() !== '') {
-            empleado.jefeCargo = jefe.cargo.trim();
+            (empleado as any).jefeCargo = jefe.cargo.trim();
           }
         }
       }
@@ -1611,7 +1611,7 @@ const preparePDFData = async (params: PreparePDFDataParams): Promise<PreparedPDF
   
   // 2. Obtener nombre y cargo de la Directora de RRHH
   let nombreDirectoraRRHH = empleado.directoraRRHHNombre;
-  let cargoDirectoraRRHH = empleado.directoraRRHHCargo;
+  let cargoDirectoraRRHH = (empleado as any).directoraRRHHCargo;
   
   if (!nombreDirectoraRRHH || !cargoDirectoraRRHH) {
     try {
@@ -1791,10 +1791,10 @@ const preparePDFData = async (params: PreparePDFDataParams): Promise<PreparedPDF
     empleado: {
       ...empleado,
       jefeNombre: nombreJefe,
-      jefeCargo: empleado.jefeCargo,
+      jefeCargo: (empleado as any).jefeCargo,
       directoraRRHHNombre: nombreDirectoraRRHH,
       directoraRRHHCargo: cargoDirectoraRRHH,
-    },
+    } as any,
     resultadoData: resultadoDataWithExplanations,
   };
 };
@@ -1891,8 +1891,8 @@ export const exportEvaluacionCompletaPDFReact = async (
     // Generar PDF usando React.createElement
     // IMPORTANTE: EvaluacionPDF ya retorna un <Document>, no debemos envolverlo en otro Document
     // Usar datos preparados que incluyen información completa de jefe y directora RRHH
-    const blob = await pdf(
-      React.createElement(EvaluacionPDF, {
+    const blob = await (pdf as any)(
+      React.createElement(EvaluacionPDF as any, {
         empleado: preparedData.empleado,
         periodo,
         fechaGeneracion,
@@ -2067,8 +2067,8 @@ export const exportMultiplePDFsToZip = async (
 
         // Generar PDF usando exactamente la misma lógica que exportEvaluacionCompletaPDFReact
         // Usar datos preparados que incluyen información completa de jefe y directora RRHH
-        const blob = await pdf(
-          React.createElement(EvaluacionPDF, {
+        const blob = await (pdf as any)(
+          React.createElement(EvaluacionPDF as any, {
             empleado: preparedData.empleado,
             periodo,
             fechaGeneracion,
@@ -2215,8 +2215,8 @@ export const exportTeamAnalysisPDF = async (
 
     const fechaGeneracion = new Date();
 
-    const blob = await pdf(
-      React.createElement(TeamAnalysisPDF, {
+    const blob = await (pdf as any)(
+      React.createElement(TeamAnalysisPDF as any, {
         tipo,
         jefe: jefeData,
         periodo: periodoData,

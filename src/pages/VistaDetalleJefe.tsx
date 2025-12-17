@@ -632,8 +632,8 @@ const VistaDetalleJefe = () => {
 
       // Preparar jefes subordinados (solo para unidad)
       let jefesSubordinados: JefeParaFiltro[] | undefined;
-      if (tipo === 'unidad' && data.jefesSubordinados) {
-        jefesSubordinados = data.jefesSubordinados;
+      if (tipo === 'unidad' && (data as any).jefesSubordinados) {
+        jefesSubordinados = (data as any).jefesSubordinados;
       }
 
       // Exportar PDF

@@ -69,8 +69,8 @@ const VistaResultadosFinales = () => {
         let jefeId = null;
         if (assignment?.jefe_id) {
           jefeId = assignment.jefe_id;
-        } else if (user?.jefeInmediatoId) {
-          jefeId = user.jefeInmediatoId;
+        } else if ((user as any)?.jefe_inmediato_id) {
+          jefeId = (user as any).jefe_inmediato_id;
         }
         
         if (jefeId) {

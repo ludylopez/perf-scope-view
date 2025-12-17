@@ -435,12 +435,12 @@ const Matriz9Box = () => {
               const autoevaluacionFormatted = {
                 responses: autoevaluacion.responses || {},
                 comments: autoevaluacion.comments || {},
-              };
+              } as any;
 
               // Calcular resultado final
               resultadoFinalData = await calculateCompleteFinalScore(
                 autoevaluacionFormatted,
-                evaluacionJefeFormatted,
+                evaluacionJefeFormatted as any,
                 instrument.dimensionesDesempeno,
                 instrument.dimensionesPotencial,
                 false

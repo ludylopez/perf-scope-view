@@ -168,12 +168,11 @@ export function TrainingPlanModal({
                   </Button>
                 )}
               </div>
-              <PDFDownloadLink
-                document={<TrainingPlanPDF plan={plan} />}
-                fileName={`plan-capacitacion-${plan.metadata.periodoNombre.replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`}
-                className="inline-block"
-              >
-                {({ loading }) => (
+              {plan.planEstructurado && (PDFDownloadLink as any)({
+                document: <TrainingPlanPDF planEstructurado={plan.planEstructurado} />,
+                fileName: `plan-capacitacion-${plan.metadata.periodoNombre.replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`,
+                className: "inline-block",
+                children: ({ loading }: any) => (
                   <Button variant="outline" size="sm" disabled={loading} className="gap-2">
                     {loading ? (
                       <>
@@ -187,8 +186,8 @@ export function TrainingPlanModal({
                       </>
                     )}
                   </Button>
-                )}
-              </PDFDownloadLink>
+                )
+              })}
             </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">

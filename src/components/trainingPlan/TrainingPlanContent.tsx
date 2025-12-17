@@ -197,12 +197,13 @@ export function TrainingPlanContent({
           )}
         </div>
          {plan.planEstructurado && (
+           // @ts-ignore - PDFDownloadLink children type compatibility issue
            <PDFDownloadLink
              document={<TrainingPlanPDF planEstructurado={plan.planEstructurado} directorNombre={directorNombre} totalColaboradores={plan.contexto.totalColaboradores} />}
              fileName={`plan-capacitacion-${plan.metadata.periodoNombre.replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`}
              className="inline-block"
            >
-             {({ loading }) => (
+             {({ loading }: any) => (
                <Button variant="outline" size="sm" disabled={loading} className="gap-2">
                  {loading ? (
                    <>

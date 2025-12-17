@@ -319,10 +319,10 @@ function preAgruparTopicos(
   totalColaboradores: number,
   umbralSimilitud: number = 0.6
 ): {
-  tematicasPreAgrupadas: import('./types/trainingPlan').TematicaPreAgrupada[];
+  tematicasPreAgrupadas: import('@/types/trainingPlan').TematicaPreAgrupada[];
   topicosIndividuales: typeof topicos;
 } {
-  const tematicasPreAgrupadas: import('./types/trainingPlan').TematicaPreAgrupada[] = [];
+  const tematicasPreAgrupadas: import('@/types/trainingPlan').TematicaPreAgrupada[] = [];
   const topicosIndividuales: typeof topicos = [];
   const topicosProcesados = new Set<number>();
 
@@ -878,12 +878,12 @@ export async function getPlanCapacitacionUnidad(
             entry.colaboradoresInfo.set(evaluacion.usuario_id, {
               nivel: colaborador.nivel || 'Sin nivel',
               cargo: colaborador.cargo || 'Sin cargo',
-              categoriaPuesto: colaborador.tipo_puesto || 'Sin categoría',
+              categoriaPuesto: (colaborador as any).tipo_puesto || 'Sin categoría',
               nombre: colaborador.nombre && colaborador.apellidos 
                 ? `${colaborador.nombre} ${colaborador.apellidos}`.trim() 
                 : undefined,
-              area: colaborador.direccion_unidad || colaborador.departamento_dependencia || 'Sin área',
-              departamento: colaborador.departamento_dependencia || 'Sin departamento'
+              area: (colaborador as any).direccion_unidad || (colaborador as any).departamento_dependencia || colaborador.area || 'Sin área',
+              departamento: (colaborador as any).departamento_dependencia || 'Sin departamento'
             });
           }
         }
@@ -1595,7 +1595,7 @@ function validarPlanGenerado(
       departamento?: string;
     }>;
   }>,
-  tematicasPreAgrupadas: import('./types/trainingPlan').TematicaPreAgrupada[],
+  tematicasPreAgrupadas: import('@/types/trainingPlan').TematicaPreAgrupada[],
   totalColaboradores: number
 ): {
   valido: boolean;

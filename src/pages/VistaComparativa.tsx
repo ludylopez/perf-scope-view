@@ -1673,7 +1673,7 @@ const VistaComparativa = () => {
                       .filter((dim: string | null): dim is string => dim !== null);
                     
                     const uniqueDimensions = Array.from(new Set(usedDimensions))
-                      .map((dimName) => {
+                      .map((dimName: string) => {
                         const dimLower = dimName.toLowerCase();
                         let color = '#6b7280';
                         if (dimLower.includes('productividad') || dimLower.includes('cumplimiento') || dimLower.includes('objetivos')) color = '#3b82f6';
@@ -1697,7 +1697,7 @@ const VistaComparativa = () => {
                           {uniqueDimensions.map((dim, idx) => (
                             <div key={idx} className="flex items-center gap-2">
                               <div className="w-4 h-4 rounded" style={{ backgroundColor: dim.color }}></div>
-                              <span>{dim.name}</span>
+                              <span>{dim.name as string}</span>
                             </div>
                           ))}
                         </div>

@@ -118,7 +118,7 @@ export function TeamMembersListCascada({
           );
           break;
         case "jefe":
-          comparison = (a.jefeNombre || "").localeCompare(b.jefeNombre || "");
+          comparison = ((a as TeamAnalysisNodeCascada).jefeNombre || "").localeCompare((b as TeamAnalysisNodeCascada).jefeNombre || "");
           break;
       }
 
@@ -152,7 +152,7 @@ export function TeamMembersListCascada({
     // Agrupar indirectos por su jefe
     indirectos.forEach(node => {
       const jefeDpi = node.jefeDpi || "sin-jefe";
-      const jefeNombre = node.jefeNombre || "Sin jefe asignado";
+      const jefeNombre = (node as TeamAnalysisNodeCascada).jefeNombre || "Sin jefe asignado";
 
       if (!groups.has(jefeDpi)) {
         groups.set(jefeDpi, {
@@ -561,22 +561,22 @@ export function TeamMembersListCascada({
                             </div>
                           )}
                           <div className="flex items-center gap-2" style={{ paddingLeft: node.nivelJerarquico > 1 ? `${(node.nivelJerarquico - 1) * 16}px` : '0' }}>
-                            {node.esJefe && (
-                              <Users className="h-4 w-4 text-primary shrink-0" title="Jefe con subordinados" />
+                          {node.esJefe && (
+                              <Users className="h-4 w-4 text-primary shrink-0" aria-label="Jefe con subordinados" />
                             )}
                             <div>
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span>{node.nombreCompleto}</span>
-                                {node.nivelJerarquico > 1 && node.jefeNombre && (
+                                {node.nivelJerarquico > 1 && (node as TeamAnalysisNodeCascada).jefeNombre && (
                                   <TooltipProvider>
                                     <Tooltip>
                                       <TooltipTrigger asChild>
                                         <span className="text-xs text-muted-foreground italic">
-                                          (via {node.jefeNombre})
+                                          (via {(node as TeamAnalysisNodeCascada).jefeNombre})
                                         </span>
                                       </TooltipTrigger>
                                       <TooltipContent>
-                                        <p>Reporta a través de {node.jefeNombre}</p>
+                                        <p>Reporta a través de {(node as TeamAnalysisNodeCascada).jefeNombre}</p>
                                       </TooltipContent>
                                     </Tooltip>
                                   </TooltipProvider>
@@ -594,7 +594,7 @@ export function TeamMembersListCascada({
                           {node.nivelJerarquico === 1 ? (
                             <span className="text-primary font-medium">{jefePrincipalNombre}</span>
                           ) : (
-                            node.jefeNombre || "-"
+                            (node as TeamAnalysisNodeCascada).jefeNombre || "-"
                           )}
                         </div>
                       </TableCell>
