@@ -922,6 +922,10 @@ export const exportEvaluacionCompletaPDFFromElement = async (
     profesion?: string;
     correo?: string;
     telefono?: string;
+    jefeNombre?: string;
+    jefeCargo?: string;
+    directoraRRHHNombre?: string;
+    directoraRRHHCargo?: string;
   },
   periodo: string,
   fechaGeneracion: Date

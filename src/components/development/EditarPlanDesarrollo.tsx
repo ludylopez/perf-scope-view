@@ -71,6 +71,7 @@ export const EditarPlanDesarrollo = ({
       ...editedAcciones,
       {
         descripcion: "",
+        tipoAprendizaje: "experiencia",
         responsable: "",
         fecha: "",
         recursos: [],

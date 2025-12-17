@@ -48,7 +48,7 @@ export const getDimensionColor = (dimension?: string): string => {
  *    - Palabras clave comunes asociadas a cada dimensión
  */
 export const getDimensionFromAction = (
-  accion: AccionDesarrollo,
+  accion: Pick<AccionDesarrollo, "descripcion"> & Partial<AccionDesarrollo>,
   dimensionesDebiles?: DimensionDebil[]
 ): string | null => {
   // PRIORIDAD 1: Si la acción ya tiene dimensión (planes nuevos), usarla directamente

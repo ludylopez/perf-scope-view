@@ -47,7 +47,7 @@ export const TeamAIAnalysisPDF = ({ analysis }: TeamAIAnalysisPDFProps) => {
       case 'baja':
         return 'BAJA';
       default:
-        return prioridad.toUpperCase();
+        return 'MEDIA';
     }
   };
 
