@@ -2192,6 +2192,19 @@ export const exportTeamAnalysisPDF = async (
       description: `Exportando análisis de ${tipo === 'equipo' ? 'equipo' : 'unidad'}`
     });
 
+    // CARGAR PLAN DE CAPACITACIÓN SI EXISTE
+    let trainingPlan: import('@/types/trainingPlan').PlanCapacitacionEstructurado | null = null;
+    try {
+      const { getPlanCapacitacionUnidad } = await import("@/lib/trainingPlanService");
+      const { plan: planData } = await getPlanCapacitacionUnidad(jefeData.dpi, periodoData.id);
+      if (planData?.planEstructurado) {
+        trainingPlan = planData.planEstructurado;
+      }
+    } catch (planError) {
+      console.warn("No se pudo cargar plan de capacitación:", planError);
+      // Continuar sin plan si hay error
+    }
+
     const { TeamAnalysisPDF } = await import("@/components/pdf/teamAnalysis");
     const { pdf } = await import("@react-pdf/renderer");
     const React = await import("react");
@@ -2208,6 +2221,7 @@ export const exportTeamAnalysisPDF = async (
         colaboradores,
         aiAnalysis: aiAnalysis || undefined,
         jefesSubordinados,
+        trainingPlan: trainingPlan || undefined, // Agregar plan
       })
     ).toBlob();
 

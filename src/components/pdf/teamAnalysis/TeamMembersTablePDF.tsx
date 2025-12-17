@@ -1,4 +1,4 @@
-import { View, Text, Page, Fragment } from '@react-pdf/renderer';
+import { View, Text, Page } from '@react-pdf/renderer';
 import { teamAnalysisStyles, NINE_BOX_COLORS, NINE_BOX_LABELS } from './teamAnalysisStyles';
 import type { TeamMember9Box } from '@/types/teamAnalysis';
 
@@ -6,20 +6,12 @@ interface TeamMembersTablePDFProps {
   colaboradores: TeamMember9Box[];
   tipo: 'equipo' | 'unidad';
   fechaFormateada: string;
-  empezarEnPrimeraPagina?: boolean; // Si true, incluye contenido en la primera página (después de header y stats)
+  empezarEnPrimeraPagina?: boolean;
 }
 
-// Constantes para paginación
-const ALTURA_PAGINA_A4 = 842;
-const ALTURA_FOOTER = 30;
-const ALTURA_HEADER = 120; // Altura aproximada del header
-const ALTURA_STATS = 100; // Altura aproximada de las estadísticas
-const ALTURA_HEADER_TABLA = 25;
-const ALTURA_FILA = 20;
-const ALTURA_DISPONIBLE_PRIMERA_PAGINA = ALTURA_PAGINA_A4 - ALTURA_HEADER - ALTURA_STATS - ALTURA_FOOTER - 60; // Espacio disponible en primera página
-const ALTURA_DISPONIBLE_PAGINAS_NORMALES = ALTURA_PAGINA_A4 - ALTURA_FOOTER - 60; // Espacio disponible en páginas normales
-const MAX_FILAS_PRIMERA_PAGINA = Math.floor((ALTURA_DISPONIBLE_PRIMERA_PAGINA - ALTURA_HEADER_TABLA) / ALTURA_FILA);
-const MAX_FILAS_POR_PAGINA = Math.floor((ALTURA_DISPONIBLE_PAGINAS_NORMALES - ALTURA_HEADER_TABLA) / ALTURA_FILA);
+// Valores fijos según lo solicitado por el usuario
+const MAX_FILAS_PRIMERA = 13; // Primera página: 12 filas
+const MAX_FILAS_SEGUNDA = 25; // Segunda página: 24 filas (reducido para acomodar nombres/cargos largos)
 
 // Función helper para renderizar el contenido de la tabla (sin Page)
 const renderizarContenidoTabla = (
@@ -33,16 +25,16 @@ const renderizarContenidoTabla = (
   totalColaboradores: number
 ) => {
   return (
-    <View style={teamAnalysisStyles.membersSection}>
+    <View style={[teamAnalysisStyles.membersSection, { marginBottom: 0, marginTop: 0 }]}>
       {mostrarTitulo && (
-        <Text style={teamAnalysisStyles.membersTitle}>
+        <Text style={[teamAnalysisStyles.membersTitle, { marginBottom: 6 }]}>
           DETALLE DE COLABORADORES ({totalColaboradores})
         </Text>
       )}
 
       <View style={teamAnalysisStyles.membersTable}>
         {mostrarHeader && (
-          <View style={teamAnalysisStyles.membersTableHeader}>
+          <View style={teamAnalysisStyles.membersTableHeader} wrap={false}>
             <Text
               style={[
                 teamAnalysisStyles.membersTableCell,
@@ -123,12 +115,14 @@ const renderizarContenidoTabla = (
 
         {colaboradoresEnPagina.map((colaborador, index) => {
           const indiceGlobal = inicio + index;
+          const esUltimaFila = index === colaboradoresEnPagina.length - 1;
           return (
             <View
               key={colaborador.dpi}
               style={[
                 teamAnalysisStyles.membersTableRow,
                 indiceGlobal % 2 === 1 ? teamAnalysisStyles.membersTableRowAlt : {},
+                esUltimaFila ? { borderBottomWidth: 0 } : {},
               ]}
               wrap={false}
             >
@@ -156,6 +150,7 @@ const renderizarContenidoTabla = (
                   showJefeColumn
                     ? teamAnalysisStyles.membersTableCellCargo
                     : teamAnalysisStyles.membersTableCellCargoWide,
+                  { fontSize: 7, lineHeight: 1.2 },
                 ]}
               >
                 {colaborador.cargo || '-'}
@@ -251,9 +246,8 @@ export const TeamMembersTableFirstPageContent = ({
   // Determinar si mostrar columna de jefe (solo para unidad/cascada)
   const showJefeColumn = tipo === 'unidad';
 
-  // Calcular cuántos colaboradores caben en la primera página
-  const maxFilasPrimera = Math.max(0, MAX_FILAS_PRIMERA_PAGINA);
-  const colaboradoresPrimeraPagina = sortedColaboradores.slice(0, maxFilasPrimera);
+  // Primera página: exactamente 12 filas
+  const colaboradoresPrimeraPagina = sortedColaboradores.slice(0, MAX_FILAS_PRIMERA);
 
   if (colaboradoresPrimeraPagina.length === 0) {
     return null;
@@ -271,7 +265,7 @@ export const TeamMembersTableFirstPageContent = ({
   );
 };
 
-// Componente para las páginas restantes
+// Componente para las páginas restantes - ENFOQUE SIMPLIFICADO
 export const TeamMembersTableRemainingPages = ({
   colaboradores,
   tipo,
@@ -301,35 +295,81 @@ export const TeamMembersTableRemainingPages = ({
   const showJefeColumn = tipo === 'unidad';
 
   // Calcular desde dónde empezar
-  let inicioRestantes = 0;
-  if (empezarEnPrimeraPagina) {
-    const maxFilasPrimera = Math.max(0, MAX_FILAS_PRIMERA_PAGINA);
-    inicioRestantes = maxFilasPrimera;
-  }
+  let colaboradoresRestantes: TeamMember9Box[];
+  let indiceInicio = 0;
 
-  // Obtener colaboradores restantes
-  const colaboradoresRestantes = sortedColaboradores.slice(inicioRestantes);
-  const totalPaginasRestantes = Math.ceil(colaboradoresRestantes.length / MAX_FILAS_POR_PAGINA);
+  if (empezarEnPrimeraPagina) {
+    // Primera página tiene 12 filas, el resto va a la segunda
+    indiceInicio = Math.min(MAX_FILAS_PRIMERA, sortedColaboradores.length);
+    colaboradoresRestantes = sortedColaboradores.slice(indiceInicio);
+  } else {
+    colaboradoresRestantes = sortedColaboradores;
+  }
 
   if (colaboradoresRestantes.length === 0) {
     return null;
   }
 
-  const paginas: JSX.Element[] = [];
+  // Algoritmo inteligente para distribuir filas y evitar páginas con pocas filas
+  const paginas: { filas: TeamMember9Box[]; mostrarTitulo: boolean }[] = [];
+  
+  if (colaboradoresRestantes.length === 0) {
+    return null;
+  }
+  
+  // Segunda página: tomar hasta 24 filas (o todas si son menos)
+  const filasSegundaPagina = colaboradoresRestantes.slice(0, MAX_FILAS_SEGUNDA);
+  
+  paginas.push({
+    filas: filasSegundaPagina,
+    mostrarTitulo: true, // Mostrar título en la segunda página
+  });
+  
+  // Si quedan más filas después de las 24, distribuir inteligentemente
+  if (colaboradoresRestantes.length > MAX_FILAS_SEGUNDA) {
+    const filasRestantes = colaboradoresRestantes.slice(MAX_FILAS_SEGUNDA);
+    
+    // Usar un valor conservador para páginas adicionales (26 filas)
+    const FILAS_POR_PAGINA_ADICIONAL = 26;
+    
+    // Distribuir las filas restantes
+    for (let i = 0; i < filasRestantes.length; i += FILAS_POR_PAGINA_ADICIONAL) {
+      const filasEnPagina = filasRestantes.slice(i, i + FILAS_POR_PAGINA_ADICIONAL);
+      paginas.push({
+        filas: filasEnPagina,
+        mostrarTitulo: false, // No mostrar título en páginas adicionales
+      });
+    }
+    
+    // Redistribución inteligente: si la última página tiene muy pocas filas (menos de 5),
+    // intentar redistribuirlas en las páginas anteriores
+    if (paginas.length > 1) {
+      const ultimaPagina = paginas[paginas.length - 1];
+      if (ultimaPagina.filas.length < 5 && paginas.length > 2) {
+        // Mover las filas de la última página a la penúltima
+        const penultimaPagina = paginas[paginas.length - 2];
+        penultimaPagina.filas = [...penultimaPagina.filas, ...ultimaPagina.filas];
+        paginas.pop(); // Eliminar la última página
+      }
+    }
+  }
 
-  for (let paginaIndex = 0; paginaIndex < totalPaginasRestantes; paginaIndex++) {
-    const inicio = paginaIndex * MAX_FILAS_POR_PAGINA;
-    const fin = Math.min(inicio + MAX_FILAS_POR_PAGINA, colaboradoresRestantes.length);
-    const colaboradoresEnPagina = colaboradoresRestantes.slice(inicio, fin);
+  // Generar páginas del PDF
+  const paginasPDF: JSX.Element[] = [];
 
-    paginas.push(
-      <Page key={`pagina-${paginaIndex}`} size="A4" style={teamAnalysisStyles.page}>
+  paginas.forEach((pagina, paginaIndex) => {
+    if (pagina.filas.length === 0) {
+      return; // Saltar páginas vacías
+    }
+
+    paginasPDF.push(
+      <Page key={`pagina-restante-${paginaIndex}`} size="LETTER" style={teamAnalysisStyles.page}>
         {renderizarContenidoTabla(
-          colaboradoresEnPagina,
-          inicioRestantes + inicio,
+          pagina.filas,
+          indiceInicio + paginas.slice(0, paginaIndex).reduce((acc, p) => acc + p.filas.length, 0),
           showJefeColumn,
-          paginaIndex === 0, // mostrar título solo en la primera página restante
-          paginaIndex === 0, // mostrar header solo en la primera página restante
+          pagina.mostrarTitulo,
+          true, // siempre mostrar header
           getPositionBadgeStyle,
           getPositionLabel,
           colaboradores.length
@@ -344,9 +384,9 @@ export const TeamMembersTableRemainingPages = ({
         />
       </Page>
     );
-  }
+  });
 
-  return <>{paginas}</>;
+  return <>{paginasPDF}</>;
 };
 
 // Componente principal (para compatibilidad hacia atrás)

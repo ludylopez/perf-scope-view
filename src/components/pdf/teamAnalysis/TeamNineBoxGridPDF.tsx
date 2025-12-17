@@ -276,7 +276,7 @@ export const TeamNineBoxGridPDF = ({
 
   if (cuadrantesConDatos.length === 0) {
     return (
-      <Page size="A4" style={teamAnalysisStyles.page}>
+      <Page size="LETTER" style={teamAnalysisStyles.page}>
         {jefe && periodo && tipo && fechaGeneracion && stats && (
           <>
             <TeamAnalysisHeaderPDF
@@ -308,8 +308,19 @@ export const TeamNineBoxGridPDF = ({
     );
   }
 
-  // Ordenar cuadrantes por cantidad de colaboradores (de mayor a menor) para optimizar empaquetado
-  cuadrantesConDatos.sort((a, b) => b.count - a.count);
+  // Separar Estrellas y Pilares para agruparlos juntos
+  const cuadranteEstrellas = cuadrantesConDatos.find(c => c.position === 'alto-alto');
+  const cuadrantePilares = cuadrantesConDatos.find(c => c.position === 'alto-medio');
+  const otrosCuadrantes = cuadrantesConDatos.filter(c => c.position !== 'alto-alto' && c.position !== 'alto-medio');
+  
+  // Ordenar otros cuadrantes por cantidad de colaboradores (de mayor a menor)
+  otrosCuadrantes.sort((a, b) => b.count - a.count);
+  
+  // Crear lista ordenada: primero Estrellas y Pilares juntos, luego los demás
+  const cuadrantesOrdenados: CuadranteData[] = [];
+  if (cuadranteEstrellas) cuadrantesOrdenados.push(cuadranteEstrellas);
+  if (cuadrantePilares) cuadrantesOrdenados.push(cuadrantePilares);
+  cuadrantesOrdenados.push(...otrosCuadrantes);
 
   // Algoritmo de bin packing para agrupar cuadrantes en páginas
   const agruparCuadrantesEnPaginas = (cuadrantes: CuadranteData[], alturaDisponible: number): CuadranteData[][] => {
@@ -318,36 +329,92 @@ export const TeamNineBoxGridPDF = ({
     let alturaActual = 0;
     const alturaTitulo = 25; // Altura del título "DISTRIBUCIÓN 9-BOX"
 
-    cuadrantes.forEach((cuadrante) => {
+    for (let index = 0; index < cuadrantes.length; index++) {
+      const cuadrante = cuadrantes[index];
       const alturaNecesaria = cuadrante.alturaEstimada + (paginaActual.length === 0 ? alturaTitulo : 0);
       
+      // Si es Estrellas o Pilares, ser más agresivo para agruparlos juntos
+      const esEstrellasOPilares = cuadrante.position === 'alto-alto' || cuadrante.position === 'alto-medio';
+      const espacioDisponible = esEstrellasOPilares && paginaActual.length > 0 && 
+        (paginaActual[0]?.position === 'alto-alto' || paginaActual[0]?.position === 'alto-medio')
+        ? alturaDisponible * 1.02 // Permitir un poco más de espacio si ya hay Estrellas o Pilares en la página
+        : alturaDisponible;
+      
       // Si el cuadrante cabe en la página actual
-      if (alturaActual + alturaNecesaria <= alturaDisponible) {
+      if (alturaActual + alturaNecesaria <= espacioDisponible) {
         paginaActual.push(cuadrante);
         alturaActual += alturaNecesaria;
       } else {
+        // Caso especial: Si es Pilares y la última página guardada tiene Estrellas, intentar agregarlo ahí
+        if (cuadrante.position === 'alto-medio' && paginas.length > 0) {
+          const ultimaPagina = paginas[paginas.length - 1];
+          const tieneEstrellas = ultimaPagina.some(c => c.position === 'alto-alto');
+          if (tieneEstrellas) {
+            // Calcular altura total de la última página
+            const alturaUltimaPagina = ultimaPagina.reduce((sum, c) => {
+              return sum + c.alturaEstimada;
+            }, alturaTitulo);
+            
+            // Si Pilares cabe en la última página, agregarlo ahí
+            if (alturaUltimaPagina + cuadrante.alturaEstimada <= alturaDisponible) {
+              ultimaPagina.push(cuadrante);
+              // No agregar a paginaActual, ya se agregó a la última página guardada
+              continue;
+            }
+          }
+        }
+        
         // Si la página actual tiene contenido, guardarla y empezar nueva
         if (paginaActual.length > 0) {
-          paginas.push(paginaActual);
+          paginas.push([...paginaActual]); // Crear copia del array para evitar referencias
+          paginaActual = []; // Resetear paginaActual después de guardarla
+          alturaActual = 0; // Resetear alturaActual también
         }
         // Si el cuadrante es muy grande para una página, dividirlo
         if (cuadrante.alturaEstimada > alturaDisponible) {
           // Dividir colaboradores del cuadrante
-          const MAX_COLABORADORES_POR_PAGINA = Math.floor((alturaDisponible - ALTURA_HEADER_CUADRANTE - ALTURA_DESCRIPCION - alturaTitulo) / ALTURA_POR_COLABORADOR);
+          // Para Estrellas, usar 25 colaboradores por página; para otros, calcular dinámicamente
+          let MAX_COLABORADORES_POR_PAGINA: number;
+          if (cuadrante.position === 'alto-alto') {
+            // Estrellas: 25 colaboradores por página
+            MAX_COLABORADORES_POR_PAGINA = 30;
+          } else {
+            // Otros cuadrantes: calcular dinámicamente
+            const espacioParaOtros = 0;
+            MAX_COLABORADORES_POR_PAGINA = Math.floor((alturaDisponible - ALTURA_HEADER_CUADRANTE - ALTURA_DESCRIPCION - alturaTitulo - espacioParaOtros) / ALTURA_POR_COLABORADOR);
+          }
           const chunks = [];
           for (let i = 0; i < cuadrante.colaboradores.length; i += MAX_COLABORADORES_POR_PAGINA) {
             chunks.push(cuadrante.colaboradores.slice(i, i + MAX_COLABORADORES_POR_PAGINA));
           }
           
-          // Crear un cuadrante por cada chunk
-          chunks.forEach((chunk, index) => {
+          // Procesar cada chunk intentando agruparlo con otros cuadrantes
+          chunks.forEach((chunk, chunkIndex) => {
+            const esUltimoChunk = chunkIndex === chunks.length - 1;
             const nuevoCuadrante: CuadranteData = {
               ...cuadrante,
               colaboradores: chunk,
               count: chunk.length,
-              alturaEstimada: ALTURA_HEADER_CUADRANTE + (chunk.length * ALTURA_POR_COLABORADOR) + (index === chunks.length - 1 ? ALTURA_DESCRIPCION : 0) + 20,
+              alturaEstimada: ALTURA_HEADER_CUADRANTE + (chunk.length * ALTURA_POR_COLABORADOR) + (esUltimoChunk ? ALTURA_DESCRIPCION : 0) + 20,
             };
-            paginas.push([nuevoCuadrante]);
+            
+            // Si es el primer chunk o la página actual está vacía, crear nueva página
+            if (paginaActual.length === 0) {
+              paginaActual = [nuevoCuadrante];
+              alturaActual = nuevoCuadrante.alturaEstimada + alturaTitulo;
+            } else {
+              // Intentar agregar a la página actual
+              const alturaNecesariaChunk = nuevoCuadrante.alturaEstimada;
+              if (alturaActual + alturaNecesariaChunk <= alturaDisponible) {
+                paginaActual.push(nuevoCuadrante);
+                alturaActual += alturaNecesariaChunk;
+              } else {
+                // No cabe, guardar página actual y crear nueva
+                paginas.push([...paginaActual]); // Crear copia del array
+                paginaActual = [nuevoCuadrante];
+                alturaActual = nuevoCuadrante.alturaEstimada + alturaTitulo;
+              }
+            }
           });
         } else {
           // Empezar nueva página con este cuadrante
@@ -355,7 +422,7 @@ export const TeamNineBoxGridPDF = ({
           alturaActual = alturaNecesaria;
         }
       }
-    });
+    }
 
     // Agregar la última página si tiene contenido
     if (paginaActual.length > 0) {
@@ -366,14 +433,14 @@ export const TeamNineBoxGridPDF = ({
   };
 
   // Agrupar cuadrantes en páginas (todas las páginas tienen el mismo espacio disponible)
-  const paginasDeCuadrantes = agruparCuadrantesEnPaginas(cuadrantesConDatos, ALTURA_DISPONIBLE_PAGINAS_NORMALES);
+  const paginasDeCuadrantes = agruparCuadrantesEnPaginas(cuadrantesOrdenados, ALTURA_DISPONIBLE_PAGINAS_NORMALES);
 
   // Generar páginas del PDF
   const paginasPDF: JSX.Element[] = [];
 
   paginasDeCuadrantes.forEach((cuadrantesEnPagina, paginaIndex) => {
     paginasPDF.push(
-      <Page key={`pagina-${paginaIndex}`} size="A4" style={teamAnalysisStyles.page}>
+      <Page key={`pagina-${paginaIndex}`} size="LETTER" style={teamAnalysisStyles.page}>
         <View style={teamAnalysisStyles.nineBoxSection}>
           {/* Título solo en la primera página */}
           {paginaIndex === 0 && (
@@ -384,6 +451,17 @@ export const TeamNineBoxGridPDF = ({
           {cuadrantesEnPagina.map((cuadrante, cuadranteIndex) => {
             const esUltimoCuadranteEnPagina = cuadranteIndex === cuadrantesEnPagina.length - 1;
             const esUltimoCuadranteDelTipo = cuadrante.colaboradores.length === colaboradoresPorCuadrante[cuadrante.position]?.length;
+            
+            // Reducir espacio si Estrellas y Pilares están juntos
+            const esEstrellasOPilares = cuadrante.position === 'alto-alto' || cuadrante.position === 'alto-medio';
+            const siguienteEsEstrellasOPilares = cuadranteIndex < cuadrantesEnPagina.length - 1 && 
+              (cuadrantesEnPagina[cuadranteIndex + 1]?.position === 'alto-alto' || 
+               cuadrantesEnPagina[cuadranteIndex + 1]?.position === 'alto-medio');
+            const marginBottom = esUltimoCuadranteEnPagina 
+              ? 0 
+              : (esEstrellasOPilares && siguienteEsEstrellasOPilares) 
+                ? 5 // Menos espacio entre Estrellas y Pilares
+                : 10;
 
             return (
               <View
@@ -395,7 +473,7 @@ export const TeamNineBoxGridPDF = ({
                     borderColor: cuadrante.colors.border,
                     borderLeftWidth: 4,
                     borderLeftColor: cuadrante.colors.border,
-                    marginBottom: cuadranteIndex < cuadrantesEnPagina.length - 1 ? 10 : 0,
+                    marginBottom: marginBottom,
                   },
                 ]}
               >

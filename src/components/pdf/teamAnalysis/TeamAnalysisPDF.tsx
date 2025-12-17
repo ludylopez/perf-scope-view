@@ -6,12 +6,14 @@ import { TeamNineBoxGridPDF } from './TeamNineBoxGridPDF';
 import { TeamMembersTablePDF, TeamMembersTableFirstPageContent, TeamMembersTableRemainingPages } from './TeamMembersTablePDF';
 import { TeamAIAnalysisPDF } from './TeamAIAnalysisPDF';
 import { TeamJefesComparisonPDF } from './TeamJefesComparisonPDF';
+import { TeamTrainingPlanPDF } from './TeamTrainingPlanPDF';
 import type {
   TeamAnalysisStats,
   TeamMember9Box,
   TeamAIAnalysisResponse,
   JefeParaFiltro,
 } from '@/types/teamAnalysis';
+import type { PlanCapacitacionEstructurado } from '@/types/trainingPlan';
 
 interface TeamAnalysisPDFProps {
   tipo: 'equipo' | 'unidad';
@@ -30,6 +32,7 @@ interface TeamAnalysisPDFProps {
   colaboradores: TeamMember9Box[];
   aiAnalysis?: TeamAIAnalysisResponse | null;
   jefesSubordinados?: JefeParaFiltro[];
+  trainingPlan?: PlanCapacitacionEstructurado;
 }
 
 export const TeamAnalysisPDF = ({
@@ -41,6 +44,7 @@ export const TeamAnalysisPDF = ({
   colaboradores,
   aiAnalysis,
   jefesSubordinados,
+  trainingPlan,
 }: TeamAnalysisPDFProps) => {
   const fechaFormateada = fechaGeneracion.toLocaleDateString('es-GT', {
     year: 'numeric',
@@ -60,10 +64,15 @@ export const TeamAnalysisPDF = ({
   // Determinar si hay jefes subordinados para mostrar (solo en unidad)
   const hasJefesSubordinados = tipo === 'unidad' && jefesSubordinados && jefesSubordinados.length > 0;
 
+  // Determinar si hay plan de capacitación para mostrar
+  const hasTrainingPlan = trainingPlan && (
+    trainingPlan.tematicas && trainingPlan.tematicas.length > 0
+  );
+
   return (
     <Document>
       {/* PÁGINA 1: Header + Estadísticas + Inicio del Listado de Colaboradores */}
-      <Page size="A4" style={teamAnalysisStyles.page}>
+      <Page size="LETTER" style={teamAnalysisStyles.page}>
         <TeamAnalysisHeaderPDF
           jefe={jefe}
           periodo={periodo}
@@ -100,7 +109,7 @@ export const TeamAnalysisPDF = ({
 
       {/* PÁGINAS: Análisis de IA (si existe) - Insights y recomendaciones */}
       {hasAIAnalysis && (
-        <Page size="A4" style={teamAnalysisStyles.page}>
+        <Page size="LETTER" style={teamAnalysisStyles.page}>
           <TeamAIAnalysisPDF analysis={aiAnalysis} />
 
           <Text
@@ -115,7 +124,7 @@ export const TeamAnalysisPDF = ({
 
       {/* PÁGINAS: Desglose por Jefe (solo para unidad/cascada) */}
       {hasJefesSubordinados && (
-        <Page size="A4" style={teamAnalysisStyles.page}>
+        <Page size="LETTER" style={teamAnalysisStyles.page}>
           <TeamJefesComparisonPDF
             jefes={jefesSubordinados!}
             colaboradores={colaboradores}
@@ -129,6 +138,16 @@ export const TeamAnalysisPDF = ({
             fixed
           />
         </Page>
+      )}
+
+      {/* PÁGINAS: Plan de Capacitación (si existe) */}
+      {hasTrainingPlan && (
+        <TeamTrainingPlanPDF 
+          plan={trainingPlan!}
+          directorNombre={jefe.nombre}
+          totalColaboradores={stats.totalPersonas}
+          fechaFormateada={fechaFormateada}
+        />
       )}
 
       {/* PÁGINAS FINALES: Distribución 9-Box (Análisis estratégico con acciones) */}

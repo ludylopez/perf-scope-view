@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, FileText, User, CheckCircle2, Clock, AlertCircle, Sparkles, FileDown, Loader2, Download, XCircle, Wand2, Brain, TrendingUp } from "lucide-react";
+import { ArrowLeft, FileText, User, CheckCircle2, Clock, AlertCircle, Sparkles, FileDown, Loader2, Download, XCircle, Wand2, Brain, TrendingUp, GraduationCap } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { calculatePerformanceScore, calculateDimensionAverage, calculateDimensionPercentage, scoreToPercentage } from "@/lib/calculations";
@@ -21,6 +21,7 @@ import { getInstrumentCalculationConfig } from "@/lib/instrumentCalculations";
 import { getConsolidatedResult } from "@/lib/finalResultSupabase";
 import { exportEvaluacionCompletaPDFReact, exportMultiplePDFsToZip, ColaboradorExportData, getDirectoraRRHHNombre, exportTeamAnalysisPDF } from "@/lib/exports";
 import { getEquipoDirectoCompleto, getEquipoCascadaCompleto } from "@/lib/teamAnalysis";
+import { getPlanCapacitacionUnidad, generateTrainingPlanWithAI } from "@/lib/trainingPlanService";
 import type { TeamAnalysisStats, TeamMember9Box, TeamAIAnalysisResponse, JefeParaFiltro } from "@/types/teamAnalysis";
 import { Progress } from "@/components/ui/progress";
 import { Package } from "lucide-react";
@@ -55,6 +56,10 @@ const VistaDetalleJefe = () => {
   // Estados para exportación PDF de análisis
   const [exportandoPDFEquipo, setExportandoPDFEquipo] = useState(false);
   const [exportandoPDFUnidad, setExportandoPDFUnidad] = useState(false);
+
+  // Estados para plan de capacitación
+  const [planCapacitacionExiste, setPlanCapacitacionExiste] = useState(false);
+  const [generandoPlanCapacitacion, setGenerandoPlanCapacitacion] = useState(false);
 
   // Cargar total de asignaciones esperadas
   useEffect(() => {
@@ -93,6 +98,8 @@ const VistaDetalleJefe = () => {
     });
     // Verificar si ya existen análisis IA de equipo/unidad
     checkExistingAnalysis();
+    // Verificar si ya existe el plan de capacitación
+    checkExistingPlan();
   }, [id, periodoId, user]);
 
   // Verificar si ya existen análisis IA guardados
@@ -112,6 +119,61 @@ const VistaDetalleJefe = () => {
       }
     } catch (error) {
       console.error("Error verificando análisis existentes:", error);
+    }
+  };
+
+  // Verificar si ya existe el plan de capacitación
+  const checkExistingPlan = async () => {
+    if (!id || !periodoId) return;
+    try {
+      const { plan } = await getPlanCapacitacionUnidad(id, periodoId);
+      setPlanCapacitacionExiste(!!plan?.planEstructurado);
+    } catch (error) {
+      console.error('Error verificando plan:', error);
+      setPlanCapacitacionExiste(false);
+    }
+  };
+
+  // Función para generar el plan estructurado
+  const generarPlanCapacitacion = async () => {
+    if (!id || !periodoId) return;
+    
+    setGenerandoPlanCapacitacion(true);
+    try {
+      // Primero obtener el plan base
+      const { plan: planBase, error: planError } = await getPlanCapacitacionUnidad(id, periodoId);
+      
+      if (planError || !planBase) {
+        toast.error("Error al obtener el plan base. Verifica que haya evaluaciones completadas.");
+        return;
+      }
+      
+      // Si ya tiene plan estructurado, preguntar si desea regenerarlo
+      if (planBase.planEstructurado) {
+        const confirmar = window.confirm("¿Deseas regenerar el plan estructurado? Esto reemplazará el plan actual.");
+        if (!confirmar) {
+          setGenerandoPlanCapacitacion(false);
+          return;
+        }
+      }
+      
+      // Generar el plan estructurado
+      const { plan: planEstructurado, error: genError } = await generateTrainingPlanWithAI(planBase);
+      
+      if (genError) {
+        toast.error(`Error generando plan: ${genError.message}`);
+        return;
+      }
+      
+      if (planEstructurado) {
+        setPlanCapacitacionExiste(true);
+        toast.success("Plan estructurado generado correctamente. Está disponible en el PDF de Análisis de Unidad.");
+      }
+    } catch (error: any) {
+      console.error("Error generando plan:", error);
+      toast.error(error.message || "Error al generar el plan estructurado");
+    } finally {
+      setGenerandoPlanCapacitacion(false);
     }
   };
 
@@ -1476,6 +1538,29 @@ const VistaDetalleJefe = () => {
                       <>
                         <FileDown className="h-4 w-4" />
                         PDF Análisis Unidad
+                      </>
+                    )}
+                  </Button>
+
+                  {/* Separador visual */}
+                  <div className="h-8 w-px bg-border mx-1" />
+
+                  {/* Botón Generar Plan Estructurado */}
+                  <Button
+                    onClick={generarPlanCapacitacion}
+                    disabled={generandoPlanCapacitacion || generandoAnalisisEquipo || generandoAnalisisUnidad || generandoPlanesMasivo || exportandoTodos}
+                    variant="outline"
+                    className="gap-2"
+                  >
+                    {generandoPlanCapacitacion ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Generando...
+                      </>
+                    ) : (
+                      <>
+                        <GraduationCap className="h-4 w-4" />
+                        {planCapacitacionExiste ? 'Regenerar' : 'Generar'} Plan Estructurado
                       </>
                     )}
                   </Button>

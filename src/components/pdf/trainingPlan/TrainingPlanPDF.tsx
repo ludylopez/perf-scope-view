@@ -285,20 +285,20 @@ export const TrainingPlanPDF = ({ planEstructurado, directorNombre, totalColabor
             INFORMACIÓN DEL DEPARTAMENTO
           </Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-            <View style={{ width: '48%', marginBottom: 8 }}>
-              <Text style={{ fontSize: 8, color: '#6b7280', marginBottom: 2 }}>DIRECTOR</Text>
+            <View style={{ width: '48%', marginBottom: 8, padding: 10, backgroundColor: '#ffffff', borderRadius: 4, borderWidth: 1, borderColor: '#e5e7eb' }}>
+              <Text style={{ fontSize: 8, color: '#6b7280', marginBottom: 4 }}>DIRECTOR</Text>
               <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#1f2937' }}>{directorNombre || "N/A"}</Text>
             </View>
-            <View style={{ width: '48%', marginBottom: 8 }}>
-              <Text style={{ fontSize: 8, color: '#6b7280', marginBottom: 2 }}>TOTAL COLABORADORES</Text>
+            <View style={{ width: '48%', marginBottom: 8, padding: 10, backgroundColor: '#ffffff', borderRadius: 4, borderWidth: 1, borderColor: '#e5e7eb' }}>
+              <Text style={{ fontSize: 8, color: '#6b7280', marginBottom: 4 }}>TOTAL COLABORADORES</Text>
               <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#1f2937' }}>{totalColab} personas</Text>
             </View>
-            <View style={{ width: '48%', marginBottom: 8 }}>
-              <Text style={{ fontSize: 8, color: '#6b7280', marginBottom: 2 }}>HORAS DE CAPACITACIÓN</Text>
+            <View style={{ width: '48%', marginBottom: 8, padding: 10, backgroundColor: '#ffffff', borderRadius: 4, borderWidth: 1, borderColor: '#e5e7eb' }}>
+              <Text style={{ fontSize: 8, color: '#6b7280', marginBottom: 4 }}>HORAS DE CAPACITACIÓN</Text>
               <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#1f2937' }}>{totalHoras} horas</Text>
             </View>
-            <View style={{ width: '48%', marginBottom: 8 }}>
-              <Text style={{ fontSize: 8, color: '#6b7280', marginBottom: 2 }}>COORDINACIÓN</Text>
+            <View style={{ width: '48%', marginBottom: 8, padding: 10, backgroundColor: '#ffffff', borderRadius: 4, borderWidth: 1, borderColor: '#e5e7eb' }}>
+              <Text style={{ fontSize: 8, color: '#6b7280', marginBottom: 4 }}>COORDINACIÓN</Text>
               <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#1f2937' }}>{responsable}</Text>
             </View>
           </View>
@@ -329,7 +329,7 @@ export const TrainingPlanPDF = ({ planEstructurado, directorNombre, totalColabor
                 )}
                 
                 {/* Título y descripción - igual que la vista */}
-                <View style={{ marginBottom: 10 }}>
+                <View style={{ marginBottom: 5 }}>
                   <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#1f2937', marginBottom: 4 }}>
                     {tematica.nombre}
                   </Text>
@@ -343,7 +343,7 @@ export const TrainingPlanPDF = ({ planEstructurado, directorNombre, totalColabor
 
                 {/* Tabla de Actividades - igual que la vista */}
                 {actividades.length > 0 && (
-                  <View style={{ marginTop: 10, borderWidth: 1, borderColor: '#d1d5db', borderRadius: 4 }}>
+                  <View style={{ marginTop: 5, borderWidth: 1, borderColor: '#d1d5db', borderRadius: 4 }}>
                     <View style={{ flexDirection: 'row', backgroundColor: '#1e40af', padding: 6 }}>
                       <Text style={{ width: '35%', fontSize: 7, fontWeight: 'bold', color: '#ffffff' }}>ACTIVIDAD</Text>
                       <Text style={{ width: '15%', fontSize: 7, fontWeight: 'bold', color: '#ffffff' }}>TIPO</Text>

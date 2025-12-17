@@ -62,8 +62,8 @@ export const teamAnalysisStyles = StyleSheet.create({
   // Header principal
   header: {
     backgroundColor: '#ffffff',
-    padding: 15,
-    marginBottom: 15,
+    padding: 12,
+    marginBottom: 10,
     textAlign: 'center',
     borderRadius: 8,
     borderWidth: 2,
@@ -117,7 +117,7 @@ export const teamAnalysisStyles = StyleSheet.create({
 
   // Info del jefe/gerente
   infoTable: {
-    marginBottom: 15,
+    marginBottom: 10,
     borderWidth: 1.5,
     borderColor: '#d1d5db',
     borderRadius: 8,
@@ -157,23 +157,72 @@ export const teamAnalysisStyles = StyleSheet.create({
     flex: 1,
     fontWeight: '600',
   },
+  infoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 15,
+  },
+  infoItem: {
+    width: '48%',
+    padding: 8,
+    backgroundColor: '#ffffff',
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  pageContent: {
+    padding: 30,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#1e40af',
+    marginBottom: 10,
+    paddingBottom: 6,
+    borderBottomWidth: 2.5,
+    borderBottomColor: '#2563eb',
+    letterSpacing: 0.5,
+  },
+  subsectionTitle: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    marginBottom: 10,
+    textTransform: 'uppercase',
+  },
+  tableHeaderCell: {
+    fontSize: 7.5,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    padding: 6,
+    textAlign: 'left',
+  },
+  tableCell: {
+    fontSize: 7.5,
+    color: '#4b5563',
+    padding: 6,
+    textAlign: 'left',
+  },
 
   // Stats Cards
   statsContainer: {
     flexDirection: 'row',
-    gap: 10,
-    marginBottom: 20,
+    gap: 6,
+    marginBottom: 15,
     flexWrap: 'wrap',
   },
   statsCard: {
     flex: 1,
     minWidth: '18%',
-    padding: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
     backgroundColor: '#ffffff',
     borderRadius: 10,
     borderWidth: 2,
     borderColor: '#e5e7eb',
     alignItems: 'center',
+    justifyContent: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
@@ -202,12 +251,12 @@ export const teamAnalysisStyles = StyleSheet.create({
   },
   statsIcon: {
     fontSize: 18,
-    marginBottom: 4,
+    marginBottom: 3,
   },
   statsLabel: {
     fontSize: 7.5,
     color: '#6b7280',
-    marginBottom: 4,
+    marginBottom: 3,
     fontWeight: '600',
     textAlign: 'center',
   },
@@ -232,13 +281,13 @@ export const teamAnalysisStyles = StyleSheet.create({
   statsSubtext: {
     fontSize: 6.5,
     color: '#6b7280',
-    marginTop: 3,
+    marginTop: 2,
     textAlign: 'center',
     fontWeight: '500',
   },
   statsComparison: {
     fontSize: 6.5,
-    marginTop: 4,
+    marginTop: 3,
     fontWeight: '600',
   },
   statsComparisonUp: {
@@ -256,7 +305,7 @@ export const teamAnalysisStyles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
     color: '#1e40af',
-    marginBottom: 12,
+    marginBottom: 6,
     paddingBottom: 6,
     borderBottomWidth: 2.5,
     borderBottomColor: '#2563eb',
@@ -275,7 +324,7 @@ export const teamAnalysisStyles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 3,
     paddingBottom: 5,
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
@@ -293,7 +342,7 @@ export const teamAnalysisStyles = StyleSheet.create({
     fontWeight: '600',
   },
   quadrantMembers: {
-    marginBottom: 8,
+    marginBottom: 4,
   },
   quadrantMemberItem: {
     marginBottom: 3,
@@ -485,7 +534,7 @@ export const teamAnalysisStyles = StyleSheet.create({
 
   // Tabla de colaboradores
   membersSection: {
-    marginBottom: 20,
+    marginBottom: 5, // Reducido aún más para evitar espacios en blanco
   },
   membersTitle: {
     fontSize: 14,
@@ -513,13 +562,13 @@ export const teamAnalysisStyles = StyleSheet.create({
     flexDirection: 'row',
     borderBottomWidth: 0.5,
     borderBottomColor: '#e5e7eb',
-    minHeight: 20,
+    minHeight: 16,
   },
   membersTableRowAlt: {
     backgroundColor: '#f9fafb',
   },
   membersTableCell: {
-    padding: 6,
+    padding: 5,
     fontSize: 7.5,
     justifyContent: 'center',
   },
@@ -529,17 +578,18 @@ export const teamAnalysisStyles = StyleSheet.create({
     color: '#ffffff',
   },
   membersTableCellNum: {
-    width: '5%',
+    width: '3%',
     textAlign: 'center',
   },
   membersTableCellName: {
-    width: '25%',
+    width: '27%',
   },
   membersTableCellCargo: {
-    width: '20%',
+    width: '22%',
+    lineHeight: 1.2,
   },
   membersTableCellJefe: {
-    width: '20%',
+    width: '30%',
   },
   membersTableCellDesempeno: {
     width: '12%',
@@ -559,6 +609,7 @@ export const teamAnalysisStyles = StyleSheet.create({
   },
   membersTableCellCargoWide: {
     width: '25%',
+    lineHeight: 1.2,
   },
   membersTableCellDesempenoWide: {
     width: '15%',

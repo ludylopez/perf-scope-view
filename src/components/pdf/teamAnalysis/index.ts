@@ -7,6 +7,7 @@ export { TeamNineBoxGridPDF } from './TeamNineBoxGridPDF';
 export { TeamMembersTablePDF } from './TeamMembersTablePDF';
 export { TeamAIAnalysisPDF } from './TeamAIAnalysisPDF';
 export { TeamJefesComparisonPDF } from './TeamJefesComparisonPDF';
+export { TeamTrainingPlanPDF } from './TeamTrainingPlanPDF';
 
 // Exportar estilos y constantes
 export {
