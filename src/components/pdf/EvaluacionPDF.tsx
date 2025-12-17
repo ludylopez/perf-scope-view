@@ -101,10 +101,16 @@ export const EvaluacionPDF = ({
     typeof a.indicador === 'string' && a.indicador.trim() !== '' &&
     typeof a.prioridad === 'string'
   );
-  const dimensionesDebiles = (planDesarrollo?.planEstructurado?.dimensionesDebiles || []).filter((d): d is NonNullable<typeof d> => 
-    d && 
-    typeof d.dimension === 'string' && d.dimension.trim() !== ''
-  );
+  const dimensionesDebiles = (planDesarrollo?.planEstructurado?.dimensionesDebiles || [])
+    .filter((d): d is NonNullable<typeof d> => 
+      d && 
+      typeof d.dimension === 'string' && d.dimension.trim() !== ''
+    )
+    .map(d => ({
+      dimension: d.dimension,
+      score: d.score ?? 0, // Asegurar que score siempre esté presente
+      accionesEspecificas: d.accionesEspecificas || []
+    }));
   const recomendaciones = (planDesarrollo?.recomendaciones || []).filter((r): r is string => 
     typeof r === 'string' && r.trim() !== ''
   );

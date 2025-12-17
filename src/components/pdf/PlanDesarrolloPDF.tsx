@@ -15,7 +15,7 @@ interface AccionDesarrollo {
 
 interface DimensionDebil {
   dimension: string;
-  score?: number;
+  score: number; // Requerido para compatibilidad con getDimensionFromAction
   accionesEspecificas?: string[];
 }
 
