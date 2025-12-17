@@ -47,13 +47,13 @@ export function UnitTrainingPlanButton({ jefeDpi, periodoId }: UnitTrainingPlanB
           {plan ? 'Ver Plan' : 'Generar Plan'}
         </Button>
 
-        {plan && (
+        {plan && plan.planEstructurado && (
           <PDFDownloadLink
-            document={<TrainingPlanPDF plan={plan} />}
+            document={<TrainingPlanPDF planEstructurado={plan.planEstructurado} />}
             fileName={`plan-capacitacion-${plan.metadata.periodoNombre.replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`}
             className="inline-block"
           >
-            {({ loading }) => (
+            {({ loading }: any) => (
               <Button
                 variant="outline"
                 size="sm"

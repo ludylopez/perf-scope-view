@@ -49,7 +49,7 @@ export const getDimensionColor = (dimension?: string): string => {
  */
 export const getDimensionFromAction = (
   accion: Pick<AccionDesarrollo, "descripcion"> & Partial<AccionDesarrollo>,
-  dimensionesDebiles?: DimensionDebil[]
+  dimensionesDebiles?: Array<{ dimension: string; score?: number; accionesEspecificas?: string[] }>
 ): string | null => {
   // PRIORIDAD 1: Si la acción ya tiene dimensión (planes nuevos), usarla directamente
   if (accion.dimension && accion.dimension.trim()) {

@@ -291,7 +291,7 @@ export async function importarAsignacionesDirecto() {
     console.log(`⚠️  Asignaciones duplicadas: ${duplicados}`);
     console.log(`❌ Asignaciones con errores: ${errores.length}`);
     console.log(`📝 Total procesado: ${ASIGNACIONES_DATA.length}`);
-    console.log(`👥 Supervisores actualizados: ${supervisoresActualizados}`);
+    console.log(`👥 Jefes actualizados: ${jefesActualizados}`);
     console.log(`👥 Jefes únicos: ${jefesUnicos.length}`);
     console.log('📊 ═══════════════════════════════════════\n');
 
@@ -300,7 +300,7 @@ export async function importarAsignacionesDirecto() {
       insertados,
       duplicados,
       errores: errores.length,
-      supervisores: supervisoresActualizados,
+      supervisores: jefesActualizados,
       jefesUnicos: jefesUnicos.length
     };
 
