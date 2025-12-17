@@ -311,7 +311,7 @@ BEGIN
                                 COUNT(*) AS cnt
                             FROM final_evaluation_results fer2
                             JOIN users u2 ON u2.dpi = fer2.colaborador_id
-                            WHERE fer2.periodo_id = periodo_id_param AND u2.nivel = jl.code
+                            WHERE fer2.periodo_id = periodo_id_param AND u2.nivel = jl.code AND u2.rol NOT IN ('admin_general', 'admin_rrhh')
                             GROUP BY 1
                         ) sub
                     ) AS distribucionCalificaciones,
@@ -326,7 +326,7 @@ BEGIN
                         ) sub
                     ) AS distribucion9Box
                 FROM job_levels jl
-                LEFT JOIN users u ON u.nivel = jl.code AND u.estado = 'activo'
+                LEFT JOIN users u ON u.nivel = jl.code AND u.estado = 'activo' AND u.rol NOT IN ('admin_general', 'admin_rrhh')
                 LEFT JOIN final_evaluation_results fer ON fer.colaborador_id = u.dpi AND fer.periodo_id = periodo_id_param
                 WHERE jl.is_active = true
                 GROUP BY jl.code, jl.name, jl.category, jl.hierarchical_order
@@ -334,24 +334,32 @@ BEGIN
             ) nivel_stats
         ),
         'ranking', (
-            SELECT COALESCE(jsonb_agg(jsonb_build_object(
-                'posicion', ROW_NUMBER() OVER (ORDER BY promedio DESC),
-                'nivel', codigo,
-                'nombre', nombre,
-                'promedio', promedio
-            )), '[]'::jsonb)
-            FROM (
+            WITH ranking_data AS (
                 SELECT
                     jl.code AS codigo,
                     jl.name AS nombre,
                     ROUND(AVG(fer.desempeno_porcentaje)::NUMERIC, 2) AS promedio
                 FROM job_levels jl
-                JOIN users u ON u.nivel = jl.code AND u.estado = 'activo'
+                JOIN users u ON u.nivel = jl.code AND u.estado = 'activo' AND u.rol NOT IN ('admin_general', 'admin_rrhh')
                 JOIN final_evaluation_results fer ON fer.colaborador_id = u.dpi AND fer.periodo_id = periodo_id_param
                 WHERE jl.is_active = true
                 GROUP BY jl.code, jl.name
                 HAVING COUNT(fer.colaborador_id) > 0
-            ) ranking_data
+            )
+            SELECT COALESCE(jsonb_agg(jsonb_build_object(
+                'posicion', posicion,
+                'nivel', codigo,
+                'nombre', nombre,
+                'promedio', promedio
+            ) ORDER BY promedio DESC), '[]'::jsonb)
+            FROM (
+                SELECT 
+                    codigo,
+                    nombre,
+                    promedio,
+                    ROW_NUMBER() OVER (ORDER BY promedio DESC) AS posicion
+                FROM ranking_data
+            ) ranked
         )
     ) INTO resultado;
 

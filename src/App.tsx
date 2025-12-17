@@ -12,6 +12,7 @@ import "./lib/buscarAutoevaluacion"; // Cargar función de búsqueda de autoeval
 import "./lib/diagnosticoAutoevaluacionesColaboradores"; // Cargar funciones de diagnóstico de autoevaluaciones de colaboradores
 import "./utils/diagnosticoEvaluacion"; // Cargar función de diagnóstico de cálculos de evaluación
 import "./lib/recalcularResultado"; // Cargar función para recalcular resultados
+import "./utils/verificarEvaluacionesPendientes"; // Cargar función para verificar evaluaciones pendientes
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Autoevaluacion from "./pages/Autoevaluacion";
@@ -47,30 +48,32 @@ import PopulateExplanations from "./pages/PopulateExplanations";
 import DashboardPersonal from "./pages/DashboardPersonal";
 import CambioContrasena from "./pages/CambioContrasena";
 import AnalisisEstadisticoEvaluaciones from "./pages/AnalisisEstadisticoEvaluaciones";
-// Componentes de análisis - Comentados temporalmente porque los archivos no existen
-// import AnalisisIndex from "./pages/analisis/index";
-// import InformeFinal from "./pages/analisis/InformeFinal";
-// import ResumenEjecutivo from "./pages/analisis/ResumenEjecutivo";
-// import ResultadosGlobales from "./pages/analisis/ResultadosGlobales";
-// import AnalisisPorDimension from "./pages/analisis/AnalisisPorDimension";
-// import AnalisisPorNivel from "./pages/analisis/AnalisisPorNivel";
-// import AnalisisPorDireccion from "./pages/analisis/AnalisisPorDireccion";
-// import AnalisisCapacitacion from "./pages/analisis/AnalisisCapacitacion";
-// import AnalisisPlanesDesarrollo from "./pages/analisis/AnalisisPlanesDesarrollo";
-// import AnalisisCorrelaciones from "./pages/analisis/AnalisisCorrelaciones";
-// import AnalisisEquidad from "./pages/analisis/AnalisisEquidad";
-// import AnalisisPorRenglon from "./pages/analisis/AnalisisPorRenglon";
-// import AnalisisDemografico from "./pages/analisis/AnalisisDemografico";
-// import AnalisisPotencial from "./pages/analisis/AnalisisPotencial";
-// import AnalisisBrechasDimension from "./pages/analisis/AnalisisBrechasDimension";
-// import AnalisisBrechasAutoJefe from "./pages/analisis/AnalisisBrechasAutoJefe";
-// import ComparativaAutoJefe from "./pages/analisis/ComparativaAutoJefe";
-// import AnalisisOutliers from "./pages/analisis/AnalisisOutliers";
-// import AnalisisLiderazgoCascada from "./pages/analisis/AnalisisLiderazgoCascada";
-// import AnalisisPerfiles from "./pages/analisis/AnalisisPerfiles";
-// import AnalisisRiesgoRotacion from "./pages/analisis/AnalisisRiesgoRotacion";
-// import AnalisisConsistencia from "./pages/analisis/AnalisisConsistencia";
-// import AnalisisBenchmarking from "./pages/analisis/AnalisisBenchmarking";
+// Componentes de análisis
+import AnalisisIndex from "./pages/analisis/index";
+import InformeFinal from "./pages/analisis/InformeFinal";
+import ResumenEjecutivo from "./pages/analisis/ResumenEjecutivo";
+import ResultadosGlobales from "./pages/analisis/ResultadosGlobales";
+import AnalisisPorDimension from "./pages/analisis/AnalisisPorDimension";
+import AnalisisPorNivel from "./pages/analisis/AnalisisPorNivel";
+import AnalisisPorDireccion from "./pages/analisis/AnalisisPorDireccion";
+import AnalisisCapacitacion from "./pages/analisis/AnalisisCapacitacion";
+import AnalisisPlanesDesarrollo from "./pages/analisis/AnalisisPlanesDesarrollo";
+import AnalisisCorrelaciones from "./pages/analisis/AnalisisCorrelaciones";
+import AnalisisEstadisticoAvanzado from "./pages/analisis/AnalisisEstadisticoAvanzado";
+import AnalisisEquidad from "./pages/analisis/AnalisisEquidad";
+import AnalisisPorRenglon from "./pages/analisis/AnalisisPorRenglon";
+import AnalisisDemografico from "./pages/analisis/AnalisisDemografico";
+import AnalisisPotencial from "./pages/analisis/AnalisisPotencial";
+import AnalisisBrechasDimension from "./pages/analisis/AnalisisBrechasDimension";
+import AnalisisBrechasAutoJefe from "./pages/analisis/AnalisisBrechasAutoJefe";
+import ComparativaAutoJefe from "./pages/analisis/ComparativaAutoJefe";
+import AnalisisOutliers from "./pages/analisis/AnalisisOutliers";
+import AnalisisLiderazgoCascada from "./pages/analisis/AnalisisLiderazgoCascada";
+import AnalisisPerfiles from "./pages/analisis/AnalisisPerfiles";
+import AnalisisRiesgoRotacion from "./pages/analisis/AnalisisRiesgoRotacion";
+import AnalisisConsistencia from "./pages/analisis/AnalisisConsistencia";
+import AnalisisBenchmarking from "./pages/analisis/AnalisisBenchmarking";
+import ResultadosConsolidados from "./pages/analisis/ResultadosConsolidados";
 
 const queryClient = new QueryClient();
 
@@ -90,6 +93,56 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   }
   
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" />;
+};
+
+// Componente para proteger rutas que solo pueden acceder administradores
+const AdminProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const { user, isAuthenticated, isLoading } = useAuth();
+  
+  // Mostrar loading mientras se restaura la sesión
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent"></div>
+          <p className="mt-4 text-muted-foreground">Cargando...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  // Si no está autenticado, redirigir al login
+  if (!isAuthenticated) {
+    return <Navigate to="/login" />;
+  }
+  
+  // Verificar que el usuario sea administrador
+  const isAdmin = user?.rol === "admin_rrhh" || user?.rol === "admin_general";
+  
+  if (!isAdmin) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="inline-block p-4 bg-red-100 rounded-full">
+            <svg className="h-12 w-12 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900">Acceso Denegado</h1>
+          <p className="text-gray-600">No tienes permisos para acceder a esta sección.</p>
+          <p className="text-sm text-gray-500">Esta área está reservada para administradores.</p>
+          <button
+            onClick={() => window.history.back()}
+            className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+          >
+            Volver
+          </button>
+        </div>
+      </div>
+    );
+  }
+  
+  return <>{children}</>;
 };
 
 // Componente wrapper para mostrar el botón de WhatsApp solo cuando el usuario esté autenticado
@@ -380,191 +433,207 @@ const App = () => (
               path="/analisis-estadistico"
               element={<AnalisisEstadisticoEvaluaciones />}
             />
-            {/* Rutas de análisis - Comentadas temporalmente porque los componentes no existen */}
-            {/* <Route
+            {/* Rutas de análisis */}
+            <Route
               path="/analisis"
               element={
-                <ProtectedRoute>
+                <AdminProtectedRoute>
                   <AnalisisIndex />
-                </ProtectedRoute>
+                </AdminProtectedRoute>
               }
             />
             <Route
               path="/analisis/informe-final"
               element={
-                <ProtectedRoute>
+                <AdminProtectedRoute>
                   <InformeFinal />
-                </ProtectedRoute>
+                </AdminProtectedRoute>
               }
             />
             <Route
               path="/analisis/resumen-ejecutivo"
               element={
-                <ProtectedRoute>
+                <AdminProtectedRoute>
                   <ResumenEjecutivo />
-                </ProtectedRoute>
+                </AdminProtectedRoute>
               }
             />
             <Route
               path="/analisis/resultados-globales"
               element={
-                <ProtectedRoute>
+                <AdminProtectedRoute>
                   <ResultadosGlobales />
-                </ProtectedRoute>
+                </AdminProtectedRoute>
               }
             />
             <Route
               path="/analisis/por-dimension"
               element={
-                <ProtectedRoute>
+                <AdminProtectedRoute>
                   <AnalisisPorDimension />
-                </ProtectedRoute>
+                </AdminProtectedRoute>
               }
             />
             <Route
               path="/analisis/por-nivel"
               element={
-                <ProtectedRoute>
+                <AdminProtectedRoute>
                   <AnalisisPorNivel />
-                </ProtectedRoute>
+                </AdminProtectedRoute>
               }
             />
             <Route
               path="/analisis/por-direccion"
               element={
-                <ProtectedRoute>
+                <AdminProtectedRoute>
                   <AnalisisPorDireccion />
-                </ProtectedRoute>
+                </AdminProtectedRoute>
               }
             />
             <Route
               path="/analisis/capacitacion"
               element={
-                <ProtectedRoute>
+                <AdminProtectedRoute>
                   <AnalisisCapacitacion />
-                </ProtectedRoute>
+                </AdminProtectedRoute>
               }
             />
             <Route
               path="/analisis/planes-desarrollo"
               element={
-                <ProtectedRoute>
+                <AdminProtectedRoute>
                   <AnalisisPlanesDesarrollo />
-                </ProtectedRoute>
+                </AdminProtectedRoute>
               }
             />
             <Route
               path="/analisis/correlaciones"
               element={
-                <ProtectedRoute>
+                <AdminProtectedRoute>
                   <AnalisisCorrelaciones />
-                </ProtectedRoute>
+                </AdminProtectedRoute>
+              }
+            />
+            <Route
+              path="/analisis/estadistico-avanzado"
+              element={
+                <AdminProtectedRoute>
+                  <AnalisisEstadisticoAvanzado />
+                </AdminProtectedRoute>
               }
             />
             <Route
               path="/analisis/equidad"
               element={
-                <ProtectedRoute>
+                <AdminProtectedRoute>
                   <AnalisisEquidad />
-                </ProtectedRoute>
+                </AdminProtectedRoute>
               }
             />
             <Route
               path="/analisis/por-renglon"
               element={
-                <ProtectedRoute>
+                <AdminProtectedRoute>
                   <AnalisisPorRenglon />
-                </ProtectedRoute>
+                </AdminProtectedRoute>
               }
             />
             <Route
               path="/analisis/demografico"
               element={
-                <ProtectedRoute>
+                <AdminProtectedRoute>
                   <AnalisisDemografico />
-                </ProtectedRoute>
+                </AdminProtectedRoute>
               }
             />
             <Route
               path="/analisis/potencial"
               element={
-                <ProtectedRoute>
+                <AdminProtectedRoute>
                   <AnalisisPotencial />
-                </ProtectedRoute>
+                </AdminProtectedRoute>
               }
             />
             <Route
               path="/analisis/brechas-dimension"
               element={
-                <ProtectedRoute>
+                <AdminProtectedRoute>
                   <AnalisisBrechasDimension />
-                </ProtectedRoute>
+                </AdminProtectedRoute>
               }
             />
             <Route
               path="/analisis/brechas-auto-jefe"
               element={
-                <ProtectedRoute>
+                <AdminProtectedRoute>
                   <AnalisisBrechasAutoJefe />
-                </ProtectedRoute>
+                </AdminProtectedRoute>
               }
             />
             <Route
               path="/analisis/comparativa-auto-jefe"
               element={
-                <ProtectedRoute>
+                <AdminProtectedRoute>
                   <ComparativaAutoJefe />
-                </ProtectedRoute>
+                </AdminProtectedRoute>
               }
             />
             <Route
               path="/analisis/outliers"
               element={
-                <ProtectedRoute>
+                <AdminProtectedRoute>
                   <AnalisisOutliers />
-                </ProtectedRoute>
+                </AdminProtectedRoute>
               }
             />
             <Route
               path="/analisis/liderazgo-cascada"
               element={
-                <ProtectedRoute>
+                <AdminProtectedRoute>
                   <AnalisisLiderazgoCascada />
-                </ProtectedRoute>
+                </AdminProtectedRoute>
               }
             />
             <Route
               path="/analisis/perfiles"
               element={
-                <ProtectedRoute>
+                <AdminProtectedRoute>
                   <AnalisisPerfiles />
-                </ProtectedRoute>
+                </AdminProtectedRoute>
               }
             />
             <Route
               path="/analisis/riesgo-rotacion"
               element={
-                <ProtectedRoute>
+                <AdminProtectedRoute>
                   <AnalisisRiesgoRotacion />
-                </ProtectedRoute>
+                </AdminProtectedRoute>
               }
             />
             <Route
               path="/analisis/consistencia"
               element={
-                <ProtectedRoute>
+                <AdminProtectedRoute>
                   <AnalisisConsistencia />
-                </ProtectedRoute>
+                </AdminProtectedRoute>
               }
             />
             <Route
               path="/analisis/benchmarking"
               element={
-                <ProtectedRoute>
+                <AdminProtectedRoute>
                   <AnalisisBenchmarking />
-                </ProtectedRoute>
+                </AdminProtectedRoute>
               }
-            /> */}
+            />
+            <Route
+              path="/analisis/resultados-consolidados"
+              element={
+                <AdminProtectedRoute>
+                  <ResultadosConsolidados />
+                </AdminProtectedRoute>
+              }
+            />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

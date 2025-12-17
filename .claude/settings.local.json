@@ -12,9 +12,14 @@
       "Bash(dir:*)",
       "Bash(wc:*)",
       "Bash(xargs cat:*)",
-      "Bash(xargs:*)"
+      "Bash(xargs:*)",
+      "mcp__supabase__execute_sql"
     ],
     "deny": [],
     "ask": []
-  }
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "supabase"
+  ]
 }

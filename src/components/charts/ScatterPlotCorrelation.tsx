@@ -75,20 +75,29 @@ export function ScatterPlotCorrelation({
   colors = defaultColors,
   className,
 }: ScatterPlotCorrelationProps) {
-  // Calcular correlación
-  const xValues = data.map((d) => d.x);
-  const yValues = data.map((d) => d.y);
-  const correlation = pearsonCorrelation(xValues, yValues);
-  const interpretation = getCorrelationInterpretation(correlation);
+  // Filtrar datos válidos antes de calcular correlación
+  const validData = data.filter((d) => 
+    isFinite(d.x) && !isNaN(d.x) && isFinite(d.y) && !isNaN(d.y)
+  );
 
-  // Calcular línea de tendencia
-  const trendLine = showTrendLine ? calculateTrendLine(data) : null;
+  // Calcular correlación solo si hay datos válidos
+  const xValues = validData.map((d) => d.x);
+  const yValues = validData.map((d) => d.y);
+  const correlation = validData.length >= 2 
+    ? pearsonCorrelation(xValues, yValues)
+    : 0;
+  const interpretation = getCorrelationInterpretation(
+    isFinite(correlation) && !isNaN(correlation) ? correlation : 0
+  );
 
-  // Calcular límites de los ejes
-  const xMin = Math.min(...xValues);
-  const xMax = Math.max(...xValues);
-  const yMin = Math.min(...yValues);
-  const yMax = Math.max(...yValues);
+  // Calcular línea de tendencia con datos válidos
+  const trendLine = showTrendLine && validData.length >= 2 ? calculateTrendLine(validData) : null;
+
+  // Calcular límites de los ejes (usar datos válidos)
+  const xMin = validData.length > 0 ? Math.min(...xValues) : 0;
+  const xMax = validData.length > 0 ? Math.max(...xValues) : 100;
+  const yMin = validData.length > 0 ? Math.min(...yValues) : 0;
+  const yMax = validData.length > 0 ? Math.max(...yValues) : 100;
   const xPadding = (xMax - xMin) * 0.1;
   const yPadding = (yMax - yMin) * 0.1;
 
@@ -181,19 +190,19 @@ export function ScatterPlotCorrelation({
                 </>
               )}
 
-              {/* Puntos por grupo o todos juntos */}
+              {/* Puntos por grupo o todos juntos (usar solo datos válidos) */}
               {hasGroups ? (
                 groups.map((group, groupIndex) => (
                   <Scatter
                     key={group}
                     name={group}
-                    data={data.filter((d) => d.group === group)}
+                    data={validData.filter((d) => d.group === group)}
                     fill={colors[groupIndex % colors.length]}
                   />
                 ))
               ) : (
-                <Scatter name="Datos" data={data} fill={colors[0]}>
-                  {data.map((entry, index) => (
+                <Scatter name="Datos" data={validData} fill={colors[0]}>
+                  {validData.map((entry, index) => (
                     <Cell
                       key={`cell-${index}`}
                       fill={entry.group ? colors[groups.indexOf(entry.group) % colors.length] : colors[0]}
@@ -221,39 +230,56 @@ export function ScatterPlotCorrelation({
         {/* Panel de estadísticas */}
         {showCorrelation && (
           <div className="mt-4 p-4 bg-muted/30 rounded-lg">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-              <div>
-                <p className="text-sm text-muted-foreground">Correlación (r)</p>
-                <p
-                  className={cn(
-                    "text-2xl font-mono font-bold",
-                    correlation > 0.3 ? "text-green-600" :
-                    correlation < -0.3 ? "text-red-600" : "text-gray-600"
+            {validData.length < 2 ? (
+              <div className="text-center py-4">
+                <p className="text-sm text-muted-foreground mb-2">
+                  <strong>Correlación no disponible</strong>
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  No se pudo calcular la correlación entre {xLabel} y {yLabel}. 
+                  Esto puede deberse a datos insuficientes o valores faltantes.
+                </p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Se requieren al menos 2 pares de valores válidos.
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Correlación (r)</p>
+                    <p
+                      className={cn(
+                        "text-2xl font-mono font-bold",
+                        correlation > 0.3 ? "text-green-600" :
+                        correlation < -0.3 ? "text-red-600" : "text-gray-600"
+                      )}
+                    >
+                      {isFinite(correlation) && !isNaN(correlation) ? correlation.toFixed(3) : "N/A"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Fuerza</p>
+                    <p className="text-lg font-medium capitalize">
+                      {interpretation.strength.replace("_", " ")}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Dirección</p>
+                    <p className="text-lg font-medium capitalize">{interpretation.direction}</p>
+                  </div>
+                  {trendLine && (
+                    <div>
+                      <p className="text-sm text-muted-foreground">R² (ajuste)</p>
+                      <p className="text-2xl font-mono font-bold">{(trendLine.r2 * 100).toFixed(1)}%</p>
+                    </div>
                   )}
-                >
-                  {correlation.toFixed(3)}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Fuerza</p>
-                <p className="text-lg font-medium capitalize">
-                  {interpretation.strength.replace("_", " ")}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Dirección</p>
-                <p className="text-lg font-medium capitalize">{interpretation.direction}</p>
-              </div>
-              {trendLine && (
-                <div>
-                  <p className="text-sm text-muted-foreground">R² (ajuste)</p>
-                  <p className="text-2xl font-mono font-bold">{(trendLine.r2 * 100).toFixed(1)}%</p>
                 </div>
-              )}
-            </div>
-            <p className="text-sm text-muted-foreground mt-3 text-center">
-              {interpretation.description}
-            </p>
+                <p className="text-sm text-muted-foreground mt-3 text-center">
+                  {interpretation.description}
+                </p>
+              </>
+            )}
           </div>
         )}
       </CardContent>

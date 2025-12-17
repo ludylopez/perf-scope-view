@@ -19,6 +19,7 @@ export interface User {
   rol: UserRole;
   estado: "activo" | "inactivo";
   primerIngreso: boolean;
+  esExterno?: boolean; // Indica si es un evaluador externo que no debe autoevaluarse
 }
 
 export interface AuthContextType {

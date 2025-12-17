@@ -236,3 +236,5 @@ El colaborador muestra conciencia de sus limitaciones y justifica algunos proble
 
 
 
+
+

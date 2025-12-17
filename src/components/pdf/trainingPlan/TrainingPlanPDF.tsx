@@ -410,3 +410,5 @@ export const TrainingPlanPDF = ({ planEstructurado, directorNombre, totalColabor
 
 
 
+
+

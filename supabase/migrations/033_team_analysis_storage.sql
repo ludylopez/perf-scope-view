@@ -32,3 +32,5 @@ CREATE TRIGGER update_team_analysis_updated_at BEFORE UPDATE ON team_analysis
 
 
 
+
+

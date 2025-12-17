@@ -23,3 +23,5 @@ COMMENT ON COLUMN team_analysis.tipo IS 'Tipo de análisis: directo (solo colabo
 
 
 
+
+

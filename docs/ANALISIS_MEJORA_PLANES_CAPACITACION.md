@@ -273,3 +273,5 @@ GROUP BY tt.topico, tt.categoria, tt.prioridad, u.nivel, u.cargo, u.tipo_puesto;
 
 
 
+
+

@@ -1542,3 +1542,329 @@ export function percentileRanks(data: number[]): number[] {
     return round(((below + 0.5 * equal) / sorted.length) * 100, 1);
   });
 }
+
+// ═══════════════════════════════════════════════════════════════
+// REGRESIÓN MÚLTIPLE
+// ═══════════════════════════════════════════════════════════════
+
+export interface MultipleRegressionResult {
+  coefficients: Record<string, number>;
+  intercept: number;
+  rSquared: number;
+  adjustedRSquared: number;
+  standardError: number;
+  fStatistic: number;
+  pValue: number;
+  significance: 'muy_significativo' | 'significativo' | 'moderado' | 'no_significativo';
+  interpretation: string;
+  predictions: number[];
+  residuals: number[];
+}
+
+/**
+ * Regresión múltiple usando mínimos cuadrados ordinarios (OLS)
+ * @param y - Variable dependiente (desempeño)
+ * @param X - Variables independientes (edad, antigüedad, etc.)
+ */
+export function multipleRegression(
+  y: number[],
+  X: Record<string, number[]>
+): MultipleRegressionResult {
+  const n = y.length;
+  const variableNames = Object.keys(X);
+  const k = variableNames.length;
+
+  if (n < k + 2) {
+    return {
+      coefficients: {},
+      intercept: 0,
+      rSquared: 0,
+      adjustedRSquared: 0,
+      standardError: 0,
+      fStatistic: 0,
+      pValue: 1,
+      significance: 'no_significativo',
+      interpretation: 'Datos insuficientes para regresión múltiple',
+      predictions: [],
+      residuals: [],
+    };
+  }
+
+  // Construir matriz de diseño (con columna de unos para intercepto)
+  const designMatrix: number[][] = [];
+  for (let i = 0; i < n; i++) {
+    const row = [1, ...variableNames.map(name => X[name][i] || 0)];
+    designMatrix.push(row);
+  }
+
+  // Calcular (X'X)^(-1)X'y usando método simplificado
+  // Para simplificar, usamos aproximación iterativa
+  const coefficients: Record<string, number> = {};
+  let intercept = mean(y);
+
+  // Ajuste iterativo simple (gradiente descendente simplificado)
+  const learningRate = 0.01;
+  const iterations = 1000;
+  let currentIntercept = intercept;
+  const currentCoeffs: Record<string, number> = {};
+  variableNames.forEach(name => { currentCoeffs[name] = 0; });
+
+  for (let iter = 0; iter < iterations; iter++) {
+    let interceptGrad = 0;
+    const coeffGrads: Record<string, number> = {};
+    variableNames.forEach(name => { coeffGrads[name] = 0; });
+
+    for (let i = 0; i < n; i++) {
+      let prediction = currentIntercept;
+      variableNames.forEach(name => {
+        prediction += currentCoeffs[name] * (X[name][i] || 0);
+      });
+      const error = y[i] - prediction;
+      
+      interceptGrad += error;
+      variableNames.forEach(name => {
+        coeffGrads[name] += error * (X[name][i] || 0);
+      });
+    }
+
+    currentIntercept += (learningRate / n) * interceptGrad;
+    variableNames.forEach(name => {
+      currentCoeffs[name] += (learningRate / n) * coeffGrads[name];
+    });
+  }
+
+  intercept = currentIntercept;
+  variableNames.forEach(name => {
+    coefficients[name] = round(currentCoeffs[name], 4);
+  });
+
+  // Calcular predicciones y residuos
+  const predictions: number[] = [];
+  const residuals: number[] = [];
+  for (let i = 0; i < n; i++) {
+    let pred = intercept;
+    variableNames.forEach(name => {
+      pred += coefficients[name] * (X[name][i] || 0);
+    });
+    predictions.push(round(pred, 2));
+    residuals.push(round(y[i] - pred, 2));
+  }
+
+  // Calcular R²
+  const yMean = mean(y);
+  const ssTotal = y.reduce((sum, yi) => sum + Math.pow(yi - yMean, 2), 0);
+  const ssResidual = residuals.reduce((sum, r) => sum + r * r, 0);
+  const rSquared = ssTotal > 0 ? 1 - (ssResidual / ssTotal) : 0;
+  const adjustedRSquared = n > k + 1 
+    ? 1 - ((1 - rSquared) * (n - 1) / (n - k - 1))
+    : rSquared;
+
+  // Calcular error estándar
+  const standardError = Math.sqrt(ssResidual / (n - k - 1));
+
+  // Calcular F-estadístico
+  const ssModel = ssTotal - ssResidual;
+  const fStatistic = (ssModel / k) / (ssResidual / (n - k - 1));
+  const pValue = approximateFDistPValue(fStatistic, k, n - k - 1);
+
+  let significance: 'muy_significativo' | 'significativo' | 'moderado' | 'no_significativo';
+  if (pValue < 0.001) significance = 'muy_significativo';
+  else if (pValue < 0.01) significance = 'significativo';
+  else if (pValue < 0.05) significance = 'moderado';
+  else significance = 'no_significativo';
+
+  const interpretation = `El modelo explica el ${round(rSquared * 100, 1)}% de la varianza en el desempeño. ${
+    significance === 'muy_significativo' || significance === 'significativo'
+      ? 'El modelo es estadísticamente significativo.'
+      : 'El modelo no es estadísticamente significativo.'
+  }`;
+
+  return {
+    coefficients,
+    intercept: round(intercept, 4),
+    rSquared: round(rSquared, 4),
+    adjustedRSquared: round(adjustedRSquared, 4),
+    standardError: round(standardError, 2),
+    fStatistic: round(fStatistic, 4),
+    pValue: round(pValue, 4),
+    significance,
+    interpretation,
+    predictions,
+    residuals,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ANÁLISIS DE VARIANZA (ANOVA)
+// ═══════════════════════════════════════════════════════════════
+
+export interface ANOVAResult {
+  groups: Array<{
+    name: string;
+    n: number;
+    mean: number;
+    variance: number;
+    stdDev: number;
+  }>;
+  fStatistic: number;
+  pValue: number;
+  significance: 'muy_significativo' | 'significativo' | 'moderado' | 'no_significativo';
+  interpretation: string;
+  effectSize: number; // Eta-squared
+}
+
+/**
+ * ANOVA de una vía para comparar medias entre grupos
+ */
+export function oneWayANOVA(
+  groups: Record<string, number[]>
+): ANOVAResult {
+  const groupNames = Object.keys(groups);
+  const k = groupNames.length;
+
+  if (k < 2) {
+    return {
+      groups: [],
+      fStatistic: 0,
+      pValue: 1,
+      significance: 'no_significativo',
+      interpretation: 'Se requieren al menos 2 grupos para ANOVA',
+      effectSize: 0,
+    };
+  }
+
+  // Calcular estadísticas por grupo
+  const groupStats = groupNames.map(name => {
+    const values = groups[name].filter(v => isFinite(v) && !isNaN(v));
+    return {
+      name,
+      n: values.length,
+      mean: mean(values),
+      variance: variance(values, true),
+      stdDev: standardDeviation(values),
+    };
+  }).filter(g => g.n > 0);
+
+  if (groupStats.length < 2) {
+    return {
+      groups: groupStats,
+      fStatistic: 0,
+      pValue: 1,
+      significance: 'no_significativo',
+      interpretation: 'Datos insuficientes para ANOVA',
+      effectSize: 0,
+    };
+  }
+
+  const totalN = groupStats.reduce((sum, g) => sum + g.n, 0);
+  const grandMean = groupStats.reduce((sum, g) => sum + g.mean * g.n, 0) / totalN;
+
+  // Suma de cuadrados entre grupos (SSB)
+  let ssBetween = 0;
+  groupStats.forEach(g => {
+    ssBetween += g.n * Math.pow(g.mean - grandMean, 2);
+  });
+
+  // Suma de cuadrados dentro de grupos (SSW)
+  let ssWithin = 0;
+  groupStats.forEach(g => {
+    const groupValues = groups[g.name].filter(v => isFinite(v) && !isNaN(v));
+    groupValues.forEach(v => {
+      ssWithin += Math.pow(v - g.mean, 2);
+    });
+  });
+
+  // Grados de libertad
+  const dfBetween = groupStats.length - 1;
+  const dfWithin = totalN - groupStats.length;
+
+  // Cuadrados medios
+  const msBetween = ssBetween / dfBetween;
+  const msWithin = ssWithin / dfWithin;
+
+  // F-estadístico
+  const fStatistic = msWithin > 0 ? msBetween / msWithin : 0;
+  const pValue = approximateFDistPValue(fStatistic, dfBetween, dfWithin);
+
+  let significance: 'muy_significativo' | 'significativo' | 'moderado' | 'no_significativo';
+  if (pValue < 0.001) significance = 'muy_significativo';
+  else if (pValue < 0.01) significance = 'significativo';
+  else if (pValue < 0.05) significance = 'moderado';
+  else significance = 'no_significativo';
+
+  // Eta-squared (tamaño del efecto)
+  const ssTotal = ssBetween + ssWithin;
+  const effectSize = ssTotal > 0 ? ssBetween / ssTotal : 0;
+
+  const interpretation = significance === 'muy_significativo' || significance === 'significativo'
+    ? `Existen diferencias estadísticamente significativas entre los grupos (p = ${round(pValue, 4)}). El tamaño del efecto es ${round(effectSize * 100, 1)}%.`
+    : `No se encontraron diferencias estadísticamente significativas entre los grupos (p = ${round(pValue, 4)}).`;
+
+  return {
+    groups: groupStats.map(g => ({
+      ...g,
+      mean: round(g.mean, 2),
+      variance: round(g.variance, 2),
+      stdDev: round(g.stdDev, 2),
+    })),
+    fStatistic: round(fStatistic, 4),
+    pValue: round(pValue, 4),
+    significance,
+    interpretation,
+    effectSize: round(effectSize, 4),
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ANÁLISIS DE FACTORES PREDICTIVOS
+// ═══════════════════════════════════════════════════════════════
+
+export interface PredictiveFactor {
+  variable: string;
+  correlation: number;
+  importance: number; // 0-100
+  direction: 'positive' | 'negative';
+  interpretation: string;
+}
+
+/**
+ * Identifica qué variables predicen mejor el desempeño
+ */
+export function identifyPredictiveFactors(
+  target: number[],
+  predictors: Record<string, number[]>
+): PredictiveFactor[] {
+  const factors: PredictiveFactor[] = [];
+
+  Object.entries(predictors).forEach(([name, values]) => {
+    // Filtrar valores válidos
+    const validPairs: Array<{ target: number; predictor: number }> = [];
+    for (let i = 0; i < Math.min(target.length, values.length); i++) {
+      if (isFinite(target[i]) && isFinite(values[i]) && !isNaN(target[i]) && !isNaN(values[i])) {
+        validPairs.push({ target: target[i], predictor: values[i] });
+      }
+    }
+
+    if (validPairs.length >= 10) {
+      const corr = pearsonCorrelation(
+        validPairs.map(p => p.target),
+        validPairs.map(p => p.predictor)
+      );
+      const importance = Math.abs(corr) * 100;
+
+      factors.push({
+        variable: name,
+        correlation: round(corr, 4),
+        importance: round(importance, 1),
+        direction: corr > 0 ? 'positive' : 'negative',
+        interpretation: Math.abs(corr) > 0.5
+          ? `Correlación fuerte (${corr > 0 ? 'positiva' : 'negativa'}). Variable importante para predecir desempeño.`
+          : Math.abs(corr) > 0.3
+          ? `Correlación moderada (${corr > 0 ? 'positiva' : 'negativa'}). Variable relevante.`
+          : `Correlación débil. Variable de baja importancia predictiva.`,
+      });
+    }
+  });
+
+  return factors.sort((a, b) => b.importance - a.importance);
+}

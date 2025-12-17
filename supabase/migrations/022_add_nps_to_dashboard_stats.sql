@@ -62,21 +62,27 @@ BEGIN
         AND e.estado = 'enviado'
     );
 
-  -- Promedio de desempeño (usando resultados consolidados)
-  SELECT AVG(desempeno_final_promedio) INTO promedio_desempeno
-  FROM final_evaluation_results_consolidated
-  WHERE periodo_id = periodo_id_param
-    AND desempeno_final_promedio IS NOT NULL;
+  -- Promedio de desempeño (usando resultados consolidados, excluyendo administrativos)
+  -- Retornar en escala 1-5 para que scoreToPercentage funcione correctamente
+  SELECT ROUND(AVG(fer.desempeno_final_promedio), 2) INTO promedio_desempeno
+  FROM final_evaluation_results_consolidated fer
+  JOIN users u ON u.dpi = fer.colaborador_id
+  WHERE fer.periodo_id = periodo_id_param
+    AND fer.desempeno_final_promedio IS NOT NULL
+    AND u.rol NOT IN ('admin_general', 'admin_rrhh');
 
-  -- Promedio de potencial (usando resultados consolidados)
-  SELECT AVG(potencial_promedio) INTO promedio_potencial
-  FROM final_evaluation_results_consolidated
-  WHERE periodo_id = periodo_id_param
-    AND potencial_promedio IS NOT NULL;
+  -- Promedio de potencial (usando resultados consolidados, excluyendo administrativos)
+  -- Retornar en escala 1-5 para que scoreToPercentage funcione correctamente
+  SELECT ROUND(AVG(fer.potencial_promedio), 2) INTO promedio_potencial
+  FROM final_evaluation_results_consolidated fer
+  JOIN users u ON u.dpi = fer.colaborador_id
+  WHERE fer.periodo_id = periodo_id_param
+    AND fer.potencial_promedio IS NOT NULL
+    AND u.rol NOT IN ('admin_general', 'admin_rrhh');
 
-  -- NUEVO: Calcular estadísticas NPS desde autoevaluaciones
+  -- NUEVO: Calcular estadísticas NPS desde autoevaluaciones (excluyendo administrativos)
   SELECT
-    AVG(nps_score),
+    ROUND(AVG(nps_score), 1),
     COUNT(*) FILTER (WHERE nps_score >= 9),
     COUNT(*) FILTER (WHERE nps_score >= 7 AND nps_score < 9),
     COUNT(*) FILTER (WHERE nps_score < 7)
@@ -85,10 +91,13 @@ BEGIN
     nps_promoters,
     nps_passives,
     nps_detractors
-  FROM evaluations
-  WHERE periodo_id = periodo_id_param
-    AND tipo = 'auto'
-    AND nps_score IS NOT NULL;
+  FROM evaluations e
+  JOIN users u ON u.dpi = e.usuario_id
+  WHERE e.periodo_id = periodo_id_param
+    AND e.tipo = 'auto'
+    AND e.estado = 'enviado'
+    AND e.nps_score IS NOT NULL
+    AND u.rol NOT IN ('admin_general', 'admin_rrhh');
 
   -- Distribución 9-box (usando moda por colaborador)
   SELECT jsonb_object_agg(

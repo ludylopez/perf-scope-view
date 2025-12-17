@@ -289,3 +289,5 @@ COMMENT ON FUNCTION recalcular_resultado_final(VARCHAR, UUID) IS 'Recalcula y ac
 
 
 
+
+

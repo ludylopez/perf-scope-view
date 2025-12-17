@@ -226,11 +226,14 @@ const DashboardRRHH = () => {
       let totalJefesConAutoevaluacion = 0;
 
       try {
+        // Obtener jefes activos que NO son externos (excluir evaluadores externos)
+        // Incluye usuarios con es_externo = false o es_externo = NULL (para compatibilidad)
         const { data: jefesData, error: jefesError } = await supabase
           .from("users")
           .select("dpi")
           .eq("rol", "jefe")
-          .eq("estado", "activo");
+          .eq("estado", "activo")
+          .or("es_externo.is.null,es_externo.eq.false");
 
         if (jefesError) {
           console.error("Error cargando jefes:", jefesError);
