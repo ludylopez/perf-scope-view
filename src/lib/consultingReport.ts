@@ -1559,21 +1559,21 @@ function buildNineBoxArtifacts(results: any[], userByDpi: Map<string, any>): Rep
   const matrix = {
     rows: [
       { potencial: "alto" as const, cols: NINE_BOX_POSITIONS[0].map((position, idx) => ({
-        desempeno: (idx === 0 ? "bajo" : idx === 1 ? "medio" : "alto") as const,
+        desempeno: (idx === 0 ? "bajo" : idx === 1 ? "medio" : "alto") as "bajo" | "medio" | "alto",
         position,
         label: NINE_BOX_METADATA[position].label,
         shortName: NINE_BOX_METADATA[position].shortName,
         count: byPosition[position].length,
       }))},
       { potencial: "medio" as const, cols: NINE_BOX_POSITIONS[1].map((position, idx) => ({
-        desempeno: (idx === 0 ? "bajo" : idx === 1 ? "medio" : "alto") as const,
+        desempeno: (idx === 0 ? "bajo" : idx === 1 ? "medio" : "alto") as "bajo" | "medio" | "alto",
         position,
         label: NINE_BOX_METADATA[position].label,
         shortName: NINE_BOX_METADATA[position].shortName,
         count: byPosition[position].length,
       }))},
       { potencial: "bajo" as const, cols: NINE_BOX_POSITIONS[2].map((position, idx) => ({
-        desempeno: (idx === 0 ? "bajo" : idx === 1 ? "medio" : "alto") as const,
+        desempeno: (idx === 0 ? "bajo" : idx === 1 ? "medio" : "alto") as "bajo" | "medio" | "alto",
         position,
         label: NINE_BOX_METADATA[position].label,
         shortName: NINE_BOX_METADATA[position].shortName,

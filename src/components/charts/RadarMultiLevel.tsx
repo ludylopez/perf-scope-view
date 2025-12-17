@@ -223,18 +223,20 @@ export function RadarDimensiones({
                   if (!active || !payload?.length) return null;
                   const d = dimensiones.find((dim) => dim.nombre === payload[0].payload.dimension);
                   return (
-                    <div className="bg-background border rounded-lg shadow-lg p-3">
-                      <p className="font-semibold">{payload[0].payload.dimension}</p>
-                      <p className="text-lg font-mono">{payload[0].value?.toFixed(1)}%</p>
-                      {d && (
-                        <p
-                          className="text-sm capitalize mt-1"
-                          style={{ color: getColorByClasificacion(d.clasificacion) }}
-                        >
-                          {d.clasificacion}
+                      <div className="bg-background border rounded-lg shadow-lg p-3">
+                        <p className="font-semibold">{payload[0].payload.dimension}</p>
+                        <p className="text-lg font-mono">
+                          {Number(payload[0].value ?? 0).toFixed(1)}%
                         </p>
-                      )}
-                    </div>
+                        {d && (
+                          <p
+                            className="text-sm capitalize mt-1"
+                            style={{ color: getColorByClasificacion(d.clasificacion) }}
+                          >
+                            {d.clasificacion}
+                          </p>
+                        )}
+                      </div>
                   );
                 }}
               />

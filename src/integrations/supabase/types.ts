@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_prompts: {
+        Row: {
+          activo: boolean | null
+          created_at: string | null
+          descripcion: string | null
+          function_name: string
+          id: string
+          prompt_text: string
+          updated_at: string | null
+          version: number | null
+        }
+        Insert: {
+          activo?: boolean | null
+          created_at?: string | null
+          descripcion?: string | null
+          function_name: string
+          id?: string
+          prompt_text: string
+          updated_at?: string | null
+          version?: number | null
+        }
+        Update: {
+          activo?: boolean | null
+          created_at?: string | null
+          descripcion?: string | null
+          function_name?: string
+          id?: string
+          prompt_text?: string
+          updated_at?: string | null
+          version?: number | null
+        }
+        Relationships: []
+      }
       development_plans: {
         Row: {
           colaborador_id: string
@@ -834,6 +867,213 @@ export type Database = {
           },
         ]
       }
+      security_audit_log: {
+        Row: {
+          action: string | null
+          error_message: string | null
+          id: string
+          ip_address: unknown
+          metadata: Json | null
+          resource: string | null
+          resource_id: string | null
+          success: boolean | null
+          timestamp: string | null
+          user_dpi: string | null
+        }
+        Insert: {
+          action?: string | null
+          error_message?: string | null
+          id?: string
+          ip_address?: unknown
+          metadata?: Json | null
+          resource?: string | null
+          resource_id?: string | null
+          success?: boolean | null
+          timestamp?: string | null
+          user_dpi?: string | null
+        }
+        Update: {
+          action?: string | null
+          error_message?: string | null
+          id?: string
+          ip_address?: unknown
+          metadata?: Json | null
+          resource?: string | null
+          resource_id?: string | null
+          success?: boolean | null
+          timestamp?: string | null
+          user_dpi?: string | null
+        }
+        Relationships: []
+      }
+      team_analysis: {
+        Row: {
+          analysis: Json
+          created_at: string | null
+          fecha_generacion: string | null
+          id: string
+          jefe_dpi: string
+          periodo_id: string
+          tipo: string
+          updated_at: string | null
+        }
+        Insert: {
+          analysis: Json
+          created_at?: string | null
+          fecha_generacion?: string | null
+          id?: string
+          jefe_dpi: string
+          periodo_id: string
+          tipo?: string
+          updated_at?: string | null
+        }
+        Update: {
+          analysis?: Json
+          created_at?: string | null
+          fecha_generacion?: string | null
+          id?: string
+          jefe_dpi?: string
+          periodo_id?: string
+          tipo?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_analysis_jefe_dpi_fkey"
+            columns: ["jefe_dpi"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["dpi"]
+          },
+          {
+            foreignKeyName: "team_analysis_periodo_id_fkey"
+            columns: ["periodo_id"]
+            isOneToOne: false
+            referencedRelation: "evaluation_periods"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      training_plans_structured: {
+        Row: {
+          fecha_generacion: string
+          fecha_modificacion: string
+          generado_por_ia: boolean
+          id: string
+          jefe_dpi: string
+          periodo_id: string
+          plan_data: Json
+          version: number
+        }
+        Insert: {
+          fecha_generacion?: string
+          fecha_modificacion?: string
+          generado_por_ia?: boolean
+          id?: string
+          jefe_dpi: string
+          periodo_id: string
+          plan_data: Json
+          version?: number
+        }
+        Update: {
+          fecha_generacion?: string
+          fecha_modificacion?: string
+          generado_por_ia?: boolean
+          id?: string
+          jefe_dpi?: string
+          periodo_id?: string
+          plan_data?: Json
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_plans_structured_periodo_id_fkey"
+            columns: ["periodo_id"]
+            isOneToOne: false
+            referencedRelation: "evaluation_periods"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      training_topics: {
+        Row: {
+          accion_relacionada_id: string | null
+          area: string
+          categoria: string
+          colaborador_id: string
+          created_at: string | null
+          descripcion: string | null
+          development_plan_id: string | null
+          dimension_relacionada: string | null
+          fecha_deteccion: string | null
+          fuente: string
+          id: string
+          nivel: string
+          periodo_id: string
+          prioridad: string
+          topico: string
+          updated_at: string | null
+        }
+        Insert: {
+          accion_relacionada_id?: string | null
+          area: string
+          categoria: string
+          colaborador_id: string
+          created_at?: string | null
+          descripcion?: string | null
+          development_plan_id?: string | null
+          dimension_relacionada?: string | null
+          fecha_deteccion?: string | null
+          fuente: string
+          id?: string
+          nivel: string
+          periodo_id: string
+          prioridad: string
+          topico: string
+          updated_at?: string | null
+        }
+        Update: {
+          accion_relacionada_id?: string | null
+          area?: string
+          categoria?: string
+          colaborador_id?: string
+          created_at?: string | null
+          descripcion?: string | null
+          development_plan_id?: string | null
+          dimension_relacionada?: string | null
+          fecha_deteccion?: string | null
+          fuente?: string
+          id?: string
+          nivel?: string
+          periodo_id?: string
+          prioridad?: string
+          topico?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_topics_colaborador_id_fkey"
+            columns: ["colaborador_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["dpi"]
+          },
+          {
+            foreignKeyName: "training_topics_development_plan_id_fkey"
+            columns: ["development_plan_id"]
+            isOneToOne: false
+            referencedRelation: "development_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "training_topics_periodo_id_fkey"
+            columns: ["periodo_id"]
+            isOneToOne: false
+            referencedRelation: "evaluation_periods"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_assignments: {
         Row: {
           activo: boolean | null
@@ -898,6 +1138,7 @@ export type Database = {
           direccion_unidad: string | null
           dpi: string
           edad: number | null
+          es_externo: boolean | null
           estado: string
           fecha_ingreso: string | null
           fecha_nacimiento: string
@@ -906,6 +1147,7 @@ export type Database = {
           jefe_inmediato_id: string | null
           nivel: string
           nombre: string
+          password_hash: string | null
           primer_ingreso: boolean | null
           profesion: string | null
           renglon: string | null
@@ -925,6 +1167,7 @@ export type Database = {
           direccion_unidad?: string | null
           dpi: string
           edad?: number | null
+          es_externo?: boolean | null
           estado?: string
           fecha_ingreso?: string | null
           fecha_nacimiento: string
@@ -933,6 +1176,7 @@ export type Database = {
           jefe_inmediato_id?: string | null
           nivel: string
           nombre: string
+          password_hash?: string | null
           primer_ingreso?: boolean | null
           profesion?: string | null
           renglon?: string | null
@@ -952,6 +1196,7 @@ export type Database = {
           direccion_unidad?: string | null
           dpi?: string
           edad?: number | null
+          es_externo?: boolean | null
           estado?: string
           fecha_ingreso?: string | null
           fecha_nacimiento?: string
@@ -960,6 +1205,7 @@ export type Database = {
           jefe_inmediato_id?: string | null
           nivel?: string
           nombre?: string
+          password_hash?: string | null
           primer_ingreso?: boolean | null
           profesion?: string | null
           renglon?: string | null
@@ -1078,7 +1324,21 @@ export type Database = {
         Args: { fecha_ingreso: string }
         Returns: number
       }
+      calcular_dimensiones_colaborador: {
+        Args: { p_colaborador_dpi: string; p_periodo_id: string }
+        Returns: Json
+      }
       calcular_edad: { Args: { fecha_nacimiento_str: string }; Returns: number }
+      calculate_and_save_result: {
+        Args: {
+          p_autoevaluacion_id: string
+          p_colaborador_id: string
+          p_evaluacion_jefe_id: string
+          p_evaluador_id: string
+          p_periodo_id: string
+        }
+        Returns: undefined
+      }
       calculate_complete_final_result: {
         Args: {
           autoevaluacion_id: string
@@ -1090,6 +1350,20 @@ export type Database = {
       calculate_dimension_average: {
         Args: { dimension: Json; responses: Json }
         Returns: number
+      }
+      calculate_dimension_percentage: {
+        Args: { dimension: Json; responses: Json }
+        Returns: number
+      }
+      calculate_dimension_percentages: {
+        Args: {
+          auto_responses: Json
+          dimensiones_desempeno: Json
+          jefe_responses: Json
+          peso_auto?: number
+          peso_jefe?: number
+        }
+        Returns: Json
       }
       calculate_dimension_score: {
         Args: { dimension: Json; responses: Json }
@@ -1104,9 +1378,17 @@ export type Database = {
         }
         Returns: number
       }
+      calculate_municipal_average_by_dimension: {
+        Args: { nivel_param: string; periodo_id_param: string }
+        Returns: Json
+      }
       calculate_nine_box_position: {
         Args: { desempeno_final: number; potencial?: number }
         Returns: string
+      }
+      calculate_organizational_averages: {
+        Args: { periodo_id_param: string }
+        Returns: Json
       }
       calculate_performance_score: {
         Args: { dimensions: Json; responses: Json }
@@ -1115,6 +1397,15 @@ export type Database = {
       calculate_potential_score: {
         Args: { potencial_dimensions: Json; potencial_responses: Json }
         Returns: number
+      }
+      consolidate_responses_at_item_level: {
+        Args: {
+          auto_responses: Json
+          jefe_responses: Json
+          peso_auto?: number
+          peso_jefe?: number
+        }
+        Returns: Json
       }
       create_job_level: {
         Args: {
@@ -1126,10 +1417,39 @@ export type Database = {
         Returns: Json
       }
       delete_job_level: { Args: { p_code: string }; Returns: Json }
+      es_jefe_de_colaborador: {
+        Args: { colaborador_dpi_param: string; jefe_dpi_param: string }
+        Returns: boolean
+      }
       es_jefe_intermedio: { Args: { usuario_dpi: string }; Returns: boolean }
+      filter_dimensions_by_cargo: {
+        Args: { cargo: string; dimensions: Json; nivel: string }
+        Returns: Json
+      }
       formatear_antiguedad_legible: { Args: { meses: number }; Returns: string }
+      get_9box_cascada_filtrable: {
+        Args: {
+          filtro_jefe_dpi?: string
+          jefe_principal_dpi: string
+          periodo_id_param: string
+        }
+        Returns: Json
+      }
       get_9box_por_antiguedad: {
         Args: { periodo_id_param: string }
+        Returns: Json
+      }
+      get_9box_unidad_directa: {
+        Args: { periodo_id_param: string; usuario_dpi: string }
+        Returns: Json
+      }
+      get_9box_unidad_filtrable: {
+        Args: {
+          filtro_grupo_id?: string
+          filtro_jefe_dpi?: string
+          periodo_id_param: string
+          usuario_dpi: string
+        }
         Returns: Json
       }
       get_advanced_dashboard_stats: {
@@ -1158,6 +1478,11 @@ export type Database = {
         Args: { periodo_id_param: string }
         Returns: Json
       }
+      get_authenticated_user_dpi: { Args: never; Returns: string }
+      get_brechas_capacitacion: {
+        Args: { periodo_id_param: string }
+        Returns: Json
+      }
       get_category_from_job_level: {
         Args: { p_nivel: string }
         Returns: string
@@ -1166,11 +1491,23 @@ export type Database = {
         Args: { jefe_superior_dpi: string; periodo_id_param: string }
         Returns: Json
       }
+      get_comparativa_equipos_cascada: {
+        Args: { periodo_id_param: string; usuario_dpi: string }
+        Returns: Json
+      }
+      get_complete_colaborador_result: {
+        Args: { colaborador_id_param: string; periodo_id_param: string }
+        Returns: Json
+      }
       get_consolidated_result: {
         Args: { p_colaborador_id: string; p_periodo_id: string }
         Returns: Json
       }
       get_dashboard_stats: { Args: { periodo_id_param: string }; Returns: Json }
+      get_datos_correlacion: {
+        Args: { periodo_id_param: string }
+        Returns: Json
+      }
       get_desarrollo_metrics: {
         Args: { periodo_actual_id: string; periodo_anterior_id: string }
         Returns: Json
@@ -1179,9 +1516,21 @@ export type Database = {
         Args: { periodo_id_param: string }
         Returns: Json
       }
+      get_detalle_colaborador_completo: {
+        Args: { colaborador_dpi: string; periodo_id_param: string }
+        Returns: Json
+      }
       get_eligibility_stats: { Args: never; Returns: Json }
       get_equidad_completa_stats: {
         Args: { periodo_id_param: string }
+        Returns: Json
+      }
+      get_equipo_cascada_completo: {
+        Args: { jefe_dpi_param: string; periodo_id_param: string }
+        Returns: Json
+      }
+      get_equipo_directo_completo: {
+        Args: { jefe_dpi_param: string; periodo_id_param: string }
         Returns: Json
       }
       get_equipo_stats: {
@@ -1198,17 +1547,36 @@ export type Database = {
       }
       get_executive_kpis: { Args: { periodo_id_param: string }; Returns: Json }
       get_genero_stats: { Args: { periodo_id_param: string }; Returns: Json }
+      get_grupos_unidad: { Args: { usuario_dpi: string }; Returns: Json }
+      get_indices_equidad: { Args: { periodo_id_param: string }; Returns: Json }
       get_instrument_config: { Args: { instrument_id: string }; Returns: Json }
       get_instrument_config_from_user: {
         Args: { user_dpi: string }
         Returns: Json
       }
+      get_jefes_para_filtro: { Args: { usuario_dpi: string }; Returns: Json }
       get_jefes_subordinados: {
         Args: { jefe_superior_dpi: string }
         Returns: Json
       }
       get_jerarquia_abajo: { Args: { usuario_dpi: string }; Returns: Json }
       get_jerarquia_arriba: { Args: { usuario_dpi: string }; Returns: Json }
+      get_jerarquia_con_dimensiones: {
+        Args: { periodo_id_param: string; usuario_dpi: string }
+        Returns: Json
+      }
+      get_jerarquia_con_resultados: {
+        Args: { periodo_id_param: string; usuario_dpi: string }
+        Returns: Json
+      }
+      get_jerarquia_directa_con_dimensiones: {
+        Args: { periodo_id_param: string; usuario_dpi: string }
+        Returns: Json
+      }
+      get_jerarquia_directa_con_resultados: {
+        Args: { periodo_id_param: string; usuario_dpi: string }
+        Returns: Json
+      }
       get_job_level_info: { Args: { p_code: string }; Returns: Json }
       get_multiple_evaluators_stats: {
         Args: { periodo_id_param: string }
@@ -1224,12 +1592,32 @@ export type Database = {
         Returns: Json
       }
       get_personal_analytics: { Args: never; Returns: Json }
+      get_plan_capacitacion_area: {
+        Args: { area_param: string; periodo_id_param: string }
+        Returns: Json
+      }
+      get_plan_capacitacion_municipalidad: {
+        Args: { periodo_id_param: string }
+        Returns: Json
+      }
       get_progresion_desempeno: {
         Args: { periodo_actual_id: string; periodo_anterior_id: string }
         Returns: Json
       }
       get_promedio_equipo: {
         Args: { jefe_dpi: string; periodo_id_param: string }
+        Returns: Json
+      }
+      get_resultados_consolidados: {
+        Args: { periodo_id_param: string }
+        Returns: Json
+      }
+      get_resultados_globales: {
+        Args: { periodo_id_param: string }
+        Returns: Json
+      }
+      get_resumen_ejecutivo: {
+        Args: { periodo_id_param: string }
         Returns: Json
       }
       get_resumen_seguimiento: {
@@ -1239,6 +1627,44 @@ export type Database = {
       get_rotacion_stats: { Args: never; Returns: Json }
       get_seguimiento_evaluaciones: {
         Args: { periodo_id_param: string }
+        Returns: Json
+      }
+      get_stats_pdi: { Args: { periodo_id_param: string }; Returns: Json }
+      get_stats_por_antiguedad_completo: {
+        Args: { periodo_id_param: string }
+        Returns: Json
+      }
+      get_stats_por_dimension: {
+        Args: { periodo_id_param: string }
+        Returns: Json
+      }
+      get_stats_por_direccion: {
+        Args: { periodo_id_param: string }
+        Returns: Json
+      }
+      get_stats_por_genero_completo: {
+        Args: { periodo_id_param: string }
+        Returns: Json
+      }
+      get_stats_por_nivel: { Args: { periodo_id_param: string }; Returns: Json }
+      get_stats_por_rango_edad: {
+        Args: { periodo_id_param: string }
+        Returns: Json
+      }
+      get_stats_por_renglon: {
+        Args: { periodo_id_param: string }
+        Returns: Json
+      }
+      get_stats_por_tipo_puesto: {
+        Args: { periodo_id_param: string }
+        Returns: Json
+      }
+      get_stats_unidad_cascada: {
+        Args: { periodo_id_param: string; usuario_dpi: string }
+        Returns: Json
+      }
+      get_stats_unidad_directa: {
+        Args: { periodo_id_param: string; usuario_dpi: string }
         Returns: Json
       }
       get_tendencia_semanal: {
@@ -1254,6 +1680,15 @@ export type Database = {
         }
         Returns: Json
       }
+      get_topicos_frecuentes: {
+        Args: { limite_param?: number; periodo_id_param: string }
+        Returns: Json
+      }
+      get_topicos_por_area: {
+        Args: { area_param: string; periodo_id_param: string }
+        Returns: Json
+      }
+      jsonb_object_keys_count: { Args: { jsonb_obj: Json }; Returns: number }
       log_openai_api_call: {
         Args: {
           colaborador_id_param?: string
@@ -1270,11 +1705,35 @@ export type Database = {
         }
         Returns: string
       }
+      log_security_event: {
+        Args: {
+          action_param: string
+          error_message_param?: string
+          metadata_param?: Json
+          resource_id_param: string
+          resource_param: string
+          success_param: boolean
+        }
+        Returns: string
+      }
       migrate_single_result_to_multiple_evaluators: {
         Args: { p_colaborador_id: string; p_periodo_id: string }
         Returns: Json
       }
+      recalculate_pending_results: {
+        Args: { p_periodo_id?: string }
+        Returns: {
+          colaborador_id: string
+          evaluador_id: string
+          mensaje: string
+          resultado_calculado: boolean
+        }[]
+      }
       score_to_percentage: { Args: { score: number }; Returns: number }
+      tiene_rol_administrativo: {
+        Args: { user_dpi_param: string }
+        Returns: boolean
+      }
       update_job_level: {
         Args: {
           p_category: string

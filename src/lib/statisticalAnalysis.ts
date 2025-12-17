@@ -44,7 +44,7 @@ export interface DifferenceCategory {
   interpretacion: string;
 }
 
-interface EvaluationWithScore {
+export interface EvaluationWithScore {
   id: string;
   usuario_id: string;
   colaborador_id?: string;

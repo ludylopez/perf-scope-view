@@ -269,7 +269,7 @@ export function LollipopChart({
               <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
               <XAxis
                 dataKey="label"
-                tick={{ fontSize: 11, angle: -45, textAnchor: "end" }}
+                tick={{ fontSize: 11, angle: -45, textAnchor: "end" } as any}
                 interval={0}
                 height={60}
               />
